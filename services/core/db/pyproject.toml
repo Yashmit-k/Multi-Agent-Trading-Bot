@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "core-db"
+version = "1.0.0"
+description = "Persistence for the core trading platform. The only package that imports SQLAlchemy."
+requires-python = ">=3.12"
+dependencies = [
+    "contracts",
+    "sqlalchemy>=2.0",
+]
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.2"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/core_db"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/core_db" = "core_db"

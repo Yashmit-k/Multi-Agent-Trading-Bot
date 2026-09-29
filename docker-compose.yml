@@ -1,0 +1,80 @@
+# Developer 3 owns this file, including the health-only placeholders.
+# intelligence, quant, and frontend are stubs until those developers start.
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: core
+      POSTGRES_PASSWORD: core
+      POSTGRES_DB: core
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U core -d core"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  core-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.core
+    env_file: .env.example
+    environment:
+      DATABASE_URL: postgresql+psycopg://core:core@postgres:5432/core
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "8000:8000"
+
+  core-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.core
+    command: ["python", "-m", "core_worker"]
+    env_file: .env.example
+    environment:
+      DATABASE_URL: postgresql+psycopg://core:core@postgres:5432/core
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  intelligence:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.placeholder
+    environment:
+      SERVICE_NAME: intelligence
+    ports:
+      - "8101:8080"
+
+  quant:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.placeholder
+    environment:
+      SERVICE_NAME: quant
+    ports:
+      - "8102:8080"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.placeholder
+    environment:
+      SERVICE_NAME: frontend
+    ports:
+      - "8103:8080"

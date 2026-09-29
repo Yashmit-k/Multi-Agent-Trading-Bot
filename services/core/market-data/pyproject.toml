@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "core-market-data"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = ["contracts", "core-db"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/core_market_data"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/core_market_data" = "core_market_data"
