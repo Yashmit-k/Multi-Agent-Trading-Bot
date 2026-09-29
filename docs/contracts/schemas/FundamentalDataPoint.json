@@ -1,0 +1,78 @@
+{
+  "additionalProperties": false,
+  "description": "A reported metric that becomes usable at available_at, not announced_at.",
+  "properties": {
+    "announced_at": {
+      "format": "date-time",
+      "title": "Announced At",
+      "type": "string"
+    },
+    "available_at": {
+      "description": "First time a backtest may observe this point. Require available_at <= as_of.",
+      "format": "date-time",
+      "title": "Available At",
+      "type": "string"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "metric": {
+      "minLength": 1,
+      "title": "Metric",
+      "type": "string"
+    },
+    "period": {
+      "minLength": 1,
+      "title": "Period",
+      "type": "string"
+    },
+    "source": {
+      "minLength": 1,
+      "title": "Source",
+      "type": "string"
+    },
+    "source_id": {
+      "minLength": 1,
+      "title": "Source Id",
+      "type": "string"
+    },
+    "symbol": {
+      "minLength": 1,
+      "title": "Symbol",
+      "type": "string"
+    },
+    "unit": {
+      "minLength": 1,
+      "title": "Unit",
+      "type": "string"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        }
+      ],
+      "title": "Value"
+    }
+  },
+  "required": [
+    "symbol",
+    "metric",
+    "value",
+    "unit",
+    "period",
+    "announced_at",
+    "available_at",
+    "source",
+    "source_id",
+    "metadata"
+  ],
+  "title": "FundamentalDataPoint",
+  "type": "object"
+}

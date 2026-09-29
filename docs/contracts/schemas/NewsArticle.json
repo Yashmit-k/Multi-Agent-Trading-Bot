@@ -1,0 +1,78 @@
+{
+  "additionalProperties": false,
+  "description": "A retrieved article. retrieved_at is never a substitute for published_at.",
+  "properties": {
+    "article_id": {
+      "minLength": 1,
+      "title": "Article Id",
+      "type": "string"
+    },
+    "content_hash": {
+      "description": "sha256 hex of raw_text, used for duplicate detection.",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Content Hash",
+      "type": "string"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "published_at": {
+      "description": "Time the source published the article.",
+      "format": "date-time",
+      "title": "Published At",
+      "type": "string"
+    },
+    "raw_text": {
+      "minLength": 1,
+      "title": "Raw Text",
+      "type": "string"
+    },
+    "retrieved_at": {
+      "description": "Time this system obtained the article.",
+      "format": "date-time",
+      "title": "Retrieved At",
+      "type": "string"
+    },
+    "source": {
+      "minLength": 1,
+      "title": "Source",
+      "type": "string"
+    },
+    "symbols": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Symbols",
+      "type": "array"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "url": {
+      "format": "uri",
+      "minLength": 1,
+      "title": "Url",
+      "type": "string"
+    }
+  },
+  "required": [
+    "article_id",
+    "source",
+    "title",
+    "url",
+    "published_at",
+    "retrieved_at",
+    "content_hash",
+    "symbols",
+    "raw_text",
+    "metadata"
+  ],
+  "title": "NewsArticle",
+  "type": "object"
+}
