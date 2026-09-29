@@ -1,0 +1,124 @@
+{
+  "$defs": {
+    "RiskCheck": {
+      "additionalProperties": false,
+      "description": "One named risk check and whether it passed.",
+      "properties": {
+        "detail": {
+          "minLength": 1,
+          "title": "Detail",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "pattern": "^[a-z0-9_.]+$",
+          "title": "Name",
+          "type": "string"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "passed",
+        "detail"
+      ],
+      "title": "RiskCheck",
+      "type": "object"
+    },
+    "RiskStatus": {
+      "enum": [
+        "APPROVED",
+        "REJECTED"
+      ],
+      "title": "RiskStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Approval or rejection of a proposal. Execution starts only after APPROVED.",
+  "properties": {
+    "approved_price": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Approved Price"
+    },
+    "approved_quantity": {
+      "minimum": 0,
+      "title": "Approved Quantity",
+      "type": "integer"
+    },
+    "checks": {
+      "items": {
+        "$ref": "#/$defs/RiskCheck"
+      },
+      "title": "Checks",
+      "type": "array"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "proposal_id": {
+      "minLength": 1,
+      "title": "Proposal Id",
+      "type": "string"
+    },
+    "rejection_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Rejection Reason"
+    },
+    "risk_decision_id": {
+      "minLength": 1,
+      "title": "Risk Decision Id",
+      "type": "string"
+    },
+    "risk_version": {
+      "minLength": 1,
+      "title": "Risk Version",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/RiskStatus"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    }
+  },
+  "required": [
+    "risk_decision_id",
+    "proposal_id",
+    "timestamp",
+    "status",
+    "risk_version",
+    "checks",
+    "rejection_reason",
+    "approved_quantity",
+    "approved_price",
+    "metadata"
+  ],
+  "title": "RiskDecision",
+  "type": "object"
+}

@@ -1,0 +1,49 @@
+{
+  "$defs": {
+    "AlertSeverity": {
+      "enum": [
+        "info",
+        "warning",
+        "critical"
+      ],
+      "title": "AlertSeverity",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Operational alert published on system.events.",
+  "properties": {
+    "alert_id": {
+      "minLength": 1,
+      "title": "Alert Id",
+      "type": "string"
+    },
+    "message": {
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "severity": {
+      "$ref": "#/$defs/AlertSeverity"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    }
+  },
+  "required": [
+    "alert_id",
+    "severity",
+    "message",
+    "timestamp",
+    "metadata"
+  ],
+  "title": "SystemAlert",
+  "type": "object"
+}

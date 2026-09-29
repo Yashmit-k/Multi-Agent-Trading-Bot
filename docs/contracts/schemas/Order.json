@@ -1,0 +1,165 @@
+{
+  "$defs": {
+    "Exchange": {
+      "enum": [
+        "NSE",
+        "BSE"
+      ],
+      "title": "Exchange",
+      "type": "string"
+    },
+    "OrderStatus": {
+      "enum": [
+        "CREATED",
+        "VALIDATED",
+        "RISK_APPROVED",
+        "SUBMITTED",
+        "OPEN",
+        "PARTIALLY_FILLED",
+        "FILLED",
+        "CANCELLED",
+        "REJECTED",
+        "EXPIRED",
+        "FAILED"
+      ],
+      "title": "OrderStatus",
+      "type": "string"
+    },
+    "OrderType": {
+      "enum": [
+        "MARKET",
+        "LIMIT",
+        "STOP_LOSS",
+        "STOP_LOSS_MARKET"
+      ],
+      "title": "OrderType",
+      "type": "string"
+    },
+    "Side": {
+      "enum": [
+        "BUY",
+        "SELL"
+      ],
+      "title": "Side",
+      "type": "string"
+    },
+    "TradingMode": {
+      "enum": [
+        "BACKTEST",
+        "PAPER",
+        "SHADOW",
+        "LIVE"
+      ],
+      "title": "TradingMode",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Broker-facing order state. Prices that do not apply to the type are null.",
+  "properties": {
+    "client_order_id": {
+      "minLength": 1,
+      "title": "Client Order Id",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "exchange": {
+      "$ref": "#/$defs/Exchange"
+    },
+    "limit_price": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Limit Price"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "order_id": {
+      "minLength": 1,
+      "title": "Order Id",
+      "type": "string"
+    },
+    "order_type": {
+      "$ref": "#/$defs/OrderType"
+    },
+    "proposal_id": {
+      "minLength": 1,
+      "title": "Proposal Id",
+      "type": "string"
+    },
+    "quantity": {
+      "exclusiveMinimum": 0,
+      "title": "Quantity",
+      "type": "integer"
+    },
+    "side": {
+      "$ref": "#/$defs/Side"
+    },
+    "status": {
+      "$ref": "#/$defs/OrderStatus"
+    },
+    "stop_price": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Stop Price"
+    },
+    "symbol": {
+      "minLength": 1,
+      "title": "Symbol",
+      "type": "string"
+    },
+    "trading_mode": {
+      "$ref": "#/$defs/TradingMode"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "order_id",
+    "client_order_id",
+    "proposal_id",
+    "symbol",
+    "exchange",
+    "side",
+    "order_type",
+    "quantity",
+    "limit_price",
+    "stop_price",
+    "trading_mode",
+    "status",
+    "created_at",
+    "updated_at",
+    "metadata"
+  ],
+  "title": "Order",
+  "type": "object"
+}
