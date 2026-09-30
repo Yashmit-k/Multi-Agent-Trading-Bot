@@ -1,0 +1,32 @@
+{
+  "additionalProperties": false,
+  "description": "Acknowledgement from the signal sink. duplicate submissions are not accepted.",
+  "properties": {
+    "accepted": {
+      "title": "Accepted",
+      "type": "boolean"
+    },
+    "duplicate": {
+      "title": "Duplicate",
+      "type": "boolean"
+    },
+    "message": {
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+    },
+    "signal_id": {
+      "minLength": 1,
+      "title": "Signal Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "accepted",
+    "signal_id",
+    "duplicate",
+    "message"
+  ],
+  "title": "SubmissionResult",
+  "type": "object"
+}

@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "description": "One named risk check and whether it passed.",
+  "properties": {
+    "detail": {
+      "minLength": 1,
+      "title": "Detail",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "pattern": "^[a-z0-9_.]+$",
+      "title": "Name",
+      "type": "string"
+    },
+    "passed": {
+      "title": "Passed",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "name",
+    "passed",
+    "detail"
+  ],
+  "title": "RiskCheck",
+  "type": "object"
+}

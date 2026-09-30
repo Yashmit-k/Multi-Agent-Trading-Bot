@@ -1,0 +1,56 @@
+name: quant-frontend
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  quant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install quant
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "packages/contracts[dev]"
+          python -m pip install -e "services/quant[dev]"
+      - name: Unit tests
+        run: python -m pytest services/quant/tests/unit -q
+      - name: Integration (core_features)
+        run: |
+          python -m pip install -e services/core/feature-engine
+          python -m pytest services/quant/tests/integration -m integration -q
+
+  mock-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          python -m pip install -e "packages/contracts[dev]" fastapi httpx
+          PYTHONPATH=apps/frontend/mock-api:packages/contracts/src python -m pytest apps/frontend/mock-api/test_mock_api.py -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - working-directory: apps/frontend
+        run: |
+          npm install
+          npm run gen:types
+          npm test
+      - name: Drift check generated contracts
+        run: |
+          git add -A apps/frontend/src/contracts/generated apps/frontend/mock-api/openapi.json
+          git diff --cached --exit-code apps/frontend/src/contracts/generated apps/frontend/mock-api/openapi.json || true
+          python apps/frontend/mock-api/export_openapi.py || python -c "import json,sys; from pathlib import Path; sys.path.insert(0,'apps/frontend/mock-api'); sys.path.insert(0,'packages/contracts/src'); from app import app; Path('apps/frontend/mock-api/openapi.json').write_text(json.dumps(app.openapi(), indent=2))"
+          node apps/frontend/scripts/gen-types.mjs
+          git diff --exit-code apps/frontend/src/contracts/generated
