@@ -9,7 +9,7 @@ export function apiUrl(path: string): string {
 }
 
 export async function fetchApi<T>(path: string): Promise<T> {
-  const response = await fetch(apiUrl(path));
+  const response = await fetch(apiUrl(path), { signal: AbortSignal.timeout(4000) });
   if (response.status === 501) {
     throw new Error("not_implemented");
   }

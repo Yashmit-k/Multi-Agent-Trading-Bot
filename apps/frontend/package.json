@@ -2,7 +2,8 @@
   "name": "trading-frontend",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbopack -H 127.0.0.1 -p 3000 --disable-source-maps",
+    "dev:prod": "next build && next start -H 127.0.0.1 -p 3000",
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
