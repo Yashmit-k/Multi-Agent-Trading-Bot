@@ -29,19 +29,9 @@ LATER_ROUTES: tuple[tuple[str, str], ...] = (
     ("GET", "/api/v1/stocks/{symbol}/fundamentals"),
     ("GET", "/api/v1/signals"),
     ("GET", "/api/v1/signals/{symbol}"),
-    ("GET", "/api/v1/decisions"),
-    ("GET", "/api/v1/decisions/{id}"),
-    ("GET", "/api/v1/risk/status"),
-    ("GET", "/api/v1/portfolio"),
-    ("GET", "/api/v1/positions"),
-    ("GET", "/api/v1/orders"),
-    ("GET", "/api/v1/trades"),
     ("GET", "/api/v1/performance"),
     ("POST", "/api/v1/backtests"),
     ("GET", "/api/v1/backtests/{id}"),
-    ("GET", "/api/v1/paper/status"),
-    ("POST", "/api/v1/paper/start"),
-    ("POST", "/api/v1/paper/stop"),
     ("GET", "/api/v1/zerodha/status"),
     ("GET", "/api/v1/zerodha/connect"),
     ("GET", "/api/v1/zerodha/callback"),
@@ -149,6 +139,58 @@ def create_app(
             skew_seconds=resolved.max_clock_skew_seconds,
         )
 
+    @app.get("/api/v1/decisions")
+    def decisions(_: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in repository.list_proposals()]
+
+    @app.get("/api/v1/decisions/{proposal_id}")
+    def decision(proposal_id: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        proposal = repository.get_proposal(proposal_id)
+        if proposal is None:
+            raise HTTPException(status_code=404, detail="unknown_proposal")
+        return proposal.model_dump(mode="json")
+
+    @app.get("/api/v1/risk/status")
+    def risk_status(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        decisions_stored = repository.list_risk_decisions()
+        latest = max(decisions_stored, key=lambda item: item.timestamp) if decisions_stored else None
+        return {
+            "risk_version": "1.0.0",
+            "kill_switch": "noop",
+            "latest": None if latest is None else latest.model_dump(mode="json"),
+        }
+
+    @app.get("/api/v1/portfolio")
+    def portfolio(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        snapshot = repository.latest_snapshot()
+        return {"snapshot": None if snapshot is None else snapshot.model_dump(mode="json")}
+
+    @app.get("/api/v1/positions")
+    def positions(_: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in repository.list_positions()]
+
+    @app.get("/api/v1/orders")
+    def orders(_: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in repository.list_orders()]
+
+    @app.get("/api/v1/trades")
+    def trades(_: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in repository.list_executions()]
+
+    @app.get("/api/v1/paper/status")
+    def paper_status(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        return _paper_body(repository, resolved)
+
+    @app.post("/api/v1/paper/start")
+    def paper_start(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        repository.set_paper_running(True)
+        return _paper_body(repository, resolved)
+
+    @app.post("/api/v1/paper/stop")
+    def paper_stop(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        repository.set_paper_running(False)
+        return _paper_body(repository, resolved)
+
     for method, path in LATER_ROUTES:
         app.add_api_route(
             path,
@@ -159,6 +201,15 @@ def create_app(
         )
 
     return app
+
+
+def _paper_body(repository: CoreRepository, settings: Settings) -> dict[str, object]:
+    return {
+        "running": repository.paper_running(),
+        "trading_mode": settings.trading_mode.value,
+        "starting_cash": str(settings.paper_starting_cash),
+        "kill_switch": "noop",
+    }
 
 
 def _instrument_body(item: object) -> dict[str, object]:

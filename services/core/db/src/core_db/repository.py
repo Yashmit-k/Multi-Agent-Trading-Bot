@@ -7,17 +7,31 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from contracts.enums import Exchange, Timeframe
+from contracts.schemas.agent_signal import AgentSignal
+from contracts.schemas.execution import Execution
 from contracts.schemas.feature_set import FeatureSet
 from contracts.schemas.market import Candle
+from contracts.schemas.order import Order
+from contracts.schemas.portfolio import PortfolioSnapshot
+from contracts.schemas.position import Position
+from contracts.schemas.risk_decision import RiskDecision
+from contracts.schemas.trade_proposal import TradeProposal
 from core_db.clock import as_utc
 from core_db.models import (
     AgentSignalRow,
     AuditLogRow,
     CandleRow,
+    ExecutionRow,
     FeatureRow,
     InstrumentRow,
     MarketTickRow,
+    OrderRow,
+    PortfolioSnapshotRow,
+    PositionRow,
+    RiskDecisionRow,
+    RuntimeFlagRow,
     SignalRejectionRow,
+    TradeProposalRow,
     UniverseMembershipRow,
 )
 from core_db.records import InstrumentRecord, TickRecord
@@ -352,6 +366,241 @@ class CoreRepository:
     def signal_count(self) -> int:
         with self._session_factory() as session:
             return len(list(session.scalars(select(AgentSignalRow))))
+
+    def signals_for(self, symbol: str) -> list[AgentSignal]:
+        name = symbol.strip().upper()
+        with self._session_factory() as session:
+            rows = session.scalars(select(AgentSignalRow).where(AgentSignalRow.symbol == name))
+            return [AgentSignal.model_validate(dict(row.payload)) for row in rows]
+
+    def latest_candle(self, symbol: str, timeframe: Timeframe | str) -> Candle | None:
+        """Latest stored bar for this symbol and timeframe. Stored bars are already complete."""
+        parsed = timeframe if isinstance(timeframe, Timeframe) else Timeframe(timeframe)
+        with self._session_factory() as session:
+            rows = list(
+                session.scalars(
+                    select(CandleRow).where(
+                        CandleRow.symbol == symbol.strip().upper(),
+                        CandleRow.timeframe == parsed.value,
+                    )
+                )
+            )
+        if not rows:
+            return None
+        return _candle(max(rows, key=lambda item: as_utc(item.end)))
+
+    def insert_proposal(self, proposal: TradeProposal) -> bool:
+        instrument = self._require_instrument(proposal.symbol)
+        with self._session_factory() as session:
+            if session.get(TradeProposalRow, proposal.proposal_id) is not None:
+                return False
+            session.add(
+                TradeProposalRow(
+                    proposal_id=proposal.proposal_id,
+                    instrument_id=instrument.instrument_id,
+                    symbol=proposal.symbol,
+                    horizon=proposal.horizon.value,
+                    as_of=as_utc(proposal.timestamp),
+                    payload=proposal.model_dump(mode="json"),
+                )
+            )
+            session.commit()
+            return True
+
+    def get_proposal(self, proposal_id: str) -> TradeProposal | None:
+        with self._session_factory() as session:
+            row = session.get(TradeProposalRow, proposal_id)
+            return TradeProposal.model_validate(dict(row.payload)) if row else None
+
+    def proposal_instrument_id(self, proposal_id: str) -> str | None:
+        with self._session_factory() as session:
+            row = session.get(TradeProposalRow, proposal_id)
+            return row.instrument_id if row else None
+
+    def list_proposals(self) -> list[TradeProposal]:
+        with self._session_factory() as session:
+            rows = session.scalars(select(TradeProposalRow).order_by(TradeProposalRow.as_of, TradeProposalRow.proposal_id))
+            return [TradeProposal.model_validate(dict(row.payload)) for row in rows]
+
+    def insert_risk_decision(self, decision: RiskDecision) -> bool:
+        proposal = self.get_proposal(decision.proposal_id)
+        if proposal is None:
+            raise KeyError(decision.proposal_id)
+        instrument = self._require_instrument(proposal.symbol)
+        with self._session_factory() as session:
+            if session.scalar(select(RiskDecisionRow).where(RiskDecisionRow.proposal_id == decision.proposal_id)) is not None:
+                return False
+            session.add(
+                RiskDecisionRow(
+                    risk_decision_id=decision.risk_decision_id,
+                    proposal_id=decision.proposal_id,
+                    instrument_id=instrument.instrument_id,
+                    payload=decision.model_dump(mode="json"),
+                )
+            )
+            session.commit()
+            return True
+
+    def risk_for_proposal(self, proposal_id: str) -> RiskDecision | None:
+        with self._session_factory() as session:
+            row = session.scalar(select(RiskDecisionRow).where(RiskDecisionRow.proposal_id == proposal_id))
+            return RiskDecision.model_validate(dict(row.payload)) if row else None
+
+    def list_risk_decisions(self) -> list[RiskDecision]:
+        with self._session_factory() as session:
+            rows = session.scalars(select(RiskDecisionRow).order_by(RiskDecisionRow.risk_decision_id))
+            return [RiskDecision.model_validate(dict(row.payload)) for row in rows]
+
+    def insert_order(self, order: Order) -> bool:
+        instrument = self._require_instrument(order.symbol)
+        with self._session_factory() as session:
+            if session.scalar(select(OrderRow).where(OrderRow.proposal_id == order.proposal_id)) is not None:
+                return False
+            session.add(
+                OrderRow(
+                    order_id=order.order_id,
+                    proposal_id=order.proposal_id,
+                    instrument_id=instrument.instrument_id,
+                    payload=order.model_dump(mode="json"),
+                )
+            )
+            session.commit()
+            return True
+
+    def order_for_proposal(self, proposal_id: str) -> Order | None:
+        with self._session_factory() as session:
+            row = session.scalar(select(OrderRow).where(OrderRow.proposal_id == proposal_id))
+            return Order.model_validate(dict(row.payload)) if row else None
+
+    def order_instrument_id(self, order_id: str) -> str | None:
+        with self._session_factory() as session:
+            row = session.get(OrderRow, order_id)
+            return row.instrument_id if row else None
+
+    def list_orders(self) -> list[Order]:
+        with self._session_factory() as session:
+            rows = session.scalars(select(OrderRow).order_by(OrderRow.order_id))
+            return [Order.model_validate(dict(row.payload)) for row in rows]
+
+    def insert_execution(self, execution: Execution) -> bool:
+        order = self._order_row_instrument(execution.order_id)
+        if order is None:
+            raise KeyError(execution.order_id)
+        with self._session_factory() as session:
+            if session.scalar(select(ExecutionRow).where(ExecutionRow.order_id == execution.order_id)) is not None:
+                return False
+            session.add(
+                ExecutionRow(
+                    execution_id=execution.execution_id,
+                    order_id=execution.order_id,
+                    instrument_id=order,
+                    payload=execution.model_dump(mode="json"),
+                )
+            )
+            session.commit()
+            return True
+
+    def list_executions(self) -> list[Execution]:
+        with self._session_factory() as session:
+            rows = session.scalars(select(ExecutionRow).order_by(ExecutionRow.execution_id))
+            return [Execution.model_validate(dict(row.payload)) for row in rows]
+
+    def execution_count(self) -> int:
+        with self._session_factory() as session:
+            return len(list(session.scalars(select(ExecutionRow))))
+
+    def save_position(self, position: Position) -> str:
+        instrument = self._require_instrument(position.symbol)
+        payload = position.model_dump(mode="json")
+        with self._session_factory() as session:
+            row = session.get(PositionRow, instrument.instrument_id)
+            if row is None:
+                session.add(PositionRow(instrument_id=instrument.instrument_id, symbol=position.symbol, payload=payload))
+            else:
+                row.symbol = position.symbol
+                row.payload = payload
+            session.commit()
+        return instrument.instrument_id
+
+    def position_for(self, symbol: str) -> Position | None:
+        instrument = self.get_by_symbol(symbol)
+        if instrument is None:
+            return None
+        with self._session_factory() as session:
+            row = session.get(PositionRow, instrument.instrument_id)
+            return Position.model_validate(dict(row.payload)) if row else None
+
+    def held_quantity(self, symbol: str) -> int:
+        position = self.position_for(symbol)
+        return 0 if position is None else position.quantity
+
+    def list_positions(self) -> list[Position]:
+        with self._session_factory() as session:
+            rows = session.scalars(select(PositionRow).order_by(PositionRow.symbol))
+            return [Position.model_validate(dict(row.payload)) for row in rows]
+
+    def insert_snapshot(self, snapshot_id: str, snapshot: PortfolioSnapshot) -> None:
+        with self._session_factory() as session:
+            if session.get(PortfolioSnapshotRow, snapshot_id) is not None:
+                return
+            session.add(
+                PortfolioSnapshotRow(
+                    snapshot_id=snapshot_id,
+                    timestamp=as_utc(snapshot.timestamp),
+                    payload=snapshot.model_dump(mode="json"),
+                )
+            )
+            session.commit()
+
+    def latest_snapshot(self) -> PortfolioSnapshot | None:
+        with self._session_factory() as session:
+            rows = list(session.scalars(select(PortfolioSnapshotRow)))
+        if not rows:
+            return None
+        row = max(rows, key=lambda item: (as_utc(item.timestamp), item.snapshot_id))
+        return PortfolioSnapshot.model_validate(dict(row.payload))
+
+    def cash_balance(self, starting_cash: Decimal) -> Decimal:
+        snapshot = self.latest_snapshot()
+        return starting_cash if snapshot is None else snapshot.cash
+
+    def paper_running(self) -> bool:
+        with self._session_factory() as session:
+            row = session.get(RuntimeFlagRow, "paper")
+            return True if row is None else bool(row.paper_running)
+
+    def set_paper_running(self, running: bool) -> bool:
+        with self._session_factory() as session:
+            row = session.get(RuntimeFlagRow, "paper")
+            if row is None:
+                session.add(RuntimeFlagRow(flag_id="paper", paper_running=running, peak_equity=None))
+            else:
+                row.paper_running = running
+            session.commit()
+        return running
+
+    def note_peak_equity(self, equity: Decimal) -> Decimal:
+        with self._session_factory() as session:
+            row = session.get(RuntimeFlagRow, "paper")
+            if row is None:
+                session.add(RuntimeFlagRow(flag_id="paper", paper_running=True, peak_equity=equity))
+                session.commit()
+                return equity
+            peak = equity if row.peak_equity is None else max(row.peak_equity, equity)
+            row.peak_equity = peak
+            session.commit()
+            return peak
+
+    def _require_instrument(self, symbol: str) -> InstrumentRecord:
+        instrument = self.get_by_symbol(symbol)
+        if instrument is None:
+            raise KeyError(symbol)
+        return instrument
+
+    def _order_row_instrument(self, order_id: str) -> str | None:
+        with self._session_factory() as session:
+            row = session.get(OrderRow, order_id)
+            return row.instrument_id if row else None
 
 
 def _instrument(row: InstrumentRow) -> InstrumentRecord:

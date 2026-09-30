@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "core-fusion"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = ["contracts"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/core_fusion"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/core_fusion" = "core_fusion"
