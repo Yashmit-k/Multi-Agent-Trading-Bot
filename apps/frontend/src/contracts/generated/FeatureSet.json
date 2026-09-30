@@ -1,0 +1,73 @@
+{
+  "$defs": {
+    "Timeframe": {
+      "enum": [
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "1d"
+      ],
+      "title": "Timeframe",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Versioned features for one symbol and timeframe.",
+  "properties": {
+    "feature_version": {
+      "minLength": 1,
+      "title": "Feature Version",
+      "type": "string"
+    },
+    "features": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
+      },
+      "title": "Features",
+      "type": "object"
+    },
+    "source_data_timestamp": {
+      "format": "date-time",
+      "title": "Source Data Timestamp",
+      "type": "string"
+    },
+    "symbol": {
+      "minLength": 1,
+      "title": "Symbol",
+      "type": "string"
+    },
+    "timeframe": {
+      "$ref": "#/$defs/Timeframe"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    }
+  },
+  "required": [
+    "symbol",
+    "timestamp",
+    "timeframe",
+    "feature_version",
+    "features",
+    "source_data_timestamp"
+  ],
+  "title": "FeatureSet",
+  "type": "object"
+}
