@@ -1,0 +1,50 @@
+{
+  "$defs": {
+    "AgentName": {
+      "enum": [
+        "technical",
+        "momentum",
+        "mean_reversion",
+        "volume",
+        "regime",
+        "ml",
+        "news",
+        "fundamental",
+        "valuation",
+        "earnings"
+      ],
+      "title": "AgentName",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Liveness record from one canonical agent.",
+  "properties": {
+    "agent_name": {
+      "$ref": "#/$defs/AgentName"
+    },
+    "agent_version": {
+      "minLength": 1,
+      "title": "Agent Version",
+      "type": "string"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    }
+  },
+  "required": [
+    "agent_name",
+    "agent_version",
+    "timestamp",
+    "metadata"
+  ],
+  "title": "AgentHeartbeat",
+  "type": "object"
+}
