@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "core-paper"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = ["contracts", "core-db", "core-fusion", "core-decision", "core-risk"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/core_paper"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/core_paper" = "core_paper"

@@ -193,7 +193,10 @@ def test_worker_replay_and_api(repository: CoreRepository) -> None:
     assert status.status_code == 200
     assert status.json()["live_enabled"] is False
     assert status.json()["exchange_scope"] == "NSE"
-    later = client.get("/api/v1/portfolio", headers={"Authorization": "Bearer core"})
+    portfolio = client.get("/api/v1/portfolio", headers={"Authorization": "Bearer core"})
+    assert portfolio.status_code == 200
+    assert portfolio.json()["snapshot"] is None
+    later = client.get("/api/v1/performance", headers={"Authorization": "Bearer core"})
     assert later.status_code == 501
     signal = sample_agent_signal("HDFCBANK")
     created = client.post(

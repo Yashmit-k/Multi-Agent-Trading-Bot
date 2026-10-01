@@ -39,6 +39,10 @@ jobs:
           python -m pip install -e services/core/feature-engine
           python -m pip install -e services/core/signal-ingestion
           python -m pip install -e services/core/market-data
+          python -m pip install -e services/core/signal-fusion
+          python -m pip install -e services/core/decision-engine
+          python -m pip install -e services/core/risk-engine
+          python -m pip install -e services/core/paper-execution
           python -m pip install -e services/core/worker
           python -m pip install -e services/core/api
       - name: Test

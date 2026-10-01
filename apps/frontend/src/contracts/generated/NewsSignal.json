@@ -1,0 +1,126 @@
+{
+  "$defs": {
+    "AgentName": {
+      "enum": [
+        "technical",
+        "momentum",
+        "mean_reversion",
+        "volume",
+        "regime",
+        "ml",
+        "news",
+        "fundamental",
+        "valuation",
+        "earnings"
+      ],
+      "title": "AgentName",
+      "type": "string"
+    },
+    "Horizon": {
+      "enum": [
+        "INTRADAY",
+        "SWING",
+        "LONG_TERM"
+      ],
+      "title": "Horizon",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Sentiment and impact for one symbol, derived from one article.",
+  "properties": {
+    "agent_name": {
+      "$ref": "#/$defs/AgentName"
+    },
+    "agent_version": {
+      "minLength": 1,
+      "title": "Agent Version",
+      "type": "string"
+    },
+    "article_id": {
+      "minLength": 1,
+      "title": "Article Id",
+      "type": "string"
+    },
+    "as_of": {
+      "format": "date-time",
+      "title": "As Of",
+      "type": "string"
+    },
+    "confidence": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "event_type": {
+      "minLength": 1,
+      "pattern": "^[a-z0-9_.]+$",
+      "title": "Event Type",
+      "type": "string"
+    },
+    "horizon": {
+      "$ref": "#/$defs/Horizon"
+    },
+    "impact": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Impact",
+      "type": "number"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "reason_codes": {
+      "items": {
+        "minLength": 1,
+        "pattern": "^[a-z0-9_.]+$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Reason Codes",
+      "type": "array"
+    },
+    "sentiment": {
+      "maximum": 1,
+      "minimum": -1,
+      "title": "Sentiment",
+      "type": "number"
+    },
+    "signal_id": {
+      "minLength": 1,
+      "title": "Signal Id",
+      "type": "string"
+    },
+    "symbol": {
+      "minLength": 1,
+      "title": "Symbol",
+      "type": "string"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    }
+  },
+  "required": [
+    "signal_id",
+    "article_id",
+    "symbol",
+    "timestamp",
+    "as_of",
+    "agent_name",
+    "agent_version",
+    "sentiment",
+    "impact",
+    "confidence",
+    "event_type",
+    "horizon",
+    "reason_codes",
+    "metadata"
+  ],
+  "title": "NewsSignal",
+  "type": "object"
+}

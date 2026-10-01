@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "core-decision"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = ["contracts", "core-fusion"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/core_decision"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/core_decision" = "core_decision"

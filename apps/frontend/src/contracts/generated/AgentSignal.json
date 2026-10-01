@@ -1,0 +1,153 @@
+{
+  "$defs": {
+    "AgentName": {
+      "enum": [
+        "technical",
+        "momentum",
+        "mean_reversion",
+        "volume",
+        "regime",
+        "ml",
+        "news",
+        "fundamental",
+        "valuation",
+        "earnings"
+      ],
+      "title": "AgentName",
+      "type": "string"
+    },
+    "Exchange": {
+      "enum": [
+        "NSE",
+        "BSE"
+      ],
+      "title": "Exchange",
+      "type": "string"
+    },
+    "Horizon": {
+      "enum": [
+        "INTRADAY",
+        "SWING",
+        "LONG_TERM"
+      ],
+      "title": "Horizon",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A directional view from one agent. It is not an order.",
+  "properties": {
+    "agent_name": {
+      "$ref": "#/$defs/AgentName"
+    },
+    "agent_version": {
+      "minLength": 1,
+      "title": "Agent Version",
+      "type": "string"
+    },
+    "as_of": {
+      "format": "date-time",
+      "title": "As Of",
+      "type": "string"
+    },
+    "confidence": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "exchange": {
+      "$ref": "#/$defs/Exchange"
+    },
+    "features": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
+      },
+      "title": "Features",
+      "type": "object"
+    },
+    "horizon": {
+      "$ref": "#/$defs/Horizon"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "description": "Enough context to reproduce why the signal was generated.",
+      "title": "Metadata",
+      "type": "object"
+    },
+    "reason_codes": {
+      "items": {
+        "minLength": 1,
+        "pattern": "^[a-z0-9_.]+$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Reason Codes",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "signal": {
+      "description": "Directional score in [-1, 1].",
+      "maximum": 1,
+      "minimum": -1,
+      "title": "Signal",
+      "type": "number"
+    },
+    "signal_id": {
+      "minLength": 1,
+      "title": "Signal Id",
+      "type": "string"
+    },
+    "symbol": {
+      "minLength": 1,
+      "title": "Symbol",
+      "type": "string"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "valid_until": {
+      "format": "date-time",
+      "title": "Valid Until",
+      "type": "string"
+    }
+  },
+  "required": [
+    "signal_id",
+    "symbol",
+    "exchange",
+    "agent_name",
+    "agent_version",
+    "timestamp",
+    "as_of",
+    "horizon",
+    "signal",
+    "confidence",
+    "valid_until",
+    "reason_codes",
+    "features",
+    "metadata"
+  ],
+  "title": "AgentSignal",
+  "type": "object"
+}

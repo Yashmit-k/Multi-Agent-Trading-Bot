@@ -6,6 +6,8 @@ Other services call `CoreRepository`. They do not import SQLAlchemy models. Time
 
 Phase 1–2 ingestion is NSE-only. `instruments.instrument_id` is the internal identity. `exchange`, `symbol`, `trading_symbol`, and `instrument_token` are attributes.
 
+Phase 4 stores proposals, risk decisions, orders, and positions on that existing `instrument_id`. The repository resolves the NSE symbol to the row and stores that ID. It does not build `instrument_id` from the symbol string.
+
 ## Migrations
 
 Alembic revisions are a shared contract. Review them with the same pull-request gate as `packages/contracts`.

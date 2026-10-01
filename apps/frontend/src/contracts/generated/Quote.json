@@ -1,0 +1,56 @@
+{
+  "$defs": {
+    "Exchange": {
+      "enum": [
+        "NSE",
+        "BSE"
+      ],
+      "title": "Exchange",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Last traded price visible at timestamp.",
+  "properties": {
+    "exchange": {
+      "$ref": "#/$defs/Exchange"
+    },
+    "last_price": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0.0,
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        }
+      ],
+      "title": "Last Price"
+    },
+    "symbol": {
+      "minLength": 1,
+      "title": "Symbol",
+      "type": "string"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "volume": {
+      "minimum": 0,
+      "title": "Volume",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "symbol",
+    "exchange",
+    "timestamp",
+    "last_price",
+    "volume"
+  ],
+  "title": "Quote",
+  "type": "object"
+}

@@ -9,3 +9,6 @@ venv/
 dist/
 build/
 .DS_Store
+node_modules/
+.next/
+.env.local
