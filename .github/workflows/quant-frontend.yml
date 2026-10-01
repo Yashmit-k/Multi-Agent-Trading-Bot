@@ -47,6 +47,11 @@ jobs:
           npm install
           npm run gen:types
           npm test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install mock API dependencies
+        run: python -m pip install -e "packages/contracts[dev]" fastapi httpx
       - name: Drift check generated contracts
         run: |
           git add -A apps/frontend/src/contracts/generated apps/frontend/mock-api/openapi.json
