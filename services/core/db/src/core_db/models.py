@@ -3,7 +3,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, DateTime, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -122,3 +122,65 @@ class SystemEventRow(Base):
     event_type: Mapped[str] = mapped_column(String(64), nullable=False)
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class TradeProposalRow(Base):
+    __tablename__ = "trade_proposals"
+
+    proposal_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    instrument_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    horizon: Mapped[str] = mapped_column(String(16), nullable=False)
+    as_of: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class RiskDecisionRow(Base):
+    __tablename__ = "risk_decisions"
+
+    risk_decision_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    proposal_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    instrument_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class OrderRow(Base):
+    __tablename__ = "orders"
+
+    order_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    proposal_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    instrument_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class ExecutionRow(Base):
+    __tablename__ = "executions"
+
+    execution_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    order_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    instrument_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class PositionRow(Base):
+    __tablename__ = "positions"
+
+    instrument_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class PortfolioSnapshotRow(Base):
+    __tablename__ = "portfolio_snapshots"
+
+    snapshot_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class RuntimeFlagRow(Base):
+    __tablename__ = "runtime_flags"
+
+    flag_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    paper_running: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    peak_equity: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)

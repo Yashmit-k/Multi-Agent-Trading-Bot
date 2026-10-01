@@ -10,6 +10,10 @@ RUN pip install --no-cache-dir \
     -e /app/services/core/feature-engine \
     -e /app/services/core/signal-ingestion \
     -e /app/services/core/market-data \
+    -e /app/services/core/signal-fusion \
+    -e /app/services/core/decision-engine \
+    -e /app/services/core/risk-engine \
+    -e /app/services/core/paper-execution \
     -e /app/services/core/worker \
     -e /app/services/core/api
 ENV PYTHONUNBUFFERED=1

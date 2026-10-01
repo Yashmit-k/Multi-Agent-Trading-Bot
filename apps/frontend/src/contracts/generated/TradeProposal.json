@@ -1,0 +1,145 @@
+{
+  "$defs": {
+    "Horizon": {
+      "enum": [
+        "INTRADAY",
+        "SWING",
+        "LONG_TERM"
+      ],
+      "title": "Horizon",
+      "type": "string"
+    },
+    "Side": {
+      "enum": [
+        "BUY",
+        "SELL"
+      ],
+      "title": "Side",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "An intent to trade. This is not an order and cannot be sent to a broker.",
+  "properties": {
+    "aggregated_confidence": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Aggregated Confidence",
+      "type": "number"
+    },
+    "aggregated_signal": {
+      "maximum": 1,
+      "minimum": -1,
+      "title": "Aggregated Signal",
+      "type": "number"
+    },
+    "entry_price": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0.0,
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        }
+      ],
+      "title": "Entry Price"
+    },
+    "horizon": {
+      "$ref": "#/$defs/Horizon"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "proposal_id": {
+      "minLength": 1,
+      "title": "Proposal Id",
+      "type": "string"
+    },
+    "quantity": {
+      "exclusiveMinimum": 0,
+      "title": "Quantity",
+      "type": "integer"
+    },
+    "side": {
+      "$ref": "#/$defs/Side"
+    },
+    "stop_loss": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0.0,
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        }
+      ],
+      "title": "Stop Loss"
+    },
+    "strategy_id": {
+      "minLength": 1,
+      "title": "Strategy Id",
+      "type": "string"
+    },
+    "strategy_version": {
+      "minLength": 1,
+      "title": "Strategy Version",
+      "type": "string"
+    },
+    "supporting_signal_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Supporting Signal Ids",
+      "type": "array"
+    },
+    "symbol": {
+      "minLength": 1,
+      "title": "Symbol",
+      "type": "string"
+    },
+    "take_profit": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0.0,
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        }
+      ],
+      "title": "Take Profit"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    }
+  },
+  "required": [
+    "proposal_id",
+    "symbol",
+    "timestamp",
+    "horizon",
+    "side",
+    "quantity",
+    "entry_price",
+    "stop_loss",
+    "take_profit",
+    "strategy_id",
+    "strategy_version",
+    "aggregated_signal",
+    "aggregated_confidence",
+    "supporting_signal_ids",
+    "metadata"
+  ],
+  "title": "TradeProposal",
+  "type": "object"
+}

@@ -1,0 +1,95 @@
+{
+  "$defs": {
+    "AgentName": {
+      "enum": [
+        "technical",
+        "momentum",
+        "mean_reversion",
+        "volume",
+        "regime",
+        "ml",
+        "news",
+        "fundamental",
+        "valuation",
+        "earnings"
+      ],
+      "title": "AgentName",
+      "type": "string"
+    },
+    "Horizon": {
+      "enum": [
+        "INTRADAY",
+        "SWING",
+        "LONG_TERM"
+      ],
+      "title": "Horizon",
+      "type": "string"
+    },
+    "TradingMode": {
+      "enum": [
+        "BACKTEST",
+        "PAPER",
+        "SHADOW",
+        "LIVE"
+      ],
+      "title": "TradingMode",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Versions and closed vocabularies shipped by this package.",
+  "properties": {
+    "contract_version": {
+      "minLength": 1,
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "event_versions": {
+      "additionalProperties": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Event Versions",
+      "type": "object"
+    },
+    "schema_versions": {
+      "additionalProperties": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Schema Versions",
+      "type": "object"
+    },
+    "supported_agents": {
+      "items": {
+        "$ref": "#/$defs/AgentName"
+      },
+      "title": "Supported Agents",
+      "type": "array"
+    },
+    "supported_horizons": {
+      "items": {
+        "$ref": "#/$defs/Horizon"
+      },
+      "title": "Supported Horizons",
+      "type": "array"
+    },
+    "supported_modes": {
+      "items": {
+        "$ref": "#/$defs/TradingMode"
+      },
+      "title": "Supported Modes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "contract_version",
+    "schema_versions",
+    "event_versions",
+    "supported_agents",
+    "supported_horizons",
+    "supported_modes"
+  ],
+  "title": "ContractCatalog",
+  "type": "object"
+}

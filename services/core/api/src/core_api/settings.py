@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from decimal import Decimal
 
 from contracts.enums import TradingMode
 
@@ -12,6 +13,7 @@ class Settings:
     internal_signal_token: str
     max_clock_skew_seconds: int
     trading_mode: TradingMode
+    paper_starting_cash: Decimal = Decimal("1000000")
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -22,4 +24,5 @@ class Settings:
             internal_signal_token=os.environ.get("INTERNAL_SIGNAL_TOKEN", "dev-internal-token"),
             max_clock_skew_seconds=int(os.environ.get("MAX_CLOCK_SKEW_SECONDS", "5")),
             trading_mode=TradingMode(os.environ.get("TRADING_MODE", TradingMode.PAPER.value)),
+            paper_starting_cash=Decimal(os.environ.get("PAPER_STARTING_CASH", "1000000")),
         )
