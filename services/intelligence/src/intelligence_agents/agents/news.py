@@ -33,15 +33,14 @@ class NewsAgent(BaseIntelligenceAgent):
         }
         if not articles:
             return self._insufficient(symbol, as_of, context, payload)
-        assessments = []
-        for article in articles:
-            request = LLMRequest(
-                content_hash=article.content_hash,
-                user_payload=wrap_untrusted(f"{article.title}\n{article.raw_text}"),
-                task="news",
-                high_impact_hint=False,
-            )
-            assessments.append(self._router.assess(request))
+        blob = "\n".join(f"{article.title}\n{article.raw_text}" for article in articles)
+        request = LLMRequest(
+            content_hash=content_hash(blob),
+            user_payload=wrap_untrusted(blob),
+            task="news",
+            high_impact_hint=False,
+        )
+        assessments = [self._router.assess(request)]
         score = sum(item.sentiment * item.impact for item in assessments) / len(assessments)
         confidence = self._combine_confidence([item.confidence for item in assessments])
         features = {

@@ -99,12 +99,18 @@ def build_router(
     tracker = CostTracker(daily_budget_usd=daily_budget_usd)
     if not api_key:
         fallback = FallbackProvider(fixture, fixture)
+        logger.info("llm_router", extra={"llm_mode": "fixture", "llm_host": ""})
         return LLMRouter(fallback, fallback, tracker, tier2_enabled=False, use_cache=use_cache)
     from intelligence_agents.llm.openai_compat import OpenAICompatibleProvider
+    from urllib.parse import urlparse
 
     kwargs = {}
     if openai_client is not None:
         kwargs["client"] = openai_client
+    logger.info(
+        "llm_router",
+        extra={"llm_mode": "openai", "llm_host": urlparse(base_url).hostname or "", "model": tier1_model},
+    )
     tier1 = OpenAICompatibleProvider(base_url, api_key, tier1_model or "tier1", timeout=timeout, **kwargs)
     tier2 = OpenAICompatibleProvider(base_url, api_key, tier2_model or "tier2", timeout=timeout, **kwargs)
     return LLMRouter(

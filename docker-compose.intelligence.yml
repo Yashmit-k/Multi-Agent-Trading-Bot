@@ -1,6 +1,7 @@
 # Overlay for local Intelligence. Does not replace docker-compose.yml.
-# Usage:
-#   docker compose -f docker-compose.yml -f docker-compose.intelligence.yml up --build -d intelligence
+# Host Ollama: ollama serve && ollama pull qwen2.5:7b
+# Bring-up:
+#   docker compose -f docker-compose.yml -f docker-compose.intelligence.yml up --build -d postgres redis core-api core-worker intelligence
 #
 # Developer 3 still owns docker-compose.yml.
 
@@ -9,12 +10,29 @@ services:
     build:
       context: .
       dockerfile: services/intelligence/Dockerfile
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file: services/intelligence/.env.example
     environment:
-      INTELLIGENCE_TRADING_MODE: BACKTEST
+      INTELLIGENCE_TRADING_MODE: PAPER
+      INTELLIGENCE_SERVICE_MODE: serve
       INTELLIGENCE_DATA_SOURCE: fixtures
       INTELLIGENCE_STORE: sqlite
       INTELLIGENCE_SQLITE_PATH: /var/lib/intelligence/intel.db
+      INTELLIGENCE_EVAL_INTERVAL_SECONDS: "3600"
+      INTELLIGENCE_SYMBOLS: RELIANCE,TCS
+      CORE_API_URL: http://core-api:8000
+      INTERNAL_SIGNAL_TOKEN: change-me
+      LLM_BASE_URL: http://host.docker.internal:11434/v1
+      LLM_API_KEY: ollama
+      LLM_TIER1_MODEL: qwen2.5:7b
+      LLM_TIER2_MODEL: qwen2.5:7b
+      LLM_DAILY_BUDGET_USD: "0"
+      LLM_TIMEOUT_SECONDS: "30"
+      INTELLIGENCE_TIER2_ENABLED: "false"
+    depends_on:
+      - core-api
+      - core-worker
     volumes:
       - intelligence-data:/var/lib/intelligence
 
