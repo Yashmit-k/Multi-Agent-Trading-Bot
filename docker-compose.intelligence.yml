@@ -1,0 +1,22 @@
+# Overlay for local Intelligence. Does not replace docker-compose.yml.
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.intelligence.yml up --build -d intelligence
+#
+# Developer 3 still owns docker-compose.yml.
+
+services:
+  intelligence:
+    build:
+      context: .
+      dockerfile: services/intelligence/Dockerfile
+    env_file: services/intelligence/.env.example
+    environment:
+      INTELLIGENCE_TRADING_MODE: BACKTEST
+      INTELLIGENCE_DATA_SOURCE: fixtures
+      INTELLIGENCE_STORE: sqlite
+      INTELLIGENCE_SQLITE_PATH: /var/lib/intelligence/intel.db
+    volumes:
+      - intelligence-data:/var/lib/intelligence
+
+volumes:
+  intelligence-data:

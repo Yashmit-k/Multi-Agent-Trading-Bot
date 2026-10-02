@@ -21,3 +21,9 @@ Do not edit the root `docker-compose.yml` from this snippet; Developer 3 owns th
 ```
 
 Mount the SQLite volume so news and fundamentals persist across restarts. Retention is unbounded in v1 (revisit at 2 GB).
+
+Local overlay (does not edit this root compose file):
+
+```text
+docker compose -f docker-compose.yml -f docker-compose.intelligence.yml up --build -d intelligence
+```
