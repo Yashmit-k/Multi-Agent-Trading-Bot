@@ -58,14 +58,18 @@ class EarningsAgent(BaseIntelligenceAgent):
                 "confidence": assessment.confidence,
                 "fallback": assessment.fallback,
                 "tier": assessment.tier,
+                "reason_codes": list(assessment.reason_codes),
             }
+            llm_codes = assessment.reason_codes
+        else:
+            llm_codes = ()
         return self._build(
             symbol=symbol,
             as_of=as_of,
             context=context,
             score=max(-1.0, min(1.0, score)),
             confidence=self._combine_confidence(confidences),
-            reason_codes=("earnings.evaluated",),
+            reason_codes=llm_codes or ("earnings.evaluated",),
             features={"point_count": len(points), "article_count": len(articles)},
             metadata={"eps_observations": len(eps_values)},
             payload=payload,

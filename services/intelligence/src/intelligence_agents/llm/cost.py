@@ -19,6 +19,8 @@ class CostTracker:
     completion_tokens: int = 0
 
     def estimate(self, prompt_tokens: int, completion_tokens: int) -> float:
+        if self.daily_budget_usd <= 0:
+            return 0.0
         return (prompt_tokens / 1000.0) * USD_PER_1K_PROMPT + (completion_tokens / 1000.0) * USD_PER_1K_COMPLETION
 
     def remaining(self) -> float:

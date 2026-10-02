@@ -15,36 +15,61 @@ class ValidationError(ValueError):
     """Structured output failed schema checks."""
 
 
+_REQUIRED = ("sentiment", "impact", "confidence", "event_type", "reason_codes", "horizon", "high_impact")
+
+
+def _strip_fences(raw: str) -> str:
+    text = raw.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text, count=1)
+        text = re.sub(r"\s*```$", "", text)
+    return text.strip()
+
+
 def parse_assessment(raw: str, *, model: str, tier: str, fallback: bool = False) -> LLMAssessment:
     try:
-        payload = json.loads(raw)
+        payload = json.loads(_strip_fences(raw))
     except json.JSONDecodeError as exc:
         raise ValidationError("invalid_json") from exc
     if not isinstance(payload, dict):
         raise ValidationError("not_object")
-    sentiment = _clip(float(payload.get("sentiment", 0.0)), -1.0, 1.0)
-    impact = _clip(float(payload.get("impact", 0.0)), 0.0, 1.0)
-    confidence = _clip(float(payload.get("confidence", 0.0)), 0.0, 1.0)
-    event_type = str(payload.get("event_type") or "unspecified")
-    if not _REASON.fullmatch(event_type):
-        event_type = "unspecified"
-    codes_raw = payload.get("reason_codes") or ["llm.assessed"]
+    missing = [key for key in _REQUIRED if key not in payload]
+    if missing:
+        raise ValidationError(f"missing_keys:{','.join(missing)}")
+    try:
+        sentiment = float(payload["sentiment"])
+        impact = float(payload["impact"])
+        confidence = float(payload["confidence"])
+    except (TypeError, ValueError) as exc:
+        raise ValidationError("non_numeric_score") from exc
+    if not -1.0 <= sentiment <= 1.0:
+        raise ValidationError("sentiment_out_of_range")
+    if not 0.0 <= impact <= 1.0:
+        raise ValidationError("impact_out_of_range")
+    if not 0.0 <= confidence <= 1.0:
+        raise ValidationError("confidence_out_of_range")
+    event_type = payload["event_type"]
+    if not isinstance(event_type, str) or not _REASON.fullmatch(event_type):
+        raise ValidationError("invalid_event_type")
+    codes_raw = payload["reason_codes"]
     if not isinstance(codes_raw, list) or not codes_raw:
-        codes_raw = ["llm.assessed"]
-    codes = tuple(str(code) for code in codes_raw if isinstance(code, str) and _REASON.fullmatch(code))
-    if not codes:
-        codes = ("llm.assessed",)
-    horizon = str(payload.get("horizon") or "SWING")
+        raise ValidationError("invalid_reason_codes")
+    codes = tuple(str(code) for code in codes_raw)
+    if any(not _REASON.fullmatch(code) for code in codes):
+        raise ValidationError("invalid_reason_codes")
+    horizon = payload["horizon"]
     if horizon not in {"INTRADAY", "SWING", "LONG_TERM"}:
-        horizon = "SWING"
-    high_impact = bool(payload.get("high_impact", False))
+        raise ValidationError("invalid_horizon")
+    high_impact = payload["high_impact"]
+    if not isinstance(high_impact, bool):
+        raise ValidationError("invalid_high_impact")
     return LLMAssessment(
         sentiment=sentiment,
         impact=impact,
         confidence=confidence,
         event_type=event_type,
         reason_codes=codes,
-        horizon=horizon,
+        horizon=str(horizon),
         high_impact=high_impact,
         model=model,
         tier=tier,
@@ -52,10 +77,6 @@ def parse_assessment(raw: str, *, model: str, tier: str, fallback: bool = False)
         completion_tokens=int(payload.get("completion_tokens") or 0),
         fallback=fallback,
     )
-
-
-def _clip(value: float, low: float, high: float) -> float:
-    return max(low, min(high, value))
 
 
 def wrap_untrusted(text: str) -> str:
