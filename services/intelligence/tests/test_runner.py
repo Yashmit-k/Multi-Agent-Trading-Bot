@@ -83,3 +83,11 @@ def test_runner_submits_fixture_signals():
     produced = runner.run(["RELIANCE"], FIXTURE_AS_OF)
     assert produced
     assert sink.submitted
+
+
+def test_cycle_as_of_is_stable_inside_interval():
+    from intelligence_agents.loop import cycle_as_of
+
+    first = datetime(2026, 10, 2, 17, 10, tzinfo=timezone.utc)
+    second = datetime(2026, 10, 2, 17, 40, tzinfo=timezone.utc)
+    assert cycle_as_of(first, 3600) == cycle_as_of(second, 3600)

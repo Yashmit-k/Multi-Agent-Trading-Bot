@@ -7,4 +7,4 @@ RUN pip install --no-cache-dir \
     -e /app/services/intelligence
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8080
-CMD ["uvicorn", "intelligence_agents.service:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "intelligence_agents.service:create_app", "--factory", "--host", "0.0.0.0", "--port", "8080"]

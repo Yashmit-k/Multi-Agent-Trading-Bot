@@ -61,6 +61,21 @@ class Runner:
                     produced.append(signal)
                     result = self.sink.submit(signal)
                     self.results.append(result)
+                    if result.duplicate:
+                        logger.info(
+                            "signal_duplicate_ok",
+                            extra={"signal_id": signal.signal_id, "agent_name": signal.agent_name.value},
+                        )
+                    elif not result.accepted:
+                        logger.error(
+                            "signal_rejected",
+                            extra={
+                                "signal_id": signal.signal_id,
+                                "agent_name": signal.agent_name.value,
+                                "message": result.message,
+                            },
+                        )
+                        raise RuntimeError(f"core_rejected:{result.message}")
                     logger.info(
                         "signal_submitted",
                         extra={
