@@ -12,3 +12,5 @@ build/
 node_modules/
 .next/
 .env.local
+.env
+services/intelligence/.env

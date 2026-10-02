@@ -35,6 +35,7 @@ class IntelligenceSettings:
     rss_interval_seconds: int
     rss_max_bytes: int
     rss_max_items: int
+    service_mode: str
 
     @classmethod
     def from_env(cls) -> IntelligenceSettings:
@@ -50,7 +51,7 @@ class IntelligenceSettings:
             sqlite_path=os.environ.get("INTELLIGENCE_SQLITE_PATH", "intelligence.db"),
             log_level=os.environ.get("INTELLIGENCE_LOG_LEVEL", "INFO"),
             symbols=tuple(item.strip().upper() for item in symbols_raw.split(",") if item.strip()),
-            eval_interval_seconds=int(os.environ.get("INTELLIGENCE_EVAL_INTERVAL_SECONDS", "60")),
+            eval_interval_seconds=int(os.environ.get("INTELLIGENCE_EVAL_INTERVAL_SECONDS", "300")),
             core_api_url=os.environ.get("CORE_API_URL", "http://localhost:8000").rstrip("/"),
             internal_signal_token=os.environ.get("INTERNAL_SIGNAL_TOKEN", ""),
             llm_base_url=os.environ.get("LLM_BASE_URL", ""),
@@ -64,18 +65,36 @@ class IntelligenceSettings:
             rss_interval_seconds=int(os.environ.get("NEWS_RSS_INTERVAL_SECONDS", "300")),
             rss_max_bytes=int(os.environ.get("NEWS_RSS_MAX_BYTES", str(1024 * 1024))),
             rss_max_items=int(os.environ.get("NEWS_RSS_MAX_ITEMS", "100")),
+            service_mode=os.environ.get("INTELLIGENCE_SERVICE_MODE", "oneshot").strip().lower(),
         )
         settings.validate()
         return settings
+
+    def llm_mode(self) -> str:
+        if self.llm_api_key and self.llm_base_url:
+            return "openai"
+        return "fixture"
+
+    def llm_host(self) -> str:
+        from urllib.parse import urlparse
+
+        return urlparse(self.llm_base_url).hostname or ""
 
     def validate(self) -> None:
         if self.data_source not in {"fixtures", "rss", "csv-live"}:
             raise ConfigError(f"unknown INTELLIGENCE_DATA_SOURCE: {self.data_source}")
         if self.store not in {"sqlite", "memory"}:
             raise ConfigError(f"unknown INTELLIGENCE_STORE: {self.store}")
+        if self.service_mode not in {"oneshot", "serve"}:
+            raise ConfigError(f"unknown INTELLIGENCE_SERVICE_MODE: {self.service_mode}")
+        if self.service_mode == "serve" and self.trading_mode is TradingMode.BACKTEST:
+            raise ConfigError("BACKTEST is oneshot only; do not serve it from uvicorn")
         if self.trading_mode is TradingMode.BACKTEST and self.data_source in LIVE_SOURCES:
             raise ConfigError("BACKTEST cannot use RSS or csv-live; fixtures only")
         if self.data_source == "rss" and not self.news_rss_urls and self.trading_mode in LIVE_MODES:
             raise ConfigError("NEWS_RSS_URLS required when INTELLIGENCE_DATA_SOURCE=rss")
         if not self.symbols:
             raise ConfigError("INTELLIGENCE_SYMBOLS must list at least one symbol")
+        if self.service_mode == "serve" and self.trading_mode in LIVE_MODES:
+            if not self.internal_signal_token or not self.core_api_url:
+                raise ConfigError("PAPER/SHADOW/LIVE serve requires CORE_API_URL and INTERNAL_SIGNAL_TOKEN")

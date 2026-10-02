@@ -75,10 +75,41 @@ def test_health_degraded_without_sink_in_backtest(monkeypatch):
 def test_refuse_live_without_sink(monkeypatch):
     monkeypatch.setenv("INTELLIGENCE_TRADING_MODE", "PAPER")
     monkeypatch.setenv("INTELLIGENCE_DATA_SOURCE", "fixtures")
+    monkeypatch.setenv("INTELLIGENCE_SERVICE_MODE", "oneshot")
+    monkeypatch.delenv("INTERNAL_SIGNAL_TOKEN", raising=False)
     settings = IntelligenceSettings.from_env()
     try:
         create_app(settings, sink=None)
         raised = False
     except RuntimeError:
+        raised = True
+    assert raised
+
+
+def test_serve_backtest_refused(monkeypatch):
+    from intelligence_agents.errors import ConfigError
+
+    monkeypatch.setenv("INTELLIGENCE_TRADING_MODE", "BACKTEST")
+    monkeypatch.setenv("INTELLIGENCE_SERVICE_MODE", "serve")
+    monkeypatch.setenv("INTELLIGENCE_DATA_SOURCE", "fixtures")
+    try:
+        IntelligenceSettings.from_env()
+        raised = False
+    except ConfigError:
+        raised = True
+    assert raised
+
+
+def test_serve_paper_requires_token(monkeypatch):
+    from intelligence_agents.errors import ConfigError
+
+    monkeypatch.setenv("INTELLIGENCE_TRADING_MODE", "PAPER")
+    monkeypatch.setenv("INTELLIGENCE_SERVICE_MODE", "serve")
+    monkeypatch.setenv("INTELLIGENCE_DATA_SOURCE", "fixtures")
+    monkeypatch.setenv("INTERNAL_SIGNAL_TOKEN", "")
+    try:
+        IntelligenceSettings.from_env()
+        raised = False
+    except ConfigError:
         raised = True
     assert raised

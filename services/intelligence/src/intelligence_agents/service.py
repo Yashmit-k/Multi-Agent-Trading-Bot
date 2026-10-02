@@ -1,50 +1,124 @@
-"""Health-only FastAPI app. Live modes refuse to start without SignalSink."""
+"""FastAPI app. Serve mode runs the evaluation loop; oneshot does not."""
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
 from contracts.enums import TradingMode
 from intelligence_agents.logging import configure_logging
+from intelligence_agents.loop import evaluation_loop
+from intelligence_agents.runtime import RunnerHealth
 from intelligence_agents.settings import LIVE_MODES, IntelligenceSettings
+from intelligence_agents.sink.http import HttpSignalSink
+
+logger = logging.getLogger(__name__)
+
+
+def _require_live_sink(settings: IntelligenceSettings, sink: object | None) -> object:
+    if settings.trading_mode not in LIVE_MODES:
+        return sink
+    if sink is not None:
+        return sink
+    if not settings.internal_signal_token:
+        raise RuntimeError("intelligence service refuses to start in PAPER/SHADOW/LIVE without a Core-owned SignalSink")
+    return HttpSignalSink(settings.core_api_url, settings.internal_signal_token, settings.trading_mode)
 
 
 def create_app(settings: IntelligenceSettings | None = None, *, sink: object | None = None) -> FastAPI:
     resolved = settings or IntelligenceSettings.from_env()
     configure_logging(resolved.log_level)
-    if resolved.trading_mode in LIVE_MODES and sink is None:
-        raise RuntimeError("intelligence service refuses to start in PAPER/SHADOW/LIVE without a Core-owned SignalSink")
-    app = FastAPI(title="Intelligence agents", version="1.0.0")
+    resolved_sink = _require_live_sink(resolved, sink)
+    health = RunnerHealth()
+    stop = asyncio.Event()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        task = None
+        if resolved.service_mode == "serve":
+            if resolved.trading_mode not in LIVE_MODES or resolved_sink is None:
+                raise RuntimeError("serve mode requires PAPER/SHADOW/LIVE and a SignalSink")
+            logger.info(
+                "serve_starting",
+                extra={
+                    "mode": resolved.trading_mode.value,
+                    "llm_mode": resolved.llm_mode(),
+                    "llm_host": resolved.llm_host(),
+                    "symbols": ",".join(resolved.symbols),
+                },
+            )
+            task = asyncio.create_task(evaluation_loop(resolved, stop, health, resolved_sink))
+        yield
+        stop.set()
+        if task is not None:
+            try:
+                await asyncio.wait_for(asyncio.shield(task), timeout=180)
+            except (TimeoutError, asyncio.CancelledError):
+                task.cancel()
+
+    app = FastAPI(title="Intelligence agents", version="1.0.0", lifespan=lifespan)
     app.state.settings = resolved
-    app.state.sink = sink
+    app.state.sink = resolved_sink
+    app.state.health = health
 
     @app.get("/health")
-    def health() -> dict[str, str]:
-        if app.state.sink is None:
-            return {"status": "degraded", "reason": "no_signal_sink"}
-        return {"status": "ok"}
+    def health_view() -> dict[str, object]:
+        reachable = _sink_reachable(resolved, resolved_sink)
+        health.sink_reachable = reachable
+        degraded = False
+        reason = None
+        if resolved.trading_mode in LIVE_MODES and resolved_sink is None:
+            degraded = True
+            reason = "no_signal_sink"
+        elif resolved.trading_mode is TradingMode.BACKTEST and resolved_sink is None:
+            degraded = True
+            reason = "no_signal_sink"
+        elif health.consecutive_failures > 0:
+            degraded = True
+            reason = "eval_failures"
+        elif reachable is False and resolved.service_mode == "serve":
+            degraded = True
+            reason = "sink_unreachable"
+        payload: dict[str, object] = {
+            "status": "degraded" if degraded else "ok",
+            "runner_running": health.runner_running,
+            "last_run_at": health.last_run_at,
+            "signals_emitted_last_run": health.signals_emitted_last_run,
+            "last_error": health.last_error,
+            "consecutive_failures": health.consecutive_failures,
+            "sink_reachable": reachable,
+            "llm_mode": resolved.llm_mode(),
+            "llm_host": resolved.llm_host(),
+            "prompt_tokens": health.prompt_tokens,
+            "completion_tokens": health.completion_tokens,
+            "fallbacks": health.fallbacks,
+        }
+        if reason:
+            payload["reason"] = reason
+        return payload
 
     return app
 
 
-app = create_app()
+def _sink_reachable(settings: IntelligenceSettings, sink: object | None) -> bool | None:
+    if settings.trading_mode is TradingMode.BACKTEST:
+        return None if sink is None else True
+    if sink is None:
+        return False
+    try:
+        import httpx
+
+        response = httpx.get(f"{settings.core_api_url}/health", timeout=2.0)
+        return response.status_code < 500
+    except Exception:
+        return False
 
 
 def main() -> None:
     import uvicorn
 
-    settings = IntelligenceSettings.from_env()
-    sink = None
-    if settings.trading_mode is not TradingMode.BACKTEST:
-        from intelligence_agents.sink.http import HttpSignalSink
-
-        sink = HttpSignalSink(
-            settings.core_api_url,
-            settings.internal_signal_token,
-            settings.trading_mode,
-        )
-    global app
-    app = create_app(settings, sink=sink)
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+    uvicorn.run("intelligence_agents.service:create_app", factory=True, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
