@@ -59,11 +59,20 @@ class HttpSignalSink:
                 if response.status_code >= 500:
                     raise httpx.HTTPError(f"status {response.status_code}")
                 if response.status_code == 422:
+                    logger.warning(
+                        "sink_invalid_schema",
+                        extra={"signal_id": signal.signal_id, "body": response.text[:500]},
+                    )
                     return SubmissionResult(
                         accepted=False,
                         signal_id=signal.signal_id,
                         duplicate=False,
                         message="invalid_schema",
+                    )
+                if response.status_code >= 400:
+                    logger.warning(
+                        "sink_http_error",
+                        extra={"signal_id": signal.signal_id, "status": response.status_code, "body": response.text[:500]},
                     )
                 response.raise_for_status()
                 return SubmissionResult.model_validate(response.json())
