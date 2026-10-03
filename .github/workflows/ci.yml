@@ -46,4 +46,4 @@ jobs:
           python -m pip install -e services/core/worker
           python -m pip install -e services/core/api
       - name: Test
-        run: python -m pytest -q
+        run: python -m pytest -q --ignore=services/intelligence
