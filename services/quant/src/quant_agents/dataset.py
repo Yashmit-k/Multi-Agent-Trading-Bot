@@ -120,3 +120,7 @@ def main() -> None:
     snapshot = resolve_snapshot_path(args.snapshot)
     written = build_dataset(snapshot, args.out, load_labeler())
     print(written)
+
+
+if __name__ == "__main__":
+    main()
