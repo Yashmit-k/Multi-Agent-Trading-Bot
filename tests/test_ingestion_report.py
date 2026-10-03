@@ -105,8 +105,23 @@ def test_future_bar_is_absent_from_postgres_when_configured() -> None:
     except ModuleNotFoundError:
         pytest.skip("psycopg is not installed")
     instrument = repository.upsert_instrument(symbol="PROOF", exchange="NSE", trading_symbol="PROOF")
-    repository.add_membership(instrument.instrument_id, "NIFTY50", datetime(2024, 1, 1, tzinfo=UTC), None)
-    _assert_future_bar_absent(repository, symbol="PROOF")
+    joined = datetime(2024, 1, 1, tzinfo=UTC)
+    repository.add_membership(instrument.instrument_id, "NIFTY50", joined, None)
+    try:
+        _assert_future_bar_absent(repository, symbol="PROOF")
+    finally:
+        repository.remove_membership(instrument.instrument_id, "NIFTY50", joined)
+
+
+def test_remove_membership_restores_the_prior_universe() -> None:
+    repository = _repository("RELIANCE")
+    before = repository.members_at(END)
+    instrument = repository.upsert_instrument(symbol="PROOF", exchange="NSE", trading_symbol="PROOF")
+    joined = datetime(2024, 1, 1, tzinfo=UTC)
+    repository.add_membership(instrument.instrument_id, "NIFTY50", joined, None)
+    assert any(item.symbol == "PROOF" for item in repository.members_at(END))
+    repository.remove_membership(instrument.instrument_id, "NIFTY50", joined)
+    assert repository.members_at(END) == before
 
 
 def test_callback_logs_the_report_on_every_run(caplog: pytest.LogCaptureFixture) -> None:

@@ -123,6 +123,14 @@ class CoreRepository:
                 )
                 session.commit()
 
+    def remove_membership(self, instrument_id: str, universe: str, effective_from: datetime) -> None:
+        membership_id = f"{instrument_id}:{universe}:{as_utc(effective_from).date().isoformat()}"
+        with self._session_factory() as session:
+            row = session.get(UniverseMembershipRow, membership_id)
+            if row is not None:
+                session.delete(row)
+                session.commit()
+
     def members_at(self, as_of: datetime, universe: str = "NIFTY50") -> list[InstrumentRecord]:
         moment = as_utc(as_of)
         with self._session_factory() as session:
