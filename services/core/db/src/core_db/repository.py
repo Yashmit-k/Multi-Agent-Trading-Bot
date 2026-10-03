@@ -248,6 +248,20 @@ class CoreRepository:
                 candles.append(_candle(row))
             return candles
 
+    def stored_candles(self, symbol: str, timeframe: Timeframe | str) -> list[Candle]:
+        """Every row in the candle table for this symbol and timeframe, with no as_of filter."""
+        parsed = timeframe if isinstance(timeframe, Timeframe) else Timeframe(timeframe)
+        with self._session_factory() as session:
+            rows = session.scalars(
+                select(CandleRow)
+                .where(
+                    CandleRow.symbol == symbol.strip().upper(),
+                    CandleRow.timeframe == parsed.value,
+                )
+                .order_by(CandleRow.start)
+            )
+            return [_candle(row) for row in rows]
+
     def upsert_feature(self, feature_set: FeatureSet, instrument_id: str) -> None:
         with self._session_factory() as session:
             key = (
@@ -306,6 +320,11 @@ class CoreRepository:
         with self._session_factory() as session:
             row = session.get(AgentSignalRow, signal_id)
             return dict(row.payload) if row else None
+
+    def list_signal_payloads(self) -> list[dict]:
+        with self._session_factory() as session:
+            rows = session.scalars(select(AgentSignalRow).order_by(AgentSignalRow.symbol, AgentSignalRow.signal_id))
+            return [dict(row.payload) for row in rows]
 
     def insert_signal(self, signal_id: str, symbol: str, exchange: str, payload: dict, recorded_at: datetime) -> bool:
         with self._session_factory() as session:

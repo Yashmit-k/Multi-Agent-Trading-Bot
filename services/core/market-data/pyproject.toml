@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "core-market-data"
 version = "1.0.0"
 requires-python = ">=3.12"
-dependencies = ["contracts", "core-db"]
+dependencies = ["contracts", "core-db", "kiteconnect>=4.2,<5"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/core_market_data"]

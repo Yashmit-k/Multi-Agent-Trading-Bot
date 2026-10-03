@@ -1,4 +1,6 @@
 import "./globals.css";
+
+export const dynamic = "force-dynamic";
 import { Nav } from "@/components/Nav";
 import { ModeBanner } from "@/components/ModeBanner";
 import { fetchApi } from "@/lib/api";
