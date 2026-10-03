@@ -146,3 +146,7 @@ def main() -> None:
     repository = CoreRepository(create_schema(os.environ.get("DATABASE_URL", "sqlite:///./core.db")))
     snapshot = export_snapshot(repository, args.out, as_of=datetime.now(timezone.utc))
     print(snapshot.manifest["snapshot_id"])
+
+
+if __name__ == "__main__":
+    main()
