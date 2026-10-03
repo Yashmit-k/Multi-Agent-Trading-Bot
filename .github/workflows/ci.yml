@@ -45,5 +45,6 @@ jobs:
           python -m pip install -e services/core/paper-execution
           python -m pip install -e services/core/worker
           python -m pip install -e services/core/api
+          python -m pip install -e services/quant
       - name: Test
         run: python -m pytest -q --ignore=services/intelligence

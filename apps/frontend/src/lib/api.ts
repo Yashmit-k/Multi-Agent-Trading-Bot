@@ -9,7 +9,9 @@ export function apiUrl(path: string): string {
 }
 
 export async function fetchApi<T>(path: string): Promise<T> {
-  const response = await fetch(apiUrl(path), { signal: AbortSignal.timeout(4000) });
+  const token = process.env.NEXT_PUBLIC_CORE_API_TOKEN;
+  const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+  const response = await fetch(apiUrl(path), { signal: AbortSignal.timeout(15000), headers });
   if (response.status === 501) {
     throw new Error("not_implemented");
   }

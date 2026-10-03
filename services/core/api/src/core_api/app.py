@@ -1,10 +1,13 @@
 """Core HTTP API. Unfinished product routes return 501."""
 
-from datetime import datetime, timezone
-from typing import Annotated
+import logging
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+from typing import Annotated, Any
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ValidationError
 
@@ -16,25 +19,19 @@ from core_api.settings import Settings
 from core_db.repository import CoreRepository
 from core_db.seed import load_seed
 from core_db.session import create_schema
+from core_features.engine import build_feature_set
 from core_ingestion.service import EventPublisher, MemoryEventPublisher, RedisEventPublisher, ingest_signal
 from core_market_data import ZerodhaMarketDataProvider
+from core_market_data.zerodha import SEED_HISTORY_DAYS, format_ingestion_report
+
+logger = logging.getLogger(__name__)
 
 _bearer = HTTPBearer(auto_error=False)
 
 LATER_ROUTES: tuple[tuple[str, str], ...] = (
-    ("GET", "/api/v1/market/overview"),
-    ("GET", "/api/v1/stocks/{symbol}/signals"),
-    ("GET", "/api/v1/stocks/{symbol}/agents"),
-    ("GET", "/api/v1/stocks/{symbol}/news"),
-    ("GET", "/api/v1/stocks/{symbol}/fundamentals"),
-    ("GET", "/api/v1/signals"),
-    ("GET", "/api/v1/signals/{symbol}"),
     ("GET", "/api/v1/performance"),
     ("POST", "/api/v1/backtests"),
     ("GET", "/api/v1/backtests/{id}"),
-    ("GET", "/api/v1/zerodha/status"),
-    ("GET", "/api/v1/zerodha/connect"),
-    ("GET", "/api/v1/zerodha/callback"),
     ("GET", "/api/v1/agents"),
     ("GET", "/api/v1/agents/{agent_name}/health"),
 )
@@ -50,6 +47,7 @@ def create_app(
     publisher: EventPublisher | None = None,
     *,
     seed: bool = False,
+    kite_client: Any | None = None,
 ) -> FastAPI:
     resolved = settings or Settings.from_env()
     if repository is None:
@@ -60,9 +58,17 @@ def create_app(
     if publisher is None:
         publisher = _publisher(resolved.redis_url)
     app = FastAPI(title="Core trading API", version="1.0.0")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://127.0.0.1:3000", "http://localhost:3000"],
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
     app.state.settings = resolved
     app.state.repository = repository
     app.state.publisher = publisher
+    app.state.kite_client = kite_client
+    app.state.zerodha_access_token = None
 
     def require_user(credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]) -> None:
         if credentials is None or credentials.credentials != resolved.core_api_token:
@@ -103,17 +109,84 @@ def create_app(
         bars = repository.candles_until(symbol, Timeframe(timeframe), moment)
         return [bar.model_dump(mode="json") for bar in bars]
 
+    @app.get("/api/v1/market/overview")
+    def market_overview(_: Annotated[None, Depends(require_user)], as_of: datetime | None = None) -> dict[str, object]:
+        moment = as_of or datetime.now(timezone.utc)
+        return _overview_body(repository, moment, resolved.trading_mode)
+
+    @app.get("/api/v1/features/{symbol}")
+    def features(
+        symbol: str,
+        _: Annotated[None, Depends(require_user)],
+        timeframe: str = "1d",
+        as_of: datetime | None = None,
+    ) -> dict[str, object]:
+        try:
+            parsed = Timeframe(timeframe)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="invalid_timeframe") from exc
+        latest = repository.latest_candle(symbol, parsed)
+        if latest is None:
+            raise HTTPException(status_code=404, detail="no_features")
+        moment = as_of or latest.end
+        bars = repository.candles_until(symbol, parsed, moment)
+        built = build_feature_set(symbol, parsed, bars, moment)
+        if built is None:
+            raise HTTPException(status_code=404, detail="no_features")
+        return built.model_dump(mode="json")
+
+    @app.get("/api/v1/signals")
+    def signals(_: Annotated[None, Depends(require_user)]) -> list[dict]:
+        return repository.list_signal_payloads()
+
+    @app.get("/api/v1/signals/{symbol}")
+    def signals_for_symbol(symbol: str, _: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in repository.signals_for(symbol)]
+
     @app.get("/api/v1/stocks")
     def stocks(_: Annotated[None, Depends(require_user)], as_of: datetime | None = None) -> list[dict[str, object]]:
         moment = as_of or datetime.now(timezone.utc)
-        return [_instrument_body(item) for item in repository.members_at(moment)]
+        rows = []
+        for item in repository.members_at(moment):
+            body = _instrument_body(item)
+            candle = repository.latest_candle(item.symbol, Timeframe.D1)
+            body["last_price"] = "" if candle is None else str(candle.close)
+            rows.append(body)
+        return rows
 
     @app.get("/api/v1/stocks/{symbol}")
     def stock(symbol: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
         instrument = repository.get_by_symbol(symbol)
         if instrument is None:
             raise HTTPException(status_code=404, detail="unknown_symbol")
-        return _instrument_body(instrument)
+        body = _instrument_body(instrument)
+        candle = repository.latest_candle(instrument.symbol, Timeframe.D1)
+        body["last_price"] = "" if candle is None else str(candle.close)
+        return body
+
+    @app.get("/api/v1/stocks/{symbol}/signals")
+    def stock_signals(symbol: str, _: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in repository.signals_for(symbol)]
+
+    @app.get("/api/v1/stocks/{symbol}/agents")
+    def stock_agents(symbol: str, _: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
+        return [
+            {
+                "agent_name": item.agent_name.value,
+                "signal": item.signal,
+                "confidence": item.confidence,
+                "horizon": item.horizon.value,
+            }
+            for item in repository.signals_for(symbol)
+        ]
+
+    @app.get("/api/v1/stocks/{symbol}/news")
+    def stock_news(symbol: str, _: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
+        return []
+
+    @app.get("/api/v1/stocks/{symbol}/fundamentals")
+    def stock_fundamentals(symbol: str, _: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
+        return []
 
     @app.post("/api/v1/internal/signals", response_model=SubmissionResult)
     def submit_signal(
@@ -157,13 +230,15 @@ def create_app(
         return {
             "risk_version": "1.0.0",
             "kill_switch": "noop",
+            "status": "ok",
+            "message": "kill switch is a no-op",
+            "as_of": datetime.now(timezone.utc).isoformat(),
             "latest": None if latest is None else latest.model_dump(mode="json"),
         }
 
     @app.get("/api/v1/portfolio")
     def portfolio(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
-        snapshot = repository.latest_snapshot()
-        return {"snapshot": None if snapshot is None else snapshot.model_dump(mode="json")}
+        return _portfolio_body(repository.latest_snapshot(), resolved.paper_starting_cash)
 
     @app.get("/api/v1/positions")
     def positions(_: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
@@ -191,6 +266,37 @@ def create_app(
         repository.set_paper_running(False)
         return _paper_body(repository, resolved)
 
+    @app.get("/api/v1/zerodha/status")
+    def zerodha_status(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        return {
+            "configured": app.state.kite_client is not None,
+            "authenticated": bool(app.state.zerodha_access_token),
+            "live_enabled": False,
+        }
+
+    @app.get("/api/v1/zerodha/connect")
+    def zerodha_connect(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        client = app.state.kite_client
+        if client is None:
+            raise HTTPException(status_code=503, detail="zerodha_not_configured")
+        return {"login_url": client.login_url(), "live_enabled": False}
+
+    @app.get("/api/v1/zerodha/callback")
+    def zerodha_callback(request_token: str, background: BackgroundTasks) -> dict[str, object]:
+        client = app.state.kite_client
+        if client is None:
+            raise HTTPException(status_code=503, detail="zerodha_not_configured")
+        try:
+            data = client.generate_session(request_token)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail="zerodha_session_failed") from exc
+        token = data.get("access_token")
+        if not token:
+            raise HTTPException(status_code=502, detail="zerodha_session_failed")
+        app.state.zerodha_access_token = str(token)
+        background.add_task(_ingest_seed_history, repository, client, getattr(app.state, "kite_pace", None))
+        return {"authenticated": True, "live_enabled": False}
+
     for method, path in LATER_ROUTES:
         app.add_api_route(
             path,
@@ -201,6 +307,52 @@ def create_app(
         )
 
     return app
+
+
+def _ingest_seed_history(repository: CoreRepository, client: Any, pace: Any | None = None) -> None:
+    provider = ZerodhaMarketDataProvider(repository, client, pace=pace)
+    end = datetime.now(timezone.utc)
+    report = provider.ingest_seed_history(end - timedelta(days=SEED_HISTORY_DAYS), end)
+    logger.info("%s", format_ingestion_report(report))
+
+
+def _overview_body(repository: CoreRepository, moment: datetime, mode: TradingMode) -> dict[str, object]:
+    closes: list[Decimal] = []
+    advancers = 0
+    decliners = 0
+    for item in repository.members_at(moment):
+        bars = repository.candles_until(item.symbol, Timeframe.D1, moment)
+        if not bars:
+            continue
+        closes.append(bars[-1].close)
+        if len(bars) >= 2 and bars[-1].close > bars[-2].close:
+            advancers += 1
+        elif len(bars) >= 2 and bars[-1].close < bars[-2].close:
+            decliners += 1
+    last = (sum(closes, Decimal("0")) / Decimal(len(closes))) if closes else Decimal("0")
+    return {
+        "as_of": moment.astimezone(timezone.utc).isoformat(),
+        "nifty_last": format(last, "f"),
+        "breadth_advancers": advancers,
+        "breadth_decliners": decliners,
+        "mode": mode.value,
+    }
+
+
+def _portfolio_body(snapshot: object, starting_cash: Decimal) -> dict[str, object]:
+    if snapshot is None:
+        return {
+            "snapshot": None,
+            "total_pnl": "0",
+            "equity": str(starting_cash),
+            "gross_exposure": "0",
+        }
+    return {
+        "snapshot": snapshot.model_dump(mode="json"),  # type: ignore[attr-defined]
+        "total_pnl": str(snapshot.total_pnl),  # type: ignore[attr-defined]
+        "equity": str(snapshot.equity),  # type: ignore[attr-defined]
+        "gross_exposure": str(snapshot.gross_exposure),  # type: ignore[attr-defined]
+    }
 
 
 def _paper_body(repository: CoreRepository, settings: Settings) -> dict[str, object]:
