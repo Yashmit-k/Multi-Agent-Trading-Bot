@@ -11,9 +11,9 @@ from contracts.schemas.agent_signal import AgentSignal
 from intelligence_agents.agents.base import BaseIntelligenceAgent
 from intelligence_agents.agents.confidence import CAPS
 from intelligence_agents.clock import Clock
+from intelligence_agents.agents.interpret import interpret
 from intelligence_agents.llm.router import LLMRouter
-from intelligence_agents.llm.types import LLMRequest
-from intelligence_agents.llm.validate import wrap_untrusted
+from intelligence_agents.llm.validate import as_jsonable
 
 
 class EarningsAgent(BaseIntelligenceAgent):
@@ -43,23 +43,18 @@ class EarningsAgent(BaseIntelligenceAgent):
                 growth = float((latest - previous) / abs(previous))
                 score += max(-0.5, min(0.5, growth))
                 confidences.append(0.5)
+        metrics = {point.metric: str(point.value) for point in points}
         if articles:
-            request = LLMRequest(
-                content_hash=articles[0].content_hash,
-                user_payload=wrap_untrusted("\n".join(item.raw_text for item in articles)),
+            body = "\n".join(item.raw_text for item in articles)
+            assessment = interpret(
+                self._router,
                 task="earnings",
+                payload=f"metrics={metrics}\n{body}",
                 high_impact_hint=True,
             )
-            assessment = self._router.assess(request)
             score += 0.5 * assessment.sentiment
             confidences.append(assessment.confidence)
-            payload["llm"] = {
-                "sentiment": assessment.sentiment,
-                "confidence": assessment.confidence,
-                "fallback": assessment.fallback,
-                "tier": assessment.tier,
-                "reason_codes": list(assessment.reason_codes),
-            }
+            payload["llm"] = as_jsonable(assessment)
             llm_codes = assessment.reason_codes
         else:
             llm_codes = ()

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import replace
 from typing import Protocol
+from urllib.parse import urlparse
 
 from intelligence_agents.llm.cache import LLMCache
 from intelligence_agents.llm.cost import CostTracker
@@ -26,14 +27,32 @@ class FallbackProvider:
         self._secondary = secondary
         self.fallbacks = 0
         self.model = primary.model
+        self.last_failure_type: str | None = None
+        self.last_generation: str | None = None
+        self.quota_exhausted = False
 
     def complete(self, request: LLMRequest, *, tier: str) -> LLMAssessment:
         try:
-            return self._primary.complete(request, tier=tier)
-        except Exception:
+            result = self._primary.complete(request, tier=tier)
+            self.last_generation = "success"
+            return result
+        except Exception as exc:
             self.fallbacks += 1
-            logger.warning("llm_fallback", extra={"from": self._primary.model, "to": self._secondary.model})
+            failure_type = getattr(exc, "failure_type", type(exc).__name__)
+            self.last_failure_type = str(failure_type)
+            if str(failure_type) == "quota_exhaustion":
+                self.quota_exhausted = True
+            logger.warning(
+                "llm_fallback",
+                extra={
+                    "from": self._primary.model,
+                    "to": self._secondary.model,
+                    "failure_type": failure_type,
+                    "agent": request.task,
+                },
+            )
             result = self._secondary.complete(request, tier=tier)
+            self.last_generation = "fixture_fallback"
             return replace(result, fallback=True)
 
 
@@ -47,6 +66,8 @@ class LLMRouter:
         tier2_enabled: bool,
         cache: LLMCache | None = None,
         use_cache: bool = False,
+        provider_name: str = "fixture",
+        host: str = "",
     ) -> None:
         self._tier1 = tier1
         self._tier2 = tier2
@@ -54,6 +75,8 @@ class LLMRouter:
         self._tier2_enabled = tier2_enabled
         self._cache = cache or LLMCache()
         self._use_cache = use_cache
+        self.provider_name = provider_name
+        self.host = host
 
     def assess(self, request: LLMRequest) -> LLMAssessment:
         tier = "tier1"
@@ -82,6 +105,31 @@ class LLMRouter:
             self._cache.put(request.content_hash, assessment.model, assessment)
         return assessment
 
+    def health_snapshot(self) -> dict[str, object]:
+        tier1 = self._tier1
+        return {
+            "provider": self.provider_name,
+            "model": getattr(tier1, "model", "fixture"),
+            "host": self.host,
+            "last_generation": getattr(tier1, "last_generation", None),
+            "fallback_count": getattr(tier1, "fallbacks", 0),
+            "last_failure_type": getattr(tier1, "last_failure_type", None),
+            "quota_exhausted": bool(getattr(tier1, "quota_exhausted", False)),
+            "prompt_tokens": self._tracker.prompt_tokens,
+            "completion_tokens": self._tracker.completion_tokens,
+            "cost_usd": self._tracker.estimate(self._tracker.prompt_tokens, self._tracker.completion_tokens),
+            "pricing_basis": self._tracker.pricing_basis,
+        }
+
+
+def provider_name_from_url(base_url: str) -> str:
+    host = (urlparse(base_url).hostname or "").lower()
+    if "groq.com" in host:
+        return "groq"
+    if "11434" in base_url or host in {"host.docker.internal", "127.0.0.1", "localhost"}:
+        return "ollama"
+    return "openai_compat"
+
 
 def build_router(
     *,
@@ -100,17 +148,23 @@ def build_router(
     if not api_key:
         fallback = FallbackProvider(fixture, fixture)
         logger.info("llm_router", extra={"llm_mode": "fixture", "llm_host": ""})
-        return LLMRouter(fallback, fallback, tracker, tier2_enabled=False, use_cache=use_cache)
+        return LLMRouter(
+            fallback,
+            fallback,
+            tracker,
+            tier2_enabled=False,
+            use_cache=use_cache,
+            provider_name="fixture",
+            host="",
+        )
     from intelligence_agents.llm.openai_compat import OpenAICompatibleProvider
-    from urllib.parse import urlparse
 
     kwargs = {}
     if openai_client is not None:
         kwargs["client"] = openai_client
-    logger.info(
-        "llm_router",
-        extra={"llm_mode": "openai", "llm_host": urlparse(base_url).hostname or "", "model": tier1_model},
-    )
+    name = provider_name_from_url(base_url)
+    host = urlparse(base_url).hostname or ""
+    logger.info("llm_router", extra={"llm_mode": "openai", "llm_host": host, "model": tier1_model, "provider": name})
     tier1 = OpenAICompatibleProvider(base_url, api_key, tier1_model or "tier1", timeout=timeout, **kwargs)
     tier2 = OpenAICompatibleProvider(base_url, api_key, tier2_model or "tier2", timeout=timeout, **kwargs)
     return LLMRouter(
@@ -119,4 +173,6 @@ def build_router(
         tracker,
         tier2_enabled=tier2_enabled,
         use_cache=use_cache,
+        provider_name=name,
+        host=host,
     )

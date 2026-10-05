@@ -85,6 +85,23 @@ def test_runner_submits_fixture_signals():
     assert sink.submitted
 
 
+def test_runner_duplicate_signal_id_is_ok():
+    news, funds = make_stores()
+    router = LLMRouter(FixtureLLMProvider(), None, CostTracker(0), tier2_enabled=False)
+    agent = NewsAgent(ReplayClock(FIXTURE_AS_OF), router)
+    sink = FakeSignalSink()
+
+    def factory(symbol, as_of, horizon):
+        return make_context(news, funds, {"horizon": horizon.value})
+
+    runner = Runner([agent], sink, ReplayClock(FIXTURE_AS_OF), factory, TradingMode.BACKTEST)
+    first = runner.run(["RELIANCE"], FIXTURE_AS_OF)
+    second = runner.run(["RELIANCE"], FIXTURE_AS_OF)
+    assert first and second
+    assert runner.results[-1].duplicate is True
+    assert len(sink.submitted) == 1
+
+
 def test_cycle_as_of_is_stable_inside_interval():
     from intelligence_agents.loop import cycle_as_of
 
