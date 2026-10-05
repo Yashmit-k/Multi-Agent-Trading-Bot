@@ -34,6 +34,8 @@ def create_app(settings: IntelligenceSettings | None = None, *, sink: object | N
     configure_logging(resolved.log_level)
     resolved_sink = _require_live_sink(resolved, sink)
     health = RunnerHealth()
+    health.llm_provider = resolved.llm_provider()
+    health.llm_model = resolved.llm_tier1_model
     stop = asyncio.Event()
 
     @asynccontextmanager
@@ -96,6 +98,17 @@ def create_app(settings: IntelligenceSettings | None = None, *, sink: object | N
             "prompt_tokens": health.prompt_tokens,
             "completion_tokens": health.completion_tokens,
             "fallbacks": health.fallbacks,
+            "llm_status": {
+                "provider": resolved.llm_provider(),
+                "model": resolved.llm_tier1_model,
+                "host": resolved.llm_host(),
+                "last_generation": health.last_generation,
+                "fallback_count": health.fallbacks,
+                "last_failure_type": health.last_failure_type,
+                "quota_exhausted": health.quota_exhausted,
+                "prompt_tokens": health.prompt_tokens,
+                "completion_tokens": health.completion_tokens,
+            },
         }
         if reason:
             payload["reason"] = reason

@@ -75,6 +75,13 @@ class IntelligenceSettings:
             return "openai"
         return "fixture"
 
+    def llm_provider(self) -> str:
+        from intelligence_agents.llm.router import provider_name_from_url
+
+        if not self.llm_api_key or not self.llm_base_url:
+            return "fixture"
+        return provider_name_from_url(self.llm_base_url)
+
     def llm_host(self) -> str:
         from urllib.parse import urlparse
 

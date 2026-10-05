@@ -12,9 +12,9 @@ from contracts.schemas.agent_signal import AgentSignal
 from intelligence_agents.agents.base import BaseIntelligenceAgent
 from intelligence_agents.agents.confidence import CAPS
 from intelligence_agents.clock import Clock
+from intelligence_agents.agents.interpret import interpret
 from intelligence_agents.llm.router import LLMRouter
-from intelligence_agents.llm.types import LLMRequest
-from intelligence_agents.llm.validate import as_jsonable, wrap_untrusted
+from intelligence_agents.llm.validate import as_jsonable
 
 
 class NewsAgent(BaseIntelligenceAgent):
@@ -33,14 +33,8 @@ class NewsAgent(BaseIntelligenceAgent):
         }
         if not articles:
             return self._insufficient(symbol, as_of, context, payload)
-        blob = "\n".join(f"{article.title}\n{article.raw_text}" for article in articles)
-        request = LLMRequest(
-            content_hash=content_hash(blob),
-            user_payload=wrap_untrusted(blob),
-            task="news",
-            high_impact_hint=False,
-        )
-        assessments = [self._router.assess(request)]
+        blob = "\n".join(article.raw_text for article in articles)
+        assessments = [interpret(self._router, task="news", payload=blob)]
         score = sum(item.sentiment * item.impact for item in assessments) / len(assessments)
         confidence = self._combine_confidence([item.confidence for item in assessments])
         features = {

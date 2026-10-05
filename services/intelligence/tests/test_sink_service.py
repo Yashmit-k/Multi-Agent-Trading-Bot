@@ -113,3 +113,40 @@ def test_serve_paper_requires_token(monkeypatch):
     except ConfigError:
         raised = True
     assert raised
+
+
+def test_health_reports_configured_ollama_before_cycle(monkeypatch):
+    from fastapi.testclient import TestClient
+    from contracts.fakes import FakeSignalSink
+
+    monkeypatch.setenv("INTELLIGENCE_TRADING_MODE", "BACKTEST")
+    monkeypatch.setenv("INTELLIGENCE_SERVICE_MODE", "oneshot")
+    monkeypatch.setenv("INTELLIGENCE_DATA_SOURCE", "fixtures")
+    monkeypatch.setenv("LLM_BASE_URL", "http://host.docker.internal:11434/v1")
+    monkeypatch.setenv("LLM_API_KEY", "ollama")
+    monkeypatch.setenv("LLM_TIER1_MODEL", "phi3:mini")
+    app = create_app(IntelligenceSettings.from_env(), sink=FakeSignalSink())
+    with TestClient(app) as client:
+        body = client.get("/health").json()
+    assert body["llm_status"]["provider"] == "ollama"
+    assert body["llm_status"]["model"] == "phi3:mini"
+    assert body["llm_status"]["provider"] != "fixture"
+    assert body["fallbacks"] == 0
+
+
+def test_http_retries_then_raises():
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(503)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    sink = HttpSignalSink("http://core", "t", TradingMode.PAPER, retries=3, client=client, sleeper=lambda _: None)
+    try:
+        sink.submit(sample_agent_signal())
+        raised = False
+    except httpx.HTTPError:
+        raised = True
+    assert raised
+    assert calls["n"] == 3
