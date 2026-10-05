@@ -14,20 +14,24 @@ dependencies = [
     "core-features",
     "numpy>=2.0",
     "httpx>=0.27",
-    "pyarrow>=17",
     "pyyaml>=6.0",
     "scikit-learn>=1.5",
     "uvicorn>=0.32",
 ]
 
 [project.optional-dependencies]
+train = [
+    "pyarrow>=17",
+]
 dev = [
     "httpx>=0.27",
     "pytest>=8.0",
+    "pyarrow>=17",
 ]
 
 [project.scripts]
 quant-train = "quant_agents.ml.train:main"
+quant-experiment = "quant_agents.ml.experiment:main"
 quant-service = "quant_agents.service:main"
 
 [tool.hatch.build.targets.wheel]

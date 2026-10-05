@@ -15,3 +15,6 @@ node_modules/
 .env
 services/intelligence/.env
 snapshots/
+datasets/
+experiments/
+artifacts/

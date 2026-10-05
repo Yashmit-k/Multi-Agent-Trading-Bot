@@ -74,6 +74,7 @@ def test_incomplete_label_windows_are_dropped_and_rows_are_sorted(repository: Co
     metadata = {key.decode(): value.decode() for key, value in table.schema.metadata.items()}
     assert metadata["feature_version"] == FEATURE_VERSION
     assert metadata["dataset_schema_version"] == DATASET_SCHEMA_VERSION
+    assert metadata["label_version"] == "1.0"
     assert metadata["timeframe"] == "1d,5m"
     assert metadata["snapshot_id"] == metadata["candle_sha256"]
     assert len(metadata["snapshot_id"]) == 64
@@ -81,7 +82,7 @@ def test_incomplete_label_windows_are_dropped_and_rows_are_sorted(repository: Co
 
 def test_mutating_a_future_bar_does_not_change_features(repository: CoreRepository, tmp_path: Path) -> None:
     snapshot = _snapshot(repository, tmp_path / "snap")
-    before, _ = build_rows(snapshot, _label_next_close)
+    before, _, _ = build_rows(snapshot, _label_next_close)
     path = snapshot / "candles.jsonl"
     lines = path.read_text(encoding="utf-8").splitlines()
     mutated = []
@@ -94,7 +95,7 @@ def test_mutating_a_future_bar_does_not_change_features(repository: CoreReposito
             row["close"] = 999999.99
         mutated.append(json.dumps(row))
     path.write_text("\n".join(mutated) + "\n", encoding="utf-8")
-    after, _ = build_rows(snapshot, _label_next_close)
+    after, _, _ = build_rows(snapshot, _label_next_close)
     reliance_before = next(row for row in before if row["symbol"] == "RELIANCE")
     reliance_after = next(row for row in after if row["symbol"] == "RELIANCE")
     before_features = {key: value for key, value in reliance_before.items() if key.startswith("feature_")}
