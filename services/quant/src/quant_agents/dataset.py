@@ -148,7 +148,14 @@ def write_parquet(rows: list[dict[str, object]], metadata: dict[str, str], out: 
 
     if not rows:
         raise SystemExit("parquet has no rows")
-    table = pa.Table.from_pylist(rows)
+    keys: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        for key in row:
+            if key not in seen:
+                seen.add(key)
+                keys.append(key)
+    table = pa.table({key: [row.get(key) for row in rows] for key in keys})
     encoded = {key.encode("utf-8"): value.encode("utf-8") for key, value in metadata.items()}
     table = table.replace_schema_metadata(encoded)
     out.parent.mkdir(parents=True, exist_ok=True)

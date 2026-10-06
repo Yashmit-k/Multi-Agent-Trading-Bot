@@ -5,7 +5,9 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
-import pyarrow.parquet as pq
+import pytest
+
+pq = pytest.importorskip("pyarrow.parquet")
 
 from contracts.enums import Exchange, Timeframe
 from contracts.schemas.market import Candle
