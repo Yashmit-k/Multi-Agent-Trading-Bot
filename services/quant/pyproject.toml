@@ -32,6 +32,7 @@ dev = [
 [project.scripts]
 quant-train = "quant_agents.ml.train:main"
 quant-experiment = "quant_agents.ml.experiment:main"
+quant-experiment-a = "quant_agents.ml.experiment_a:main"
 quant-service = "quant_agents.service:main"
 
 [tool.hatch.build.targets.wheel]

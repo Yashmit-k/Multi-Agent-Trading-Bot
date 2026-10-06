@@ -27,6 +27,14 @@ python -m quant_agents.ml.experiment --parquet datasets/nifty50-5m.parquet --out
 
 This writes sklearn logistic artifacts and appends to `experiments/log.jsonl`. It does not change production `MlAgent`. PnL needs Core's backtester. `datasets/`, `snapshots/`, `artifacts/`, and `experiments/` are gitignored.
 
+Research Experiment A (relative features, timestamp splits):
+
+```bash
+python -m quant_agents.ml.experiment_a --parquet datasets/nifty50-1d.parquet --out experiments/experiment-a/1d
+python -m quant_agents.ml.experiment_a --parquet datasets/nifty50-5m.parquet --out experiments/experiment-a/5m
+```
+
+
 ## Run
 
 ```bash
