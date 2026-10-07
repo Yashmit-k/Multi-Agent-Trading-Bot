@@ -16,7 +16,7 @@ Do not modify this document after seeing validation results. There are no valida
 | Information source | Earnings/events (priority 1; one source only) |
 | Universe | NIFTY 50 constituents |
 | Model | `sklearn.linear_model.LogisticRegression` (one fixed configuration; no sweep) |
-| Cost gate | Positive validation net edge after **2 bp**. The gate was not modified. It could not be applied because this checkout has no costed historical execution path. |
+| Cost gate | Positive validation net edge after **2 bp**. The gate was not modified. It could not be applied because this checkout has no frozen 2024–2025 snapshot. A costed historical path exists on `b4ab1ce`. |
 | Timestamp rule | `period_end` never substitutes for `available_at`. Reject RSS wall-clock `retrieved_at` and fixture clocks. Only records with a trustworthy availability time `<=` prediction timestamp may be used. |
 | Benchmarks (when evaluable) | Always-flat; always-long/passive where applicable; existing quant-agent baseline; H001 strategy |
 
@@ -37,8 +37,7 @@ Required PIT historical earnings/events are **unavailable**. Do not invent value
 ## Why evaluation is blocked
 
 - No PIT earnings/events history with trustworthy `available_at`.
-- Required candles: 2024-01-01 through 2025-12-31. Local 2026 snapshot (~Jun–Oct) must not be used for hypothesis selection.
-- No costed historical execution path (`/api/v1/backtests` returns 501; paper current-close zero-cost fills are not the baseline).
-- FeatureSet 1.1.0 verification is **NOT POSSIBLE** (current `feature_version` is `"1.0.0"`; wire `schema_version` remains `"1.0"`).
+- Required candles: 2024-01-01 through 2025-12-31. Local 2026 snapshot (~Jun–Oct) must not be used for hypothesis selection. `snapshots 2/nifty50` and `nifty50_*_20261005` are absent on this machine.
+- FeatureSet 1.1.0 is present (`feature_version` `"1.1.0"`; wire `schema_version` `"1.0"`). Costed backtest path is present. Those are no longer the block.
 
 No LogisticRegression fit. No MlAgent. No boosting. No robustness sweeps.
