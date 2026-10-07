@@ -1,4 +1,4 @@
-"""FeatureSets whose keys match the Core Feature Engine 1.0.0 snapshot."""
+"""FeatureSets whose keys match the Core Feature Engine 1.1.0 snapshot."""
 
 from __future__ import annotations
 
