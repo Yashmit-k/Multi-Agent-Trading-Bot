@@ -21,6 +21,8 @@ class QuantSettings:
     symbols: tuple[str, ...] = ()
     eval_interval_seconds: int = 300
     snapshot_path: str = ""
+    horizon: str = "SWING"
+    timeframe: str = "1d"
 
     @classmethod
     def from_env(cls) -> QuantSettings:
@@ -44,4 +46,6 @@ class QuantSettings:
             symbols=symbols,
             eval_interval_seconds=int(os.environ.get("QUANT_EVAL_INTERVAL_SECONDS", "300")),
             snapshot_path=os.environ.get("QUANT_SNAPSHOT_PATH", ""),
+            horizon=os.environ.get("QUANT_HORIZON", "SWING"),
+            timeframe=os.environ.get("QUANT_TIMEFRAME", "1d"),
         )

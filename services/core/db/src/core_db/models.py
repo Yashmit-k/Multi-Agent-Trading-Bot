@@ -178,6 +178,61 @@ class PortfolioSnapshotRow(Base):
     payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
 
 
+class BacktestRunRow(Base):
+    __tablename__ = "backtest_runs"
+
+    backtest_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    snapshot_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class BacktestCostRow(Base):
+    __tablename__ = "backtest_costs"
+
+    backtest_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class BacktestOrderRow(Base):
+    __tablename__ = "backtest_orders"
+
+    row_id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    backtest_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class BacktestFillRow(Base):
+    __tablename__ = "backtest_fills"
+
+    row_id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    backtest_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class BacktestPositionRow(Base):
+    __tablename__ = "backtest_positions"
+
+    row_id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    backtest_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class BacktestPortfolioRow(Base):
+    __tablename__ = "backtest_portfolio_snapshots"
+
+    row_id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    backtest_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class BacktestMetricRow(Base):
+    __tablename__ = "backtest_metrics"
+
+    backtest_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
 class RuntimeFlagRow(Base):
     __tablename__ = "runtime_flags"
 

@@ -23,29 +23,42 @@ _SWING = {"horizon": Horizon.SWING, "timeframe": Timeframe.D1, "regime_index_sym
 
 
 class _OneFeatureProvider:
-    def __init__(self, feature_set: FeatureSet) -> None:
-        self._feature_set = feature_set
+    def __init__(self, feature_set: FeatureSet, extras: tuple[FeatureSet, ...] = ()) -> None:
+        self._sets = {feature_set.symbol: feature_set}
+        for item in extras:
+            self._sets[item.symbol] = item
 
     def get_feature_set(self, symbol: str, timeframe: Timeframe | str, as_of: datetime) -> FeatureSet:
-        if symbol.strip().upper() != self._feature_set.symbol:
+        found = self._sets.get(symbol.strip().upper())
+        if found is None or found.timestamp > as_of:
             raise LookupError(symbol)
-        return self._feature_set
+        return found
 
 
-def publish_symbol_signals(symbol: str, feature_set: FeatureSet, sink: SignalSink) -> int:
+def publish_symbol_signals(
+    symbol: str,
+    feature_set: FeatureSet,
+    sink: SignalSink,
+    *,
+    agents=_AGENTS,
+    clock=None,
+    calendar=None,
+    configuration: dict | None = None,
+    index_sets: tuple[FeatureSet, ...] = (),
+) -> int:
     """Evaluate every quant agent once at the feature timestamp and submit each signal."""
     as_of = feature_set.timestamp
-    clock = ReplayClock(as_of)
-    calendar = StaticNseCalendar()
+    clock = clock or ReplayClock(as_of)
+    calendar = calendar or StaticNseCalendar()
     context = AgentContext(
         market_data_provider=FakeMarketDataProvider(),
-        feature_provider=_OneFeatureProvider(feature_set),
+        feature_provider=_OneFeatureProvider(feature_set, index_sets),
         news_provider=FakeNewsProvider(),
         fundamental_provider=FakeFundamentalProvider(),
-        configuration=_SWING,
+        configuration=configuration or _SWING,
     )
     written = 0
-    for agent_cls in _AGENTS:
+    for agent_cls in agents:
         signal = agent_cls(clock, calendar).evaluate(symbol, as_of, context)
         sink.submit(signal)
         written += 1
@@ -64,7 +77,15 @@ def fetch_feature(client: httpx.Client, base_url: str, token: str, symbol: str) 
     return FeatureSet.model_validate(response.json())
 
 
-def run_paper_pass(base_url: str, read_token: str, symbols: tuple[str, ...], sink: SignalSink, *, client: httpx.Client | None = None) -> int:
+def run_paper_pass(
+    base_url: str,
+    read_token: str,
+    symbols: tuple[str, ...],
+    sink: SignalSink,
+    *,
+    client: httpx.Client | None = None,
+    configuration: dict | None = None,
+) -> int:
     owned = client or httpx.Client(timeout=30.0)
     close = client is None
     written = 0
@@ -74,7 +95,7 @@ def run_paper_pass(base_url: str, read_token: str, symbols: tuple[str, ...], sin
             if feature_set is None:
                 logger.info("quant_skip_symbol", extra={"symbol": symbol, "reason": "no_features"})
                 continue
-            written += publish_symbol_signals(symbol, feature_set, sink)
+            written += publish_symbol_signals(symbol, feature_set, sink, configuration=configuration)
     finally:
         if close:
             owned.close()

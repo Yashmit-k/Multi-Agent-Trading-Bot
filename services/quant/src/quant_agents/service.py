@@ -76,6 +76,11 @@ async def _publish_loop(settings: QuantSettings, sink: object) -> None:
                 settings.core_api_token,
                 settings.symbols,
                 sink,
+                configuration={
+                    "horizon": settings.horizon,
+                    "timeframe": settings.timeframe,
+                    "regime_index_symbols": (),
+                },
             )
         except Exception:
             logger.exception("quant paper pass failed")

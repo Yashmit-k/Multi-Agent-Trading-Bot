@@ -35,9 +35,12 @@ class ReportingKite:
         return {}
 
     def historical_data(self, instrument_token: int, from_date: datetime, to_date: datetime, interval: str) -> list[dict[str, object]]:
-        day = from_date.date()
+        moment = from_date
+        if moment.tzinfo is not None and moment.astimezone(UTC).hour >= 4:
+            moment = moment + timedelta(days=1)
+        day = moment.date()
         if instrument_token == 2:
-            day = (from_date + timedelta(days=self.late_days)).date()
+            day = (moment + timedelta(days=self.late_days)).date()
         rows = [_bar(day, interval)]
         if self.future:
             rows.append(_bar(to_date.date() + timedelta(days=3), interval))

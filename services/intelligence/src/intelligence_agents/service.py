@@ -60,10 +60,27 @@ def create_app(settings: IntelligenceSettings | None = None, *, sink: object | N
             except (TimeoutError, asyncio.CancelledError):
                 task.cancel()
 
+    from datetime import datetime, timezone
+
+    from intelligence_agents.runtime import make_stores
+
+    news_store, fund_store = make_stores(resolved)
     app = FastAPI(title="Intelligence agents", version="1.0.0", lifespan=lifespan)
     app.state.settings = resolved
     app.state.sink = resolved_sink
     app.state.health = health
+    app.state.news_store = news_store
+    app.state.fund_store = fund_store
+
+    @app.get("/news/{symbol}")
+    def news_rows(symbol: str, as_of: str | None = None) -> list[dict[str, object]]:
+        moment = datetime.now(timezone.utc) if as_of is None else datetime.fromisoformat(as_of)
+        return [item.model_dump(mode="json") for item in news_store.articles_for(symbol, moment)]
+
+    @app.get("/fundamentals/{symbol}")
+    def fundamental_rows(symbol: str, as_of: str | None = None) -> list[dict[str, object]]:
+        moment = datetime.now(timezone.utc) if as_of is None else datetime.fromisoformat(as_of)
+        return [item.model_dump(mode="json") for item in fund_store.points_for(symbol, moment)]
 
     @app.get("/health")
     def health_view() -> dict[str, object]:

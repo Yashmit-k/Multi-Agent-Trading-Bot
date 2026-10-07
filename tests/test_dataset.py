@@ -78,8 +78,8 @@ def test_incomplete_label_windows_are_dropped_and_rows_are_sorted(repository: Co
     assert metadata["dataset_schema_version"] == DATASET_SCHEMA_VERSION
     assert metadata["label_version"] == "1.0"
     assert metadata["timeframe"] == "1d,5m"
-    assert metadata["snapshot_id"] == metadata["candle_sha256"]
-    assert len(metadata["snapshot_id"]) == 64
+    assert metadata["snapshot_id"] == "nifty50_1d_5m_20240604"
+    assert len(metadata["candle_sha256"]) == 64
 
 
 def test_mutating_a_future_bar_does_not_change_features(repository: CoreRepository, tmp_path: Path) -> None:

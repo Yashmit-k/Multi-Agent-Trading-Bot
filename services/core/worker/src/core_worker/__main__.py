@@ -9,6 +9,7 @@ from core_db.seed import load_seed
 from core_db.session import create_schema
 from core_ingestion.service import MemoryEventPublisher, RedisEventPublisher
 from core_paper import run_paper_cycle
+from core_paper.costs import CostSchedule
 from core_worker.loop import run_once
 
 database_url = os.environ.get("DATABASE_URL", "sqlite:///./core.db")
@@ -24,7 +25,10 @@ if redis_url:
     publisher = RedisEventPublisher(redis.Redis.from_url(redis_url))
 else:
     publisher = MemoryEventPublisher()
+cost_raw = os.environ.get("PAPER_TRANSACTION_COST_BPS")
+slip_raw = os.environ.get("PAPER_SLIPPAGE_BPS", "0")
+schedule = None if cost_raw is None else CostSchedule.research(Decimal(cost_raw), Decimal(slip_raw))
 while True:
     run_once(repository, datetime.now(timezone.utc))
-    run_paper_cycle(repository, publisher, mode=mode, starting_cash=starting_cash)
+    run_paper_cycle(repository, publisher, mode=mode, starting_cash=starting_cash, schedule=schedule)
     time.sleep(interval)
