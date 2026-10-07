@@ -1,5 +1,8 @@
 # Local quant configuration. Not a contracts vocabulary.
 # Horizon is never inferred from timeframe; both must be supplied.
+# label_horizon is t+h in existing bars (QUANT_LABEL_HORIZON overrides). Must be >= 1.
+
+label_horizon: 1
 
 allowed:
   INTRADAY:

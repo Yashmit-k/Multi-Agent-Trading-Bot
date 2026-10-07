@@ -1,0 +1,41 @@
+# Overlay for local Intelligence. Does not replace docker-compose.yml.
+# Host Ollama: ollama serve && ollama pull qwen2.5:7b
+# Bring-up:
+#   docker compose -f docker-compose.yml -f docker-compose.intelligence.yml up --build -d postgres redis core-api core-worker intelligence
+#
+# Developer 3 still owns docker-compose.yml.
+
+services:
+  intelligence:
+    build:
+      context: .
+      dockerfile: services/intelligence/Dockerfile
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - services/intelligence/.env.example
+      - .env
+    environment:
+      INTELLIGENCE_TRADING_MODE: PAPER
+      INTELLIGENCE_SERVICE_MODE: serve
+      INTELLIGENCE_DATA_SOURCE: fixtures
+      INTELLIGENCE_STORE: sqlite
+      INTELLIGENCE_SQLITE_PATH: /var/lib/intelligence/intel.db
+      INTELLIGENCE_EVAL_INTERVAL_SECONDS: "300"
+      INTELLIGENCE_SYMBOLS: ADANIENT,ADANIPORTS,APOLLOHOSP,ASIANPAINT,AXISBANK,BAJAJ-AUTO,BAJFINANCE,BAJAJFINSV,BEL,BHARTIARTL,BPCL,BRITANNIA,CIPLA,COALINDIA,DRREDDY,EICHERMOT,GRASIM,HCLTECH,HDFCBANK,HDFCLIFE,HEROMOTOCO,HINDALCO,HINDUNILVR,ICICIBANK,INDUSINDBK,INFY,ITC,JSWSTEEL,KOTAKBANK,LT,M&M,MARUTI,NESTLEIND,NTPC,ONGC,POWERGRID,RELIANCE,SBILIFE,SBIN,SHRIRAMFIN,SUNPHARMA,TATACONSUM,TATAMOTORS,TATASTEEL,TCS,TECHM,TITAN,TRENT,ULTRACEMCO,WIPRO
+      CORE_API_URL: http://core-api:8000
+      LLM_BASE_URL: http://host.docker.internal:11434/v1
+      LLM_API_KEY: ollama
+      LLM_TIER1_MODEL: qwen2.5:7b
+      LLM_TIER2_MODEL: qwen2.5:7b
+      LLM_DAILY_BUDGET_USD: "0"
+      LLM_TIMEOUT_SECONDS: "30"
+      INTELLIGENCE_TIER2_ENABLED: "false"
+    depends_on:
+      - core-api
+      - core-worker
+    volumes:
+      - intelligence-data:/var/lib/intelligence
+
+volumes:
+  intelligence-data:

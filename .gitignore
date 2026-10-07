@@ -12,3 +12,9 @@ build/
 node_modules/
 .next/
 .env.local
+.env
+services/intelligence/.env
+snapshots/
+datasets/
+experiments/
+artifacts/

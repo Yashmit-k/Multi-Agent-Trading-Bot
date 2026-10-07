@@ -11,7 +11,8 @@ Do not use a service-directory build context. `packages/contracts` must be avail
       - "8102:8080"
     env_file: services/quant/.env.example
     environment:
-      QUANT_TRADING_MODE: BACKTEST
+      QUANT_TRADING_MODE: PAPER
+      CORE_API_URL: http://core-api:8000
 
   frontend-mock-api:
     build:
@@ -27,5 +28,5 @@ Do not use a service-directory build context. `packages/contracts` must be avail
     ports:
       - "3000:3000"
     environment:
-      NEXT_PUBLIC_API_BASE_URL: http://frontend-mock-api:8090
+      NEXT_PUBLIC_API_BASE_URL: http://core-api:8000
 ```

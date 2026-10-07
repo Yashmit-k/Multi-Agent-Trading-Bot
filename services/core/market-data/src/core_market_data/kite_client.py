@@ -1,0 +1,71 @@
+"""Kite Connect v4 client. Tests inject a stand-in and never construct this against the network."""
+
+from __future__ import annotations
+
+import os
+from datetime import datetime
+from typing import Any
+
+
+class KiteConnectMarketClient:
+    """Wraps pykiteconnect. Historical calls stay non-continuous equity candles."""
+
+    def __init__(
+        self,
+        api_key: str,
+        api_secret: str,
+        access_token: str | None = None,
+        kite: Any | None = None,
+    ) -> None:
+        self._api_secret = api_secret
+        self.access_token = access_token
+        if kite is None:
+            from kiteconnect import KiteConnect
+
+            kite = KiteConnect(api_key=api_key)
+            if access_token:
+                kite.set_access_token(access_token)
+        self._kite = kite
+
+    def login_url(self) -> str:
+        return str(self._kite.login_url())
+
+    def generate_session(self, request_token: str) -> dict[str, Any]:
+        data = self._kite.generate_session(request_token, api_secret=self._api_secret)
+        token = data.get("access_token")
+        if token:
+            self.access_token = str(token)
+            self._kite.set_access_token(self.access_token)
+        return dict(data)
+
+    def instruments(self, exchange: str) -> list[dict[str, Any]]:
+        return list(self._kite.instruments(exchange))
+
+    def quote(self, key: str) -> dict[str, Any]:
+        return dict(self._kite.quote(key))
+
+    def historical_data(
+        self,
+        instrument_token: int,
+        from_date: datetime,
+        to_date: datetime,
+        interval: str,
+    ) -> list[dict[str, Any]]:
+        rows = self._kite.historical_data(
+            instrument_token,
+            from_date,
+            to_date,
+            interval,
+            continuous=False,
+            oi=False,
+        )
+        return list(rows)
+
+
+def kite_client_from_env() -> KiteConnectMarketClient | None:
+    api_key = os.environ.get("ZERODHA_API_KEY", "").strip()
+    api_secret = os.environ.get("ZERODHA_API_SECRET", "").strip()
+    if not api_key or not api_secret:
+        return None
+    access_token = os.environ.get("ZERODHA_ACCESS_TOKEN", "").strip() or None
+    return KiteConnectMarketClient(api_key, api_secret, access_token)

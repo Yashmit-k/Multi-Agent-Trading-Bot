@@ -17,4 +17,5 @@ class FeatureSet(ContractModel):
     timeframe: Timeframe
     feature_version: NonEmptyStr
     features: Features
+    unavailable: list[str] = []
     source_data_timestamp: AwareDatetime

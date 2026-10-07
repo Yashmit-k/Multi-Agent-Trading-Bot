@@ -12,6 +12,7 @@ from sklearn.metrics import accuracy_score
 from quant_agents.ml.artifact import write_artifact
 from quant_agents.ml.dataset import FEATURE_COLUMNS, build_dataset
 from quant_agents.ml.model import make_model
+from quant_agents.labelers import parse_label_horizon
 from quant_agents.ml.splits import chronological_split
 from quant_agents.testing.history import HistoryFeatureProvider
 
@@ -26,8 +27,9 @@ def train(
     cutoff: datetime,
     symbol: str = "RELIANCE",
     timeframe: Timeframe = Timeframe.D1,
-    label_horizon: int = 1,
+    label_horizon: int | None = None,
 ) -> Path:
+    horizon = parse_label_horizon(label_horizon)
     provider = HistoryFeatureProvider()
     as_of_points = _as_of_grid(datetime(2024, 1, 15, 10, 0, tzinfo=timezone.utc), 80)
     dataset = build_dataset(
@@ -35,10 +37,10 @@ def train(
         symbol=symbol,
         timeframe=timeframe,
         as_of_points=as_of_points,
-        label_horizon=label_horizon,
+        label_horizon=horizon,
         training_data_cutoff=cutoff,
     )
-    split = chronological_split(len(dataset.rows), label_horizon=label_horizon)
+    split = chronological_split(len(dataset.rows), label_horizon=horizon)
     x_train = [[row[col] for col in FEATURE_COLUMNS] for row in dataset.rows[: split.train_end]]
     y_train = dataset.labels[: split.train_end]
     x_valid = [[row[col] for col in FEATURE_COLUMNS] for row in dataset.rows[split.train_end : split.valid_end]]
@@ -60,8 +62,9 @@ def train(
         timeframe=timeframe.value,
         training_data_cutoff=cutoff,
         trained_at=datetime(2024, 6, 1, 0, 0, tzinfo=timezone.utc),
-        label_horizon=label_horizon,
+        label_horizon=horizon,
         embargo_bars=split.embargo_bars,
+        cutoff_source="explicit",
         diagnostics=diagnostics,
     )
     return output_dir
