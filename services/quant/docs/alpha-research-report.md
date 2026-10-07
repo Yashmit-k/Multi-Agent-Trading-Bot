@@ -14,7 +14,7 @@ Re-audit tree: `origin/main` **`b4ab1ce`**. See [`research-audit-2026-10.md`](re
 - FeatureSet 1.1 verification: **POSSIBLE** (engine emits requested fields; `volume_imbalance` unavailable).
 - Agents: five rule agents. MlAgent not loaded. Technical / Momentum / Mean Reversion still vote on 1.0 keys; 1.1 optionals are unused except Regime `volatility_percentile` when present. Volume compares `last_volume` vs `volume_mean` and does **not** consume engine `relative_volume`.
 - Leakage: engine `bar.end <= as_of`; agents do not read candles. Holdout unused.
-- Baseline status: **NOT RUN**. Costed historical backtest exists (`POST /api/v1/backtests`, `run_backtest`, default 2 bp). Frozen 2024–2025 snapshot is **absent** on this machine. Experiment A is prior context only.
+- Baseline status: **NOT RUN**. Costed historical backtest exists. Frozen 2024–2025 snapshots are **MARKET_DATA_READY** at `snapshots 2/nifty50`. H001 still blocked on PIT events. Experiment A is prior context only.
 
 ## 2. Baseline results
 
@@ -86,7 +86,7 @@ PIT earnings/events and frozen 2024–2025 snapshots are missing. Stop. Do not t
 
 - Feature Engine owner: FeatureSet **1.1.0** is on `b4ab1ce` — not blocking.
 - Core/backtest owner: next-bar execution, costs, slippage, 2 bp **capability** are on `b4ab1ce` — not blocking.
-- Data owner: provide frozen **non-holdout** 2024–2025 snapshots (`snapshots 2/nifty50`, `nifty50_5m_20261005`, `nifty50_1d_20261005`). Do not open holdout.
+- Data owner: frozen 2024–2025 snapshots are at `snapshots 2/nifty50` after move/rename (**MARKET_DATA_READY**). Do not open holdout.
 - Intelligence owner: PIT earnings/events with trustworthy `available_at` (not `period_end`, not RSS wall-clock, not fixtures).
 
 **P1** Re-run the audit after those files exist (snapshot names, backtest smoke, agent 1.1 consumption) without opening holdout.

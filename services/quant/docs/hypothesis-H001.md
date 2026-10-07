@@ -37,7 +37,7 @@ Required PIT historical earnings/events are **unavailable**. Do not invent value
 ## Why evaluation is blocked
 
 - No PIT earnings/events history with trustworthy `available_at`.
-- Required candles: 2024-01-01 through 2025-12-31. Local 2026 snapshot (~Jun–Oct) must not be used for hypothesis selection. `snapshots 2/nifty50` and `nifty50_*_20261005` are absent on this machine.
-- FeatureSet 1.1.0 is present (`feature_version` `"1.1.0"`; wire `schema_version` `"1.0"`). Costed backtest path is present. Those are no longer the block.
+- Required candles: 2024-01-01 through 2025-12-31. Frozen IDs `nifty50_5m_20261005` / `nifty50_1d_20261005` are at `snapshots 2/nifty50` after a move/rename (**MARKET_DATA_READY**). Do not use the short 2026 `snapshots/nifty50` tape for hypothesis selection.
+- FeatureSet 1.1.0 and the costed backtest path are present. Remaining block is PIT earnings/events.
 
 No LogisticRegression fit. No MlAgent. No boosting. No robustness sweeps.
