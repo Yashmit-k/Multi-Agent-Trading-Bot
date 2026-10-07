@@ -27,7 +27,7 @@ python -m quant_agents.ml.experiment --parquet datasets/nifty50-5m.parquet --out
 
 This writes sklearn logistic artifacts and appends to `experiments/log.jsonl`. It does not change production `MlAgent`. PnL needs Core's backtester. `datasets/`, `snapshots/`, `artifacts/`, and `experiments/` are gitignored.
 
-Research Experiment A (relative features, timestamp splits) is **closed**. Decision and numbers: [`docs/experiment-a.md`](docs/experiment-a.md). Do not collect more history or wire production `MlAgent` on this snapshot. Quant baseline + H001: [`docs/alpha-research-report.md`](docs/alpha-research-report.md) (FAIL / BLOCKED_PRECONDITION).
+Research Experiment A (relative features, timestamp splits) is **closed**. Decision and numbers: [`docs/experiment-a.md`](docs/experiment-a.md). Do not collect more history or wire production `MlAgent` on this snapshot. Quant baseline + H001: [`docs/alpha-research-report.md`](docs/alpha-research-report.md) (FAIL / BLOCKED_PRECONDITION). Data readiness: [`docs/data-readiness-2026-10.md`](docs/data-readiness-2026-10.md) (`BLOCKED_PRECONDITION`; market `PATH_BLOCKED`; events `EVENT_DATA_BLOCKED`).
 
 ```bash
 python -m quant_agents.ml.experiment_a --parquet datasets/nifty50-1d.parquet --out experiments/experiment-a/1d
