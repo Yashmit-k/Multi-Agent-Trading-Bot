@@ -11,6 +11,8 @@ services:
       POSTGRES_DB: core
     ports:
       - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U core -d core"]
       interval: 5s
@@ -30,6 +32,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://core:core@postgres:5432/core
       REDIS_URL: redis://redis:6379/0
+      SEED_HISTORY_DAYS: ${SEED_HISTORY_DAYS:-100}
     depends_on:
       postgres:
         condition: service_healthy
@@ -105,4 +108,5 @@ services:
       - "3000:3000"
 
 volumes:
+  postgres-data:
   intelligence-data:
