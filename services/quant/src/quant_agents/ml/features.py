@@ -192,3 +192,91 @@ def new_matrix(feature_rows: list[dict[str, float]]) -> list[list[float]]:
         if absent:
             raise SystemExit(f"NEW feature columns missing after transform: {absent}")
     return [[float(item[name]) for name in NEW_COLUMNS] for item in feature_rows]
+
+
+_ENGINE_RATIOS = (
+    "sma_10_over_sma_20",
+    "ema_12_over_ema_26",
+    "macd_histogram_over_close",
+    "bollinger_width",
+)
+
+BAR_SHAPE_COLUMNS = (
+    "body_over_range",
+    "upper_wick_over_range",
+    "lower_wick_over_range",
+    "close_position",
+    "range_over_close",
+)
+
+# close_vwap is renamed so the column says this is the window VWAP, not a session VWAP.
+DIRECTION_COLUMNS = tuple(
+    "close_window_vwap" if name == "close_vwap" else name for name in NEW_COLUMNS
+) + _ENGINE_RATIOS + BAR_SHAPE_COLUMNS
+
+FORBIDDEN_X_COLUMNS = ("symbol", "timeframe", "end", "future_end", "label")
+
+
+def bar_shape(open_: float, high: float, low: float, close: float) -> dict[str, float] | None:
+    """Candle geometry from bar T only. None when the range or close is zero."""
+    span = high - low
+    if span == 0.0 or close == 0.0:
+        return None
+    upper = high - max(open_, close)
+    lower = min(open_, close) - low
+    payload = {
+        "body_over_range": (close - open_) / span,
+        "upper_wick_over_range": upper / span,
+        "lower_wick_over_range": lower / span,
+        "close_position": (close - low) / span,
+        "range_over_close": span / close,
+    }
+    if any(not math.isfinite(value) for value in payload.values()):
+        return None
+    return payload
+
+
+def direction_row(
+    row: dict[str, Any],
+    *,
+    open_: float,
+    high: float,
+    low: float,
+    close: float,
+) -> tuple[dict[str, float] | None, str | None]:
+    """Thin direction matrix. Does not recompute indicators."""
+    reason = _drop_reason(row)
+    if reason is not None:
+        return None, reason
+    if high == low:
+        return None, "flat_range"
+    base = relative_row(row)
+    sma_10 = _as_float(engine_value(row, "sma_10"))
+    sma_20 = _as_float(engine_value(row, "sma_20"))
+    ema_12 = _as_float(engine_value(row, "ema_12"))
+    ema_26 = _as_float(engine_value(row, "ema_26"))
+    macd = _as_float(engine_value(row, "macd"))
+    macd_signal = _as_float(engine_value(row, "macd_signal"))
+    upper = _as_float(engine_value(row, "bollinger_upper"))
+    lower = _as_float(engine_value(row, "bollinger_lower"))
+    last_close = _as_float(engine_value(row, "last_close"))
+    assert sma_10 is not None and sma_20 is not None
+    assert ema_12 is not None and ema_26 is not None
+    assert macd is not None and macd_signal is not None
+    assert upper is not None and lower is not None and last_close is not None
+    shape = bar_shape(open_, high, low, close)
+    if shape is None:
+        return None, "flat_range"
+    payload = {
+        **base,
+        "close_window_vwap": base["close_vwap"],
+        "sma_10_over_sma_20": sma_10 / sma_20 - 1.0,
+        "ema_12_over_ema_26": ema_12 / ema_26 - 1.0,
+        "macd_histogram_over_close": (macd - macd_signal) / last_close,
+        "bollinger_width": (upper - lower) / last_close,
+        **shape,
+    }
+    features = {name: float(payload[name]) for name in DIRECTION_COLUMNS}
+    if any(not math.isfinite(value) for value in features.values()):
+        return None, "non_finite"
+    return features, None

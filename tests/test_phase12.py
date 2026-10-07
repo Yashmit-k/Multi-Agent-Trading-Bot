@@ -18,7 +18,7 @@ from core_db.records import TickRecord
 from core_db.repository import CoreRepository
 from core_db.seed import SEED_PATH, load_seed
 from core_db.session import create_schema
-from core_features import build_feature_set
+from core_features import FEATURE_VERSION, build_feature_set
 from core_ingestion.service import MemoryEventPublisher, ingest_signal
 from core_market_data import HistoricalReplayMarketDataProvider, ZerodhaMarketDataProvider, ZerodhaUnavailable
 from core_worker import run_once
@@ -173,7 +173,7 @@ def test_worker_replay_and_api(repository: CoreRepository) -> None:
     quote = replay.get_quote("HDFCBANK", as_of)
     assert quote.last_price == Decimal("102")
     assert replay.get_quote("HDFCBANK", datetime(2024, 6, 3, 12, tzinfo=UTC)).last_price == Decimal("102")
-    feature = repository.feature_at("HDFCBANK", "1m", as_of, "1.0.0")
+    feature = repository.feature_at("HDFCBANK", "1m", as_of, FEATURE_VERSION)
     assert feature is not None
     assert feature.features["last_close"] == build_feature_set("HDFCBANK", "1m", replay.get_candles("HDFCBANK", "1m", datetime(2024, 6, 3, tzinfo=UTC), as_of), as_of).features["last_close"]
 
@@ -197,7 +197,7 @@ def test_worker_replay_and_api(repository: CoreRepository) -> None:
     assert portfolio.status_code == 200
     assert portfolio.json()["snapshot"] is None
     later = client.get("/api/v1/performance", headers={"Authorization": "Bearer core"})
-    assert later.status_code == 501
+    assert later.status_code == 404
     signal = sample_agent_signal("HDFCBANK")
     created = client.post(
         "/api/v1/internal/signals",

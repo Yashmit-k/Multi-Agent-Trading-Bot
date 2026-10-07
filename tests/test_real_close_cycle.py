@@ -68,11 +68,31 @@ def test_real_closes_produce_one_filled_paper_order(repository: CoreRepository |
     run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"))
     orders = repository.list_orders()
     assert len(orders) == 1
+    assert orders[0].status == OrderStatus.OPEN
+    nxt = moment + timedelta(days=1)
+    repository.upsert_candles(
+        [
+            Candle(
+                symbol="RELIANCE",
+                exchange=Exchange.NSE,
+                timeframe=Timeframe.D1,
+                open=Decimal("1170.00"),
+                high=Decimal("1180.00"),
+                low=Decimal("1160.00"),
+                close=Decimal("1175.00"),
+                volume=1000,
+                start=nxt - timedelta(hours=6),
+                end=nxt,
+            )
+        ]
+    )
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"))
+    orders = repository.list_orders()
     assert orders[0].status == OrderStatus.FILLED
     assert orders[0].symbol == "RELIANCE"
     fills = repository.list_executions()
     assert len(fills) == 1
-    assert fills[0].price in {RELIANCE_CLOSE, TCS_CLOSE}
+    assert fills[0].price == Decimal("1170.00")
 
 
 def _store_symbol(repository: CoreRepository, symbol: str, closes: tuple[Decimal, ...]) -> None:
