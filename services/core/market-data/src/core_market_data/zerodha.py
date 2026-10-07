@@ -1,5 +1,6 @@
 """Zerodha market-data adapter. Order placement is not implemented here."""
 
+import logging
 import os
 import time
 from collections.abc import Callable
@@ -10,10 +11,14 @@ from enum import Enum
 from typing import Protocol
 from zoneinfo import ZoneInfo
 
+from pydantic import ValidationError
+
 from contracts.enums import Exchange, Timeframe
 from contracts.schemas.market import Candle, Quote
 from core_db.repository import CoreRepository
+from core_market_data.nse_sessions import chunk_is_complete
 
+logger = logging.getLogger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
 SESSION_OPEN = clock(9, 15)
 SESSION_CLOSE = clock(15, 30)
@@ -174,31 +179,44 @@ class ZerodhaMarketDataProvider:
         return written
 
     def download_seed_candles(self, start: datetime, end: datetime) -> IngestionReport:
-        """Day and 5-minute bars for current universe members. Every member gets a report row."""
+        """Day and 5-minute bars for members whose interval overlaps the window."""
         written = 0
         rows: list[IngestionRow] = []
+        window_start = _aware(start)
         window_end = _aware(end)
-        for instrument in self._repository.members_at(window_end):
+        spans = self._repository.overlapping_memberships(window_start, window_end)
+        grouped: dict[str, list[tuple[object, datetime, datetime | None]]] = {}
+        for instrument, opened, closed in spans:
+            grouped.setdefault(instrument.symbol, []).append((instrument, opened, closed))
+        for symbol in sorted(grouped):
+            instrument = grouped[symbol][0][0]
             if instrument.instrument_token is None:
-                rows.append(_missing_token_row(instrument.symbol, self._broker_rows))
+                rows.append(_missing_token_row(symbol, self._broker_rows))
                 continue
-            stored: dict[Timeframe, list[Candle]] = {}
-            for timeframe in SEED_HISTORY:
-                candles = [
-                    bar
-                    for bar in self.get_candles(instrument.symbol, timeframe, start, window_end)
-                    if bar.end <= window_end
-                ]
-                if candles:
-                    self._repository.upsert_candles(candles)
-                    written += len(candles)
-                stored[timeframe] = candles
+            stored: dict[Timeframe, list[Candle]] = {Timeframe.D1: [], Timeframe.M5: []}
+            asked_from = window_end
+            for _instrument, opened, closed in grouped[symbol]:
+                request_start = max(window_start, opened)
+                request_end = window_end if closed is None else min(window_end, closed)
+                if request_end <= request_start:
+                    continue
+                asked_from = min(asked_from, request_start)
+                for timeframe in SEED_HISTORY:
+                    candles = [
+                        bar
+                        for bar in self.get_candles(symbol, timeframe, request_start, request_end)
+                        if request_start <= bar.start and bar.end <= request_end
+                    ]
+                    if candles:
+                        self._repository.upsert_candles(candles)
+                        written += len(candles)
+                    stored[timeframe].extend(candles)
             rows.append(
                 _report_row(
-                    instrument.symbol,
+                    symbol,
                     stored[Timeframe.D1],
                     stored[Timeframe.M5],
-                    start,
+                    asked_from,
                     self._partial_gap_days,
                 )
             )
@@ -235,14 +253,25 @@ class ZerodhaMarketDataProvider:
             raise ZerodhaUnavailable(f"missing instrument token for {symbol.strip().upper()}")
         client = self._require()
         interval = _KITE_INTERVAL[parsed]
+        window_start = _aware(start)
         window_end = _aware(end)
+        stored = self._repository.stored_candles(instrument.symbol, parsed)
         candles: list[Candle] = []
-        for chunk_start, chunk_end in _chunks(start, window_end, _CHUNK_DAYS[parsed]):
+        for chunk_start, chunk_end in _chunks(window_start, window_end, _CHUNK_DAYS[parsed]):
+            if chunk_is_complete(stored, chunk_start, chunk_end, parsed):
+                candles.extend(
+                    bar
+                    for bar in stored
+                    if chunk_start <= bar.start.astimezone(timezone.utc) and bar.end.astimezone(timezone.utc) <= chunk_end
+                )
+                continue
             self._pace.wait()
             rows = client.historical_data(instrument.instrument_token, chunk_start, chunk_end, interval)
             for row in rows:
                 bar = _candle_from_kite(instrument.symbol, parsed, row)
-                if bar.end <= window_end:
+                if bar is None:
+                    continue
+                if window_start <= bar.start and bar.end <= window_end:
                     candles.append(bar)
         return candles
 
@@ -397,7 +426,7 @@ def _chunks(start: datetime, end: datetime, days: int) -> list[tuple[datetime, d
     return windows
 
 
-def _candle_from_kite(symbol: str, timeframe: Timeframe, row: dict[str, object]) -> Candle:
+def _candle_from_kite(symbol: str, timeframe: Timeframe, row: dict[str, object]) -> Candle | None:
     stamp = row["date"]
     if isinstance(stamp, str):
         parsed = datetime.fromisoformat(stamp)
@@ -414,15 +443,27 @@ def _candle_from_kite(symbol: str, timeframe: Timeframe, row: dict[str, object])
     else:
         start = parsed.astimezone(timezone.utc)
         end = start + timedelta(minutes=_BAR_MINUTES[timeframe])
-    return Candle(
-        symbol=symbol,
-        exchange=Exchange.NSE,
-        timeframe=timeframe,
-        open=Decimal(str(row["open"])),
-        high=Decimal(str(row["high"])),
-        low=Decimal(str(row["low"])),
-        close=Decimal(str(row["close"])),
-        volume=int(row["volume"]),
-        start=start,
-        end=end,
-    )
+    try:
+        return Candle(
+            symbol=symbol,
+            exchange=Exchange.NSE,
+            timeframe=timeframe,
+            open=Decimal(str(row["open"])),
+            high=Decimal(str(row["high"])),
+            low=Decimal(str(row["low"])),
+            close=Decimal(str(row["close"])),
+            volume=0 if row.get("volume") is None else int(row["volume"]),
+            start=start,
+            end=end,
+        )
+    except ValidationError:
+        logger.warning(
+            "skipped invalid %s %s bar open=%s high=%s low=%s close=%s",
+            symbol,
+            timeframe.value,
+            row.get("open"),
+            row.get("high"),
+            row.get("low"),
+            row.get("close"),
+        )
+        return None

@@ -1,8 +1,10 @@
 """The only indicator implementation in the platform.
 
 Agents consume FeatureSet. They do not recompute these values.
+A missing numeric feature is omitted. It is not stored as 0 or false.
 """
 
+import math
 from datetime import datetime, timezone
 from statistics import pstdev
 
@@ -10,7 +12,7 @@ from contracts.enums import Timeframe
 from contracts.schemas.feature_set import FeatureSet
 from contracts.schemas.market import Candle
 
-FEATURE_VERSION = "1.0.0"
+FEATURE_VERSION = "1.1.0"
 
 
 def build_feature_set(
@@ -18,6 +20,8 @@ def build_feature_set(
     timeframe: Timeframe | str,
     candles: list[Candle],
     as_of: datetime,
+    *,
+    nifty_return: float | None = None,
 ) -> FeatureSet | None:
     parsed = timeframe if isinstance(timeframe, Timeframe) else Timeframe(timeframe)
     moment = _aware(as_of)
@@ -57,6 +61,22 @@ def build_feature_set(
             features["volatility"] = _num(pstdev(returns))
     if len(closes) >= 10:
         features["momentum_10"] = _num(closes[-1] - closes[-10])
+    _put(features, "bollinger_pct_b", _pct_b(closes[-1], lower, upper))
+    _put(features, "distance_from_mean", None if mid is None else closes[-1] - mid)
+    _put(features, "zscore_20", _zscore(closes))
+    _put(features, "reversion_half_life", _half_life(closes))
+    _put(features, "relative_volume", _relative_volume(volumes))
+    _put(features, "volume_acceleration", _volume_acceleration(volumes))
+    _put(features, "price_volume_corr", _price_volume_corr(closes, volumes))
+    _put(features, "roc_10", _roc(closes, 10))
+    _put(features, "trend_strength_adx", _adx(visible, 14))
+    if nifty_return is not None and "return_1" in features:
+        _put(features, "relative_strength_nifty", float(features["return_1"]) - nifty_return)
+    _put(features, "volume_confirmation", _volume_confirmation(features))
+    _put(features, "support_level", _window_low(lows, 20))
+    _put(features, "resistance_level", _window_high(highs, 20))
+    _put(features, "trend_slope", _slope(closes, 20))
+    _put(features, "volatility_percentile", _volatility_percentile(closes))
     last = visible[-1]
     return FeatureSet(
         symbol=symbol,
@@ -64,6 +84,7 @@ def build_feature_set(
         timeframe=parsed,
         feature_version=FEATURE_VERSION,
         features=features,
+        unavailable=["volume_imbalance"],
         source_data_timestamp=_aware(last.end),
     )
 
@@ -154,6 +175,170 @@ def _bollinger(closes: list[float], length: int) -> tuple[float | None, float | 
     mid = sum(window) / length
     deviation = pstdev(window)
     return mid, mid + 2 * deviation, mid - 2 * deviation
+
+
+def _pct_b(close: float, lower: float | None, upper: float | None) -> float | None:
+    if lower is None or upper is None or upper == lower:
+        return None
+    return (close - lower) / (upper - lower)
+
+
+def _zscore(closes: list[float]) -> float | None:
+    if len(closes) < 20:
+        return None
+    window = closes[-20:]
+    mid = sum(window) / 20
+    deviation = pstdev(window)
+    if deviation == 0:
+        return None
+    return (closes[-1] - mid) / deviation
+
+
+def _half_life(closes: list[float]) -> float | None:
+    if len(closes) < 20:
+        return None
+    window = closes[-20:]
+    mean = sum(window) / len(window)
+    demeaned = [value - mean for value in window]
+    xs = demeaned[:-1]
+    variance = sum(value * value for value in xs)
+    if variance == 0:
+        return None
+    phi = sum(left * right for left, right in zip(xs, demeaned[1:], strict=False)) / variance
+    if phi <= 0 or phi >= 1:
+        return None
+    return math.log(0.5) / math.log(phi)
+
+
+def _relative_volume(volumes: list[int]) -> float | None:
+    if not volumes:
+        return None
+    mean = sum(volumes) / len(volumes)
+    if mean == 0:
+        return None
+    return volumes[-1] / mean
+
+
+def _volume_acceleration(volumes: list[int]) -> float | None:
+    if len(volumes) < 2 or volumes[-2] == 0:
+        return None
+    return (volumes[-1] / volumes[-2]) - 1
+
+
+def _price_volume_corr(closes: list[float], volumes: list[int]) -> float | None:
+    if len(closes) < 21:
+        return None
+    returns = [(closes[index] / closes[index - 1]) - 1 for index in range(1, len(closes))]
+    paired = list(zip(returns, volumes[1:], strict=False))[-20:]
+    if len(paired) < 20:
+        return None
+    xs = [item[0] for item in paired]
+    ys = [float(item[1]) for item in paired]
+    mean_x = sum(xs) / len(xs)
+    mean_y = sum(ys) / len(ys)
+    covariance = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys, strict=False))
+    var_x = sum((x - mean_x) ** 2 for x in xs)
+    var_y = sum((y - mean_y) ** 2 for y in ys)
+    if var_x == 0 or var_y == 0:
+        return None
+    return covariance / math.sqrt(var_x * var_y)
+
+
+def _roc(closes: list[float], length: int) -> float | None:
+    if len(closes) <= length or closes[-1 - length] == 0:
+        return None
+    return (closes[-1] / closes[-1 - length]) - 1
+
+
+def _adx(candles: list[Candle], length: int) -> float | None:
+    if len(candles) <= length * 2:
+        return None
+    plus_dm: list[float] = []
+    minus_dm: list[float] = []
+    true_ranges: list[float] = []
+    for index in range(1, len(candles)):
+        up = float(candles[index].high) - float(candles[index - 1].high)
+        down = float(candles[index - 1].low) - float(candles[index].low)
+        plus_dm.append(up if up > down and up > 0 else 0.0)
+        minus_dm.append(down if down > up and down > 0 else 0.0)
+        high = float(candles[index].high)
+        low = float(candles[index].low)
+        previous = float(candles[index - 1].close)
+        true_ranges.append(max(high - low, abs(high - previous), abs(low - previous)))
+
+    def _wilder(values: list[float]) -> list[float]:
+        seed = sum(values[:length])
+        series = [seed]
+        for value in values[length:]:
+            seed = seed - (seed / length) + value
+            series.append(seed)
+        return series
+
+    smoothed_tr = _wilder(true_ranges)
+    smoothed_plus = _wilder(plus_dm)
+    smoothed_minus = _wilder(minus_dm)
+    dx: list[float] = []
+    for atr, plus, minus in zip(smoothed_tr, smoothed_plus, smoothed_minus, strict=False):
+        if atr == 0:
+            continue
+        plus_di = 100 * plus / atr
+        minus_di = 100 * minus / atr
+        total = plus_di + minus_di
+        if total == 0:
+            continue
+        dx.append(100 * abs(plus_di - minus_di) / total)
+    if len(dx) < length:
+        return None
+    value = sum(dx[:length]) / length
+    for item in dx[length:]:
+        value = ((value * (length - 1)) + item) / length
+    return value
+
+
+def _volume_confirmation(features: dict[str, str | int | float | bool]) -> float | None:
+    if "return_1" not in features or "relative_volume" not in features:
+        return None
+    ret = float(features["return_1"])
+    relative = float(features["relative_volume"]) - 1
+    if ret == 0 or relative == 0:
+        return 0.0
+    return 1.0 if (ret > 0) == (relative > 0) else 0.0
+
+
+def _window_low(lows: list[float], length: int) -> float | None:
+    if len(lows) < length:
+        return None
+    return min(lows[-length:])
+
+
+def _window_high(highs: list[float], length: int) -> float | None:
+    if len(highs) < length:
+        return None
+    return max(highs[-length:])
+
+
+def _slope(closes: list[float], length: int) -> float | None:
+    if len(closes) < length:
+        return None
+    window = closes[-length:]
+    mean_x = (length - 1) / 2
+    mean_y = sum(window) / length
+    variance = sum((index - mean_x) ** 2 for index in range(length))
+    if variance == 0:
+        return None
+    return sum((index - mean_x) * (value - mean_y) for index, value in enumerate(window)) / variance
+
+
+def _volatility_percentile(closes: list[float]) -> float | None:
+    if len(closes) < 42:
+        return None
+    returns = [(closes[index] / closes[index - 1]) - 1 for index in range(1, len(closes))]
+    vols = [pstdev(returns[index - 20 : index]) for index in range(20, len(returns) + 1)]
+    if len(vols) < 21:
+        return None
+    current = vols[-1]
+    prior = vols[-21:-1]
+    return 100 * sum(1 for value in prior if value <= current) / len(prior)
 
 
 def _put(features: dict[str, str | int | float | bool], name: str, value: float | None) -> None:

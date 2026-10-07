@@ -10,7 +10,7 @@ from contracts.schemas.market import Candle
 from core_db.repository import CoreRepository
 from core_features.engine import build_feature_set
 from core_market_data.replay import HistoricalReplayMarketDataProvider
-from core_market_data.snapshot import _FORBIDDEN, export_snapshot
+from core_market_data.snapshot import _FORBIDDEN, export_snapshot, validate_snapshot
 from core_market_data.zerodha import RequestPace, ZerodhaMarketDataProvider
 
 UTC = timezone.utc
@@ -37,7 +37,8 @@ def test_export_is_stable_lists_empty_symbols_and_has_no_credentials(repository:
     first = export_snapshot(repository, tmp_path / "a", as_of=T + timedelta(days=1), created_at=datetime(2026, 10, 4, tzinfo=UTC))
     second = export_snapshot(repository, tmp_path / "b", as_of=T + timedelta(days=1), created_at=datetime(2026, 10, 5, tzinfo=UTC))
     assert first.manifest["candle_sha256"] == second.manifest["candle_sha256"]
-    assert first.manifest["snapshot_id"] == first.manifest["candle_sha256"]
+    assert first.manifest["snapshot_id"] == "nifty50_1d_5m_20240603"
+    assert first.manifest["snapshot_id"] != first.manifest["candle_sha256"]
     assert first.manifest["schema_version"] == "1.0"
     assert first.manifest["created_at"] != second.manifest["created_at"]
     candle_text = (tmp_path / "a" / "candles.jsonl").read_text(encoding="utf-8")
@@ -121,3 +122,35 @@ def test_feature_sets_match_when_the_candle_inputs_match(repository: CoreReposit
     replay_features = build_feature_set("RELIANCE", Timeframe.D1, replay_bars, T)
     assert live_features is not None and replay_features is not None
     assert live_features.model_dump() == replay_features.model_dump()
+
+
+def test_one_timeframe_export_uses_the_latest_bar_date(repository: CoreRepository, tmp_path: Path) -> None:
+    repository.upsert_candles(
+        [
+            _bar("RELIANCE", T, "10"),
+            _bar("RELIANCE", T, "11", start=T - timedelta(minutes=5)).model_copy(
+                update={"timeframe": Timeframe.M5}
+            ),
+        ]
+    )
+    exported = export_snapshot(
+        repository,
+        tmp_path,
+        as_of=T,
+        symbols=("RELIANCE",),
+        timeframes=(Timeframe.D1,),
+    )
+    assert exported.manifest["timeframes"] == ["1d"]
+    assert exported.manifest["snapshot_id"] == "nifty50_1d_20240603"
+    assert "5m" not in (tmp_path / "candles.jsonl").read_text(encoding="utf-8")
+
+
+def test_validate_snapshot_checks_the_exported_folder(repository: CoreRepository, tmp_path: Path) -> None:
+    repository.upsert_candles([_bar("RELIANCE", T, "10")])
+    export_snapshot(repository, tmp_path, as_of=T + timedelta(days=1))
+    window = dict(window_start=datetime(2024, 1, 1, tzinfo=UTC), window_end=T + timedelta(days=1))
+    assert validate_snapshot(tmp_path, **window) == []
+    path = tmp_path / "candles.jsonl"
+    path.write_text(path.read_text(encoding="utf-8") + path.read_text(encoding="utf-8"), encoding="utf-8")
+    problems = validate_snapshot(tmp_path, **window)
+    assert any("candle_sha256" in item or "duplicate" in item for item in problems)
