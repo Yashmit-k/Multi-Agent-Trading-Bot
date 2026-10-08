@@ -15,6 +15,11 @@ node_modules/
 .env
 services/intelligence/.env
 snapshots/
+snapshots 2/
+snapshots.zip
+snapshots 2.zip
+intelligence.db
+.vscode/
 datasets/
 experiments/
 artifacts/
