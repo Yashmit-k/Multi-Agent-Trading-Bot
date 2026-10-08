@@ -9,8 +9,8 @@ description = "Shared schemas, events, and interfaces for the multi-agent Indian
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.115,<1",
-    "pydantic>=2.10,<3",
+    "fastapi>=0.142.2,<0.143",
+    "pydantic>=2.13.5,<2.14",
 ]
 
 [project.optional-dependencies]
