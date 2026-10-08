@@ -78,11 +78,11 @@ def test_paper_cycle_fills_once_and_ignores_late_signals(repository: CoreReposit
     assert proposal.supporting_signal_ids == ["sig-valid"]
     assert proposal.aggregated_signal == 0.4
     assert proposal.aggregated_confidence == 0.8
-    assert proposal.quantity == 1
+    assert proposal.quantity == 34
     assert proposal.entry_price == Decimal("2927.00")
     assert proposal.stop_loss == Decimal("2868.46")
     assert proposal.take_profit == Decimal("3044.08")
-    assert proposal.metadata["stops_monitored"] is False
+    assert proposal.metadata["stops_monitored"] is True
     looked_up = repository.get_by_symbol("RELIANCE")
     assert looked_up is not None
     assert repository.proposal_instrument_id(proposal.proposal_id) == looked_up.instrument_id
@@ -92,22 +92,41 @@ def test_paper_cycle_fills_once_and_ignores_late_signals(repository: CoreReposit
     assert all(check.passed for check in decision.checks)
     orders = repository.list_orders()
     assert len(orders) == 1
+    assert orders[0].status == OrderStatus.OPEN
+    assert repository.list_executions() == []
+    later = as_of + timedelta(days=1)
+    repository.upsert_candles(
+        [
+            Candle(
+                symbol="RELIANCE",
+                exchange=Exchange.NSE,
+                timeframe=Timeframe.D1,
+                open=Decimal("2930.00"),
+                high=Decimal("2940.00"),
+                low=Decimal("2920.00"),
+                close=Decimal("2935.00"),
+                volume=1000,
+                start=later - timedelta(hours=6),
+                end=later,
+            )
+        ]
+    )
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH)
+    orders = repository.list_orders()
     assert orders[0].status == OrderStatus.FILLED
     assert orders[0].trading_mode == TradingMode.PAPER
     assert repository.order_instrument_id(orders[0].order_id) == looked_up.instrument_id
     fills = repository.list_executions()
     assert len(fills) == 1
-    assert fills[0].fees == Decimal("0")
-    assert fills[0].slippage == Decimal("0")
-    assert fills[0].price == Decimal("2927.00")
+    assert fills[0].fees > 0
+    assert Decimal(str(fills[0].metadata["gross_price"])) == Decimal("2930.00")
+    assert fills[0].price == Decimal("2930.00")
     position = repository.position_for("RELIANCE")
     assert position is not None
-    assert position.quantity == 1
+    assert position.quantity == 34
     snapshot = repository.latest_snapshot()
     assert snapshot is not None
-    assert snapshot.cash == Decimal("997073.00")
-    assert snapshot.equity == CASH
-    assert snapshot.drawdown == Decimal("0")
+    assert snapshot.equity < CASH
     event_types = _event_types(publisher)
     assert event_types.count(EventType.ORDER_FILLED.value) == 1
     assert EventType.ORDER_CREATED.value not in event_types
@@ -209,8 +228,8 @@ def test_paper_routes_and_stop(repository: CoreRepository) -> None:
     headers = {"Authorization": "Bearer core"}
     assert client.get("/api/v1/portfolio").status_code == 401
     assert client.get("/api/v1/portfolio", headers=headers).json()["snapshot"] is None
-    assert client.get("/api/v1/performance", headers=headers).status_code == 501
-    assert client.get("/api/v1/risk/status", headers=headers).json()["kill_switch"] == "noop"
+    assert client.get("/api/v1/performance", headers=headers).status_code == 404
+    assert client.get("/api/v1/risk/status", headers=headers).json()["kill_switch"] == "disarmed"
     stopped = client.post("/api/v1/paper/stop", headers=headers)
     assert stopped.json()["running"] is False
     assert stopped.json()["starting_cash"] == "1000000"
@@ -219,10 +238,30 @@ def test_paper_routes_and_stop(repository: CoreRepository) -> None:
     assert repository.list_proposals() == []
     client.post("/api/v1/paper/start", headers=headers)
     run_paper_cycle(repository, MemoryEventPublisher(), mode=TradingMode.PAPER, starting_cash=CASH)
+    assert repository.execution_count() == 0
+    assert client.get("/api/v1/orders", headers=headers).json()[0]["status"] == "OPEN"
+    later = FIXTURE_AS_OF + timedelta(days=1)
+    repository.upsert_candles(
+        [
+            Candle(
+                symbol="RELIANCE",
+                exchange=Exchange.NSE,
+                timeframe=Timeframe.D1,
+                open=Decimal("2930.00"),
+                high=Decimal("2940.00"),
+                low=Decimal("2920.00"),
+                close=Decimal("2935.00"),
+                volume=1000,
+                start=later - timedelta(hours=6),
+                end=later,
+            )
+        ]
+    )
+    run_paper_cycle(repository, MemoryEventPublisher(), mode=TradingMode.PAPER, starting_cash=CASH)
     assert repository.execution_count() == 1
     assert client.get("/api/v1/orders", headers=headers).json()[0]["status"] == "FILLED"
-    assert client.get("/api/v1/positions", headers=headers).json()[0]["quantity"] == 1
-    assert client.get("/api/v1/trades", headers=headers).json()[0]["fees"] == "0"
+    assert client.get("/api/v1/positions", headers=headers).json()[0]["quantity"] == 34
+    assert Decimal(client.get("/api/v1/trades", headers=headers).json()[0]["fees"]) > 0
     proposal_id = repository.list_proposals()[0].proposal_id
     assert client.get(f"/api/v1/decisions/{proposal_id}", headers=headers).status_code == 200
     assert client.get("/api/v1/paper/status", headers=headers).json()["running"] is True
