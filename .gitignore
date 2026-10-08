@@ -18,3 +18,7 @@ services/intelligence/.env
 snapshots/
 snapshots 2/
 snapshots 2.zip
+datasets/
+experiments/
+artifacts/
+services/intelligence/tmp-ollama-probe.json

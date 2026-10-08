@@ -1,5 +1,6 @@
-# Developer 3 owns this file, including the health-only placeholders.
-# intelligence, quant, and frontend are stubs until those developers start.
+# Core, intelligence, quant, and the dashboard. LIVE stays off.
+
+x-nifty50-symbols: &nifty50 "ADANIENT,ADANIPORTS,APOLLOHOSP,ASIANPAINT,AXISBANK,BAJAJ-AUTO,BAJFINANCE,BAJAJFINSV,BEL,BHARTIARTL,BPCL,BRITANNIA,CIPLA,COALINDIA,DRREDDY,EICHERMOT,GRASIM,HCLTECH,HDFCBANK,HDFCLIFE,HEROMOTOCO,HINDALCO,HINDUNILVR,ICICIBANK,INDUSINDBK,INFY,ITC,JSWSTEEL,KOTAKBANK,LT,M&M,MARUTI,NESTLEIND,NTPC,ONGC,POWERGRID,RELIANCE,SBILIFE,SBIN,SHRIRAMFIN,SUNPHARMA,TATACONSUM,TATAMOTORS,TATASTEEL,TCS,TECHM,TITAN,TRENT,ULTRACEMCO,WIPRO"
 
 services:
   postgres:
@@ -10,6 +11,8 @@ services:
       POSTGRES_DB: core
     ports:
       - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U core -d core"]
       interval: 5s
@@ -25,10 +28,11 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.core
-    env_file: .env.example
+    env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://core:core@postgres:5432/core
       REDIS_URL: redis://redis:6379/0
+      SEED_HISTORY_DAYS: ${SEED_HISTORY_DAYS:-100}
     depends_on:
       postgres:
         condition: service_healthy
@@ -42,7 +46,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.core
     command: ["python", "-m", "core_worker"]
-    env_file: .env.example
+    env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://core:core@postgres:5432/core
       REDIS_URL: redis://redis:6379/0
@@ -55,26 +59,54 @@ services:
   intelligence:
     build:
       context: .
-      dockerfile: docker/Dockerfile.placeholder
+      dockerfile: services/intelligence/Dockerfile
+    env_file: .env
     environment:
-      SERVICE_NAME: intelligence
+      INTELLIGENCE_TRADING_MODE: PAPER
+      INTELLIGENCE_SERVICE_MODE: serve
+      INTELLIGENCE_DATA_SOURCE: fixtures
+      INTELLIGENCE_STORE: sqlite
+      INTELLIGENCE_SQLITE_PATH: /var/lib/intelligence/intel.db
+      INTELLIGENCE_EVAL_INTERVAL_SECONDS: "300"
+      INTELLIGENCE_SYMBOLS: *nifty50
+      CORE_API_URL: http://core-api:8000
+      LLM_BASE_URL: ""
+      LLM_API_KEY: ""
+    depends_on:
+      - core-api
     ports:
       - "8101:8080"
+    volumes:
+      - intelligence-data:/var/lib/intelligence
 
   quant:
     build:
       context: .
-      dockerfile: docker/Dockerfile.placeholder
+      dockerfile: services/quant/Dockerfile
+    env_file: .env
     environment:
-      SERVICE_NAME: quant
+      QUANT_TRADING_MODE: PAPER
+      QUANT_DATA_SOURCE: fixtures
+      QUANT_SYMBOLS: *nifty50
+      QUANT_EVAL_INTERVAL_SECONDS: "300"
+      CORE_API_URL: http://core-api:8000
+    depends_on:
+      - core-api
     ports:
       - "8102:8080"
 
   frontend:
     build:
       context: .
-      dockerfile: docker/Dockerfile.placeholder
-    environment:
-      SERVICE_NAME: frontend
+      dockerfile: apps/frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://core-api:8000
+        NEXT_PUBLIC_CORE_API_TOKEN: ${CORE_API_TOKEN}
+    depends_on:
+      - core-api
     ports:
-      - "8103:8080"
+      - "3000:3000"
+
+volumes:
+  postgres-data:
+  intelligence-data:

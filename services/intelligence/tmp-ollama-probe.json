@@ -1,1 +1,0 @@
-{"model":"phi3:mini","prompt":"JSON only. {\"sentiment\":0.0}","stream":false,"format":"json","options":{"temperature":0,"num_predict":40}}

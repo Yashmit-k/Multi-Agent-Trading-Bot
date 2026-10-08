@@ -1,6 +1,6 @@
 """Repository used by every other core service."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -20,6 +20,13 @@ from core_db.clock import as_utc
 from core_db.models import (
     AgentSignalRow,
     AuditLogRow,
+    BacktestCostRow,
+    BacktestFillRow,
+    BacktestMetricRow,
+    BacktestOrderRow,
+    BacktestPortfolioRow,
+    BacktestPositionRow,
+    BacktestRunRow,
     CandleRow,
     ExecutionRow,
     FeatureRow,
@@ -123,6 +130,14 @@ class CoreRepository:
                 )
                 session.commit()
 
+    def remove_membership(self, instrument_id: str, universe: str, effective_from: datetime) -> None:
+        membership_id = f"{instrument_id}:{universe}:{as_utc(effective_from).date().isoformat()}"
+        with self._session_factory() as session:
+            row = session.get(UniverseMembershipRow, membership_id)
+            if row is not None:
+                session.delete(row)
+                session.commit()
+
     def members_at(self, as_of: datetime, universe: str = "NIFTY50") -> list[InstrumentRecord]:
         moment = as_utc(as_of)
         with self._session_factory() as session:
@@ -138,6 +153,31 @@ class CoreRepository:
                 select(InstrumentRow).where(InstrumentRow.instrument_id.in_(instrument_ids)).order_by(InstrumentRow.symbol)
             )
             return [_instrument(row) for row in instruments]
+
+    def overlapping_memberships(
+        self,
+        start: datetime,
+        end: datetime,
+        universe: str = "NIFTY50",
+    ) -> list[tuple[InstrumentRecord, datetime, datetime | None]]:
+        """Members whose interval overlaps [start, end), with that interval's bounds."""
+        window_start = as_utc(start)
+        window_end = as_utc(end)
+        found: list[tuple[InstrumentRecord, datetime, datetime | None]] = []
+        with self._session_factory() as session:
+            rows = session.scalars(
+                select(UniverseMembershipRow).where(UniverseMembershipRow.universe == universe)
+            )
+            for row in rows:
+                opened = as_utc(row.effective_from)
+                closed = as_utc(row.effective_to) if row.effective_to else None
+                if opened >= window_end or (closed is not None and closed <= window_start):
+                    continue
+                instrument = session.get(InstrumentRow, row.instrument_id)
+                if instrument is not None:
+                    found.append((_instrument(instrument), opened, closed))
+        found.sort(key=lambda item: item[0].symbol)
+        return found
 
     def insert_ticks(self, ticks: list[TickRecord]) -> int:
         written = 0
@@ -248,6 +288,20 @@ class CoreRepository:
                 candles.append(_candle(row))
             return candles
 
+    def stored_candles(self, symbol: str, timeframe: Timeframe | str) -> list[Candle]:
+        """Every row in the candle table for this symbol and timeframe, with no as_of filter."""
+        parsed = timeframe if isinstance(timeframe, Timeframe) else Timeframe(timeframe)
+        with self._session_factory() as session:
+            rows = session.scalars(
+                select(CandleRow)
+                .where(
+                    CandleRow.symbol == symbol.strip().upper(),
+                    CandleRow.timeframe == parsed.value,
+                )
+                .order_by(CandleRow.start)
+            )
+            return [_candle(row) for row in rows]
+
     def upsert_feature(self, feature_set: FeatureSet, instrument_id: str) -> None:
         with self._session_factory() as session:
             key = (
@@ -306,6 +360,11 @@ class CoreRepository:
         with self._session_factory() as session:
             row = session.get(AgentSignalRow, signal_id)
             return dict(row.payload) if row else None
+
+    def list_signal_payloads(self) -> list[dict]:
+        with self._session_factory() as session:
+            rows = session.scalars(select(AgentSignalRow).order_by(AgentSignalRow.symbol, AgentSignalRow.signal_id))
+            return [dict(row.payload) for row in rows]
 
     def insert_signal(self, signal_id: str, symbol: str, exchange: str, payload: dict, recorded_at: datetime) -> bool:
         with self._session_factory() as session:
@@ -366,6 +425,11 @@ class CoreRepository:
     def signal_count(self) -> int:
         with self._session_factory() as session:
             return len(list(session.scalars(select(AgentSignalRow))))
+
+    def list_signals(self) -> list[AgentSignal]:
+        with self._session_factory() as session:
+            rows = session.scalars(select(AgentSignalRow))
+            return [AgentSignal.model_validate(dict(row.payload)) for row in rows]
 
     def signals_for(self, symbol: str) -> list[AgentSignal]:
         name = symbol.strip().upper()
@@ -466,6 +530,39 @@ class CoreRepository:
             )
             session.commit()
             return True
+
+    def save_order(self, order: Order) -> None:
+        with self._session_factory() as session:
+            row = session.get(OrderRow, order.order_id)
+            if row is None:
+                return
+            row.payload = order.model_dump(mode="json")
+            session.commit()
+
+    def clear_position(self, symbol: str) -> None:
+        instrument = self.get_by_symbol(symbol)
+        if instrument is None:
+            return
+        with self._session_factory() as session:
+            row = session.get(PositionRow, instrument.instrument_id)
+            if row is not None:
+                session.delete(row)
+                session.commit()
+
+    def kill_switch_armed(self) -> bool:
+        with self._session_factory() as session:
+            row = session.get(RuntimeFlagRow, "kill")
+            return bool(row and row.paper_running)
+
+    def set_kill_switch(self, armed: bool) -> bool:
+        with self._session_factory() as session:
+            row = session.get(RuntimeFlagRow, "kill")
+            if row is None:
+                session.add(RuntimeFlagRow(flag_id="kill", paper_running=armed, peak_equity=None))
+            else:
+                row.paper_running = armed
+            session.commit()
+        return armed
 
     def order_for_proposal(self, proposal_id: str) -> Order | None:
         with self._session_factory() as session:
@@ -590,6 +687,61 @@ class CoreRepository:
             row.peak_equity = peak
             session.commit()
             return peak
+
+    def insert_backtest(self, backtest_id: str, snapshot_id: str, payload: dict) -> None:
+        with self._session_factory() as session:
+            session.add(
+                BacktestRunRow(
+                    backtest_id=backtest_id,
+                    snapshot_id=snapshot_id,
+                    created_at=datetime.now(timezone.utc),
+                    payload=payload,
+                )
+            )
+            session.commit()
+        self._write_backtest_children(backtest_id, payload)
+
+    def _write_backtest_children(self, backtest_id: str, payload: dict) -> None:
+        try:
+            with self._session_factory() as session:
+                session.add(BacktestCostRow(backtest_id=backtest_id, payload=payload.get("cost_schedule") or {}))
+                session.add(BacktestMetricRow(backtest_id=backtest_id, payload=payload.get("metrics") or {}))
+                for index, item in enumerate(payload.get("trades") or []):
+                    session.add(BacktestFillRow(row_id=f"{backtest_id}:fill:{index}", backtest_id=backtest_id, payload=item))
+                for index, item in enumerate(payload.get("equity_curve") or []):
+                    session.add(
+                        BacktestPortfolioRow(row_id=f"{backtest_id}:equity:{index}", backtest_id=backtest_id, payload=item)
+                    )
+                for symbol, quantity in (payload.get("positions") or {}).items():
+                    session.add(
+                        BacktestPositionRow(
+                            row_id=f"{backtest_id}:position:{symbol}",
+                            backtest_id=backtest_id,
+                            payload={"symbol": symbol, "quantity": quantity},
+                        )
+                    )
+                session.add(
+                    BacktestOrderRow(
+                        row_id=f"{backtest_id}:orders",
+                        backtest_id=backtest_id,
+                        payload={"orders_generated": payload.get("orders_generated"), "orders_filled": payload.get("orders_filled")},
+                    )
+                )
+                session.commit()
+        except Exception:
+            return
+
+    def list_backtests(self) -> list[dict]:
+        with self._session_factory() as session:
+            rows = session.scalars(select(BacktestRunRow).order_by(BacktestRunRow.created_at.desc())).all()
+            return [row.payload | {"backtest_id": row.backtest_id} for row in rows]
+
+    def get_backtest(self, backtest_id: str) -> dict | None:
+        with self._session_factory() as session:
+            row = session.get(BacktestRunRow, backtest_id)
+            if row is None:
+                return None
+            return row.payload | {"backtest_id": row.backtest_id}
 
     def _require_instrument(self, symbol: str) -> InstrumentRecord:
         instrument = self.get_by_symbol(symbol)
