@@ -22,9 +22,12 @@ Snapshot is ~2 months of current NIFTY50 constituents. Cutoff `2026-09-01T10:00:
 
 This 2-month sample cannot support a trading model. Stop expanding data. Do not collect ≥3 years of bars, do not relabel 5m, do not switch to LightGBM/XGBoost or per-stock models, and do not wire production `MlAgent`.
 
-## Feature Engine still owes
+## Feature Engine after this experiment
 
-Listed in [`docs/feature-requests.md`](../../../docs/feature-requests.md):
+The Feature Engine is now `1.1.0`. It emits the 1.0 OHLCV fields and `bollinger_pct_b`, `distance_from_mean`, `zscore_20`, `reversion_half_life`, `relative_volume`, `volume_acceleration`, `price_volume_corr`, `roc_10`, `trend_strength_adx`, `relative_strength_nifty`, `volume_confirmation`, `support_level`, `resistance_level`, `trend_slope`, and `volatility_percentile`. A short window omits a field. `volume_imbalance` stays unavailable because these candles have no bid or ask.
 
-- Index FeatureSets for NIFTY50 and INDIAVIX (RISK_ON / RISK_OFF).
-- Research ratios in `ml/features.py` are **not** FeatureSet fields until the engine emits them. Production agents must not compute them.
+`NIFTY50` and `INDIAVIX` are aliases built at read time from `snapshots/context_through_20261005`. The files themselves use `NIFTY 50` and `INDIA VIX`. Oil & Gas is unavailable and is not invented. This experiment did not use those index series, and that result is unchanged.
+
+VWAP is typical price times volume over the bars passed into `build_feature_set`. `close / vwap - 1` is distance from that window VWAP. It is not a daily, session, or 09:15-reset VWAP.
+
+Research ratios in `quant_agents/ml/features.py` are not FeatureSet fields. Production agents must not compute them. This experiment's decision stands: the 2-month sample cannot support a trading model.
