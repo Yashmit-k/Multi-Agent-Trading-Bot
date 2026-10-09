@@ -2,13 +2,13 @@
 
 Re-audit on `origin/main` **`b4ab1ce`** (local `main` fast-forwarded). Holdout path not read, listed, or traversed.
 
-**Final decision:** FAIL  
+**Final decision:** BLOCKED_PRECONDITION
 **Research status:** BLOCKED_PRECONDITION  
 **HOLDOUT_READY:** NO  
 
-Hypothesis H001 **could not be validly evaluated**. This is not a finding that it failed to predict returns.
+Hypothesis H001 has not been run. `BLOCKED_PRECONDITION` is the same research-data blocker as `DATA NOT READY`. This is not a finding that it failed to predict returns, and it is not a pass. There is no validation result and no predictive score.
 
-Core FeatureSet 1.1.0 and a costed historical backtest path **are present**. Remaining block is **data/intelligence**: no frozen 2024–2025 snapshot on this machine, no PIT earnings/events history.
+Core FeatureSet 1.1.0 and a costed historical backtest path **are present**. The frozen candles `nifty50_5m_20261005` and `nifty50_1d_20261005` are `MARKET_DATA_READY` at `snapshots 2/nifty50`. The remaining block is PIT earnings and events with a trustworthy `available_at`.
 
 ## Versions (keep separate)
 
@@ -52,21 +52,21 @@ Volume still does **not** vote on engine `relative_volume`.
 
 Required research window: **2024-01-01 through 2025-12-31** (train 2024-01-01–2025-06-30, validation 2025-07-01–2025-12-31).
 
-Local `Test-Path` only (no listing of holdout children): `snapshots/nifty50` yes (~Jun–Oct **2026**); `snapshots 2`, `snapshots 2/nifty50`, `nifty50_5m_20261005`, `nifty50_1d_20261005` **no**. The 2026 snapshot **must not** be substituted.
+Reference for the candle files: [`data-readiness-2026-10.md`](data-readiness-2026-10.md). `nifty50_5m_20261005` and `nifty50_1d_20261005` are at `snapshots 2/nifty50` and are `MARKET_DATA_READY`. The short 2026 tape at `snapshots/nifty50` **must not** be substituted.
 
 Holdout path `snapshots/holdout_after_20261005`: **not read, not listed, not traversed.** Existence check only: absent.
 
-`scripts/backtest_july.py` expects `snapshots 2/nifty50` and `nifty50_5m_20261005`. **NOT RUN** here (files absent).
+`scripts/backtest_july.py` expects `snapshots 2/nifty50` and `nifty50_5m_20261005`. This audit does not treat those candles as missing. H001 itself was **NOT RUN** because the event file is unavailable.
 
 ## Backtest vs paper vs Experiment A
 
-Costed historical path exists: `POST /api/v1/backtests` (API defaults `transaction_cost_bps=2`, `slippage_bps=1`), `core_paper.backtest.run_backtest`, `CostSchedule.research`. Paper default schedule is **2 bp, never zero**, next later bar **open**. Paper is **not** the H001 baseline; the baseline is the historical backtester. Baseline **NOT RUN** (no frozen 2024–2025 snapshot on this machine).
+Costed historical path exists: `POST /api/v1/backtests` (API defaults `transaction_cost_bps=2`, `slippage_bps=1`), `core_paper.backtest.run_backtest`, `CostSchedule.research`. Paper default schedule is **2 bp, never zero**, next later bar **open**. Paper is **not** the H001 baseline; the baseline is the historical backtester. Baseline **NOT RUN**. The candle snapshot is present. H001 has not been run because point-in-time event data is unavailable.
 
 Experiment A is **prior context only** (classification, `no_costs: true`).
 
 ## Costs
 
-The 2 bp research gate was **not modified**. It **could not be applied** because this checkout has **no frozen 2024–2025 snapshot** to run. Seven cost scenarios are **NOT RUN**. Sharpe is **N/A**. The 2 bp edge is **NOT EVALUABLE**.
+The 2 bp research gate was **not modified**. It **has not been applied** because H001 has not been run: point-in-time earnings and events are unavailable. The market candles exist. Seven cost scenarios are **NOT RUN**. Sharpe is **N/A**. The 2 bp edge is **NOT EVALUABLE**. That is not a pass and not a model failure.
 
 ## Intelligence: schema vs data
 
