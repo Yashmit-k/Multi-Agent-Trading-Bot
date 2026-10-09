@@ -4,6 +4,8 @@ H001 has not been run. This note does not train a model, freeze a target, freeze
 
 **Decision: DATA NOT READY**
 
+`DATA NOT READY` and `BLOCKED_PRECONDITION` name the same research-data blocker. H001 has not been run. This is not a failed model, not evidence of poor predictive performance, and not a pass.
+
 ## 1. Objective
 
 Determine whether this repository can build historical earnings and events with an `available_at` that is the time the information was actually public. That property is required before any H001 label or model.
@@ -74,7 +76,9 @@ RELIANCE fixture headline `news-reliance-20240603`: `published_at` `2024-06-03T0
 
 ## 10. Final decision
 
-**DATA NOT READY**
+**DATA NOT READY** (`BLOCKED_PRECONDITION`)
+
+H001 has not been run. This names the missing point-in-time event data. It is not a pass and not a model failure.
 
 ## 11. Exact blocker
 

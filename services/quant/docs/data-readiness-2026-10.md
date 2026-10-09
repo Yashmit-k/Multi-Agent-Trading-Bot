@@ -88,7 +88,7 @@ Events: EVENT_DATA_BLOCKED
 READY_TO_RUN: NO
 ```
 
-No alpha metrics. No LogisticRegression. No MlAgent.
+`BLOCKED_PRECONDITION` and `DATA NOT READY` name this same research-data blocker. H001 has not been run, so this is not a pass, not a cleared 2 bp gate, and not an alpha result. No LogisticRegression. No MlAgent.
 
 ## Required next action
 

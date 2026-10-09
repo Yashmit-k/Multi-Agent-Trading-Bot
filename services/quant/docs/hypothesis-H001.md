@@ -1,10 +1,10 @@
 # Hypothesis H001
 
-**Final decision:** FAIL  
+**Final decision:** BLOCKED_PRECONDITION
 **Research status:** BLOCKED_PRECONDITION  
 **HOLDOUT_READY:** NO  
 
-H001 **could not be validly evaluated**. This is not a finding that it failed to predict returns.
+H001 has not been run. `BLOCKED_PRECONDITION` is the same research-data blocker as `DATA NOT READY`: historical earnings and events have no trustworthy `available_at`. This is not a failed model, not evidence of poor predictive performance, and not a pass. There is no validation result and no predictive score.
 
 Do not modify this document after seeing validation results. There are no validation results.
 
@@ -16,7 +16,7 @@ Do not modify this document after seeing validation results. There are no valida
 | Information source | Earnings/events (priority 1; one source only) |
 | Universe | NIFTY 50 constituents |
 | Model | `sklearn.linear_model.LogisticRegression` (one fixed configuration; no sweep) |
-| Cost gate | Positive validation net edge after **2 bp**. The gate was not modified. It could not be applied because this checkout has no frozen 2024–2025 snapshot. A costed historical path exists on `b4ab1ce`. |
+| Cost gate | Positive validation net edge after **2 bp**. The gate was not modified and has not been applied. The frozen candles `nifty50_5m_20261005` and `nifty50_1d_20261005` are `MARKET_DATA_READY` at `snapshots 2/nifty50`. The gate stays unevaluated because point-in-time earnings and events are unavailable. |
 | Timestamp rule | `period_end` never substitutes for `available_at`. Reject RSS wall-clock `retrieved_at` and fixture clocks. Only records with a trustworthy availability time `<=` prediction timestamp may be used. |
 | Benchmarks (when evaluable) | Always-flat; always-long/passive where applicable; existing quant-agent baseline; H001 strategy |
 

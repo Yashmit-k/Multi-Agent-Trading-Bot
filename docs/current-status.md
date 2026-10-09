@@ -58,7 +58,7 @@ OHLCV direction research is closed. It was evaluated and does not demonstrate tr
 
 ## 12. H001 status
 
-`BLOCKED — DATA READINESS`. H001 has not been run. This is not a model failure. See `services/quant/docs/h001-data-readiness.md`. The decision is DATA NOT READY.
+`BLOCKED — DATA READINESS`. H001 has not been run, so this is not a pass and there is no predictive score. `DATA NOT READY` and `BLOCKED_PRECONDITION` name the same research-data blocker: historical earnings and events have no trustworthy `available_at`. This is not a model failure. Market candles `nifty50_5m_20261005` and `nifty50_1d_20261005` exist. See `services/quant/docs/h001-data-readiness.md`.
 
 ## 13. Live trading status
 

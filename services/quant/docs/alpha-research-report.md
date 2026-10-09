@@ -1,10 +1,10 @@
 # Alpha research report
 
-**Final decision:** FAIL  
+**Final decision:** BLOCKED_PRECONDITION
 **Research status:** BLOCKED_PRECONDITION  
 **HOLDOUT_READY:** NO  
 
-H001 **could not be validly evaluated**. This is not a finding that it failed to predict returns.
+H001 has not been run. `BLOCKED_PRECONDITION` is the same research-data blocker as `DATA NOT READY`: historical earnings and events have no trustworthy `available_at`. This is not a failed model, not evidence of poor predictive performance, and not a pass. There is no validation result and no predictive score.
 
 Re-audit tree: `origin/main` **`b4ab1ce`**. See [`research-audit-2026-10.md`](research-audit-2026-10.md) and [`hypothesis-H001.md`](hypothesis-H001.md).
 
@@ -24,9 +24,9 @@ Samples, signals, proposals, orders, fills, gross P&L, fees, slippage, net P&L, 
 
 Cost scenarios (all **NOT RUN**): 0/0, 1/0, 2/0, 3/0, 5/0, 0/1, 2/1 (cost bp / slippage bp).
 
-2 bp validation net edge: **NOT EVALUABLE**. The gate was not modified. It could not be applied because this checkout has no frozen 2024–2025 snapshot.
+2 bp validation net edge: **NOT EVALUABLE**. The gate was not modified. It has not been applied because point-in-time earnings and events are unavailable. H001 has not been run, so the gate is neither passed nor failed as a model result.
 
-Required window 2024-01-01 through 2025-12-31. Available local snapshot is 2026 (~Jun–Oct) and was **not** substituted.
+Required window 2024-01-01 through 2025-12-31. Frozen candles `nifty50_5m_20261005` and `nifty50_1d_20261005` are `MARKET_DATA_READY` at `snapshots 2/nifty50`, per [`data-readiness-2026-10.md`](data-readiness-2026-10.md). The short 2026 tape at `snapshots/nifty50` was **not** substituted.
 
 ## 3. New hypothesis
 
@@ -54,11 +54,11 @@ Always-flat, always-long/passive, existing agents, H001: **NOT RUN**.
 
 ## 9. Final decision
 
-**FAIL**  
+**BLOCKED_PRECONDITION** (`DATA NOT READY`)
 **Research status:** BLOCKED_PRECONDITION  
 **HOLDOUT_READY:** NO  
 
-PIT earnings/events and frozen 2024–2025 snapshots are missing. Stop. Do not tune. Do not use 2026 bars to select H001.
+H001 has not been run. Point-in-time earnings and events with a trustworthy `available_at` are missing. The 2024–2025 market candles exist and are `MARKET_DATA_READY`. This is not a pass and not a predictive failure. Stop. Do not tune. Do not use 2026 bars to select H001.
 
 ## 10. Safety confirmation
 
@@ -67,7 +67,7 @@ PIT earnings/events and frozen 2024–2025 snapshots are missing. Stop. Do not t
 | Holdout path not read | Yes |
 | Holdout path not listed | Yes |
 | Holdout path not traversed | Yes |
-| Frozen snapshots not modified (`snapshots 2/nifty50` absent; `snapshots/nifty50` not mutated) | Yes |
+| Frozen snapshots not modified (`snapshots 2/nifty50` present and not rewritten; `snapshots/nifty50` not mutated) | Yes |
 | No live orders | Yes |
 | No KiteTicker | Yes |
 | LIVE not enabled | Yes |
@@ -89,7 +89,7 @@ PIT earnings/events and frozen 2024–2025 snapshots are missing. Stop. Do not t
 - Data owner: frozen 2024–2025 snapshots are at `snapshots 2/nifty50` after move/rename (**MARKET_DATA_READY**). Do not open holdout.
 - Intelligence owner: PIT earnings/events with trustworthy `available_at` (not `period_end`, not RSS wall-clock, not fixtures).
 
-**P1** Re-run the audit after those files exist (snapshot names, backtest smoke, agent 1.1 consumption) without opening holdout.
+**P1** Re-run the audit after the point-in-time event file exists, without opening holdout. The candle snapshots are already `MARKET_DATA_READY`.
 
 **P2** Execute H001: freeze target/features/horizon, versioned dataset, LogisticRegression, costed simulation, 2 bp gate, drift and concentration. Robustness only if PASS.
 
