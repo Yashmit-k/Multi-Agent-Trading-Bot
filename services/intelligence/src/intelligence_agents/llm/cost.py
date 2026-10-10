@@ -18,6 +18,10 @@ class CostTracker:
     prompt_tokens: int = 0
     completion_tokens: int = 0
 
+    @property
+    def pricing_basis(self) -> str:
+        return "free_tier" if self.daily_budget_usd <= 0 else "estimated"
+
     def estimate(self, prompt_tokens: int, completion_tokens: int) -> float:
         if self.daily_budget_usd <= 0:
             return 0.0
@@ -30,6 +34,7 @@ class CostTracker:
         return max(0.0, self.daily_budget_usd - self._spent)
 
     def can_spend(self, prompt_tokens: int, completion_tokens: int) -> bool:
+        # Budget 0 is free-tier: still call the primary provider; do not escalate to tier2.
         if self.daily_budget_usd <= 0:
             return False
         return self.estimate(prompt_tokens, completion_tokens) <= self.remaining()

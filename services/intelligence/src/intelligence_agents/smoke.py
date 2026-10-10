@@ -27,8 +27,8 @@ def main() -> int:
     router = LLMRouter(FixtureLLMProvider(), None, CostTracker(0), tier2_enabled=False)
     agents = (
         NewsAgent(clock, router),
-        FundamentalAgent(clock),
-        ValuationAgent(clock),
+        FundamentalAgent(clock, router),
+        ValuationAgent(clock, router),
         EarningsAgent(clock, router),
     )
     sink = FakeSignalSink()

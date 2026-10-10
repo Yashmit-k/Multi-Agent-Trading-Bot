@@ -26,7 +26,13 @@ def run_cycle(settings: IntelligenceSettings, runner, health: RunnerHealth, rout
     health.signals_emitted_last_run = len(produced)
     health.prompt_tokens = router._tracker.prompt_tokens
     health.completion_tokens = router._tracker.completion_tokens
-    health.fallbacks = getattr(router._tier1, "fallbacks", 0)
+    snapshot = router.health_snapshot()
+    health.fallbacks = int(snapshot["fallback_count"])
+    health.last_generation = snapshot["last_generation"]  # type: ignore[assignment]
+    health.last_failure_type = snapshot["last_failure_type"]  # type: ignore[assignment]
+    health.llm_provider = str(snapshot["provider"])
+    health.llm_model = str(snapshot["model"])
+    health.quota_exhausted = bool(snapshot["quota_exhausted"])
     duplicates = sum(1 for item in runner.results[-len(produced) :] if item.duplicate)
     logger.info(
         "eval_cycle_complete",
@@ -35,8 +41,11 @@ def run_cycle(settings: IntelligenceSettings, runner, health: RunnerHealth, rout
             "duplicates": duplicates,
             "prompt_tokens": health.prompt_tokens,
             "completion_tokens": health.completion_tokens,
-            "estimated_usd": router._tracker.estimate(health.prompt_tokens, health.completion_tokens),
+            "estimated_usd": snapshot["cost_usd"],
+            "pricing_basis": snapshot["pricing_basis"],
             "fallbacks": health.fallbacks,
+            "last_generation": health.last_generation,
+            "last_failure_type": health.last_failure_type,
         },
     )
 
@@ -44,6 +53,9 @@ def run_cycle(settings: IntelligenceSettings, runner, health: RunnerHealth, rout
 async def evaluation_loop(settings: IntelligenceSettings, stop: asyncio.Event, health: RunnerHealth, sink) -> None:
     runner, router = make_runner(settings, sink=sink)
     health.runner_running = True
+    snapshot = router.health_snapshot()
+    health.llm_provider = str(snapshot["provider"])
+    health.llm_model = str(snapshot["model"])
     try:
         while not stop.is_set():
             try:

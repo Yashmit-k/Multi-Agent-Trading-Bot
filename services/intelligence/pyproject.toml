@@ -32,3 +32,6 @@ packages = ["src/intelligence_agents"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = [
+    "live_llm: optional real-provider smoke; skipped unless INTELLIGENCE_LIVE_LLM=1",
+]
