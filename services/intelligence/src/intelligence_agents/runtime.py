@@ -36,6 +36,11 @@ class RunnerHealth:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     fallbacks: int = 0
+    last_generation: str | None = None
+    last_failure_type: str | None = None
+    llm_provider: str = ""
+    llm_model: str = ""
+    quota_exhausted: bool = False
     extras: dict[str, object] = field(default_factory=dict)
 
 
@@ -91,8 +96,8 @@ def make_runner(
     router = make_router(settings)
     agents = (
         NewsAgent(resolved_clock, router),
-        FundamentalAgent(resolved_clock),
-        ValuationAgent(resolved_clock),
+        FundamentalAgent(resolved_clock, router),
+        ValuationAgent(resolved_clock, router),
         EarningsAgent(resolved_clock, router),
     )
 

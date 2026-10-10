@@ -69,8 +69,8 @@ def test_injection_article_in_bounds():
 def test_fundamental_valuation_earnings():
     news, funds = make_stores()
     context = make_context(news, funds)
-    fund = FundamentalAgent(CLOCK).evaluate("RELIANCE", FIXTURE_AS_OF, context)
-    val = ValuationAgent(CLOCK).evaluate("RELIANCE", FIXTURE_AS_OF, context)
+    fund = FundamentalAgent(CLOCK, _router()).evaluate("RELIANCE", FIXTURE_AS_OF, context)
+    val = ValuationAgent(CLOCK, _router()).evaluate("RELIANCE", FIXTURE_AS_OF, context)
     earn = EarningsAgent(CLOCK, _router()).evaluate("RELIANCE", FIXTURE_AS_OF, context)
     assert fund.agent_name.value == "fundamental"
     assert val.agent_name.value == "valuation"

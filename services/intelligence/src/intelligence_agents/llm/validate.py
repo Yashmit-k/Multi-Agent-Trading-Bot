@@ -14,6 +14,15 @@ _REASON = re.compile(r"^[a-z0-9_.]+$")
 class ValidationError(ValueError):
     """Structured output failed schema checks."""
 
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        if message == "invalid_json":
+            self.failure_type = "malformed_json"
+        elif message in {"unsupported_reason", "order_language"}:
+            self.failure_type = message
+        else:
+            self.failure_type = "schema_failure"
+
 
 _REQUIRED = ("sentiment", "impact", "confidence", "event_type", "reason_codes", "horizon", "high_impact")
 
@@ -26,9 +35,22 @@ def _strip_fences(raw: str) -> str:
     return text.strip()
 
 
+def _extract_json_object(raw: str) -> str:
+    text = _strip_fences(raw)
+    start = text.find("{")
+    end = text.rfind("}")
+    if start >= 0 and end > start:
+        return text[start : end + 1]
+    return text
+
+
+def _token(value: object) -> str:
+    return str(value).strip().lower().replace("-", "_").replace(" ", "_")
+
+
 def parse_assessment(raw: str, *, model: str, tier: str, fallback: bool = False) -> LLMAssessment:
     try:
-        payload = json.loads(_strip_fences(raw))
+        payload = json.loads(_extract_json_object(raw))
     except json.JSONDecodeError as exc:
         raise ValidationError("invalid_json") from exc
     if not isinstance(payload, dict):
@@ -48,14 +70,14 @@ def parse_assessment(raw: str, *, model: str, tier: str, fallback: bool = False)
         raise ValidationError("impact_out_of_range")
     if not 0.0 <= confidence <= 1.0:
         raise ValidationError("confidence_out_of_range")
-    event_type = payload["event_type"]
-    if not isinstance(event_type, str) or not _REASON.fullmatch(event_type):
+    event_type = _token(payload["event_type"])
+    if not event_type or not _REASON.fullmatch(event_type):
         raise ValidationError("invalid_event_type")
     codes_raw = payload["reason_codes"]
     if not isinstance(codes_raw, list) or not codes_raw:
         raise ValidationError("invalid_reason_codes")
-    codes = tuple(str(code) for code in codes_raw)
-    if any(not _REASON.fullmatch(code) for code in codes):
+    codes = tuple(_token(code) for code in codes_raw if str(code).strip())
+    if not codes or any(not _REASON.fullmatch(code) for code in codes):
         raise ValidationError("invalid_reason_codes")
     horizon = payload["horizon"]
     if horizon not in {"INTRADAY", "SWING", "LONG_TERM"}:

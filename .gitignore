@@ -14,6 +14,7 @@ node_modules/
 .env.local
 .env
 services/intelligence/.env
+# Frozen market dumps are too large for GitHub (5m candles.jsonl > 100MB).
 snapshots/
 snapshots 2/
 snapshots.zip
@@ -23,3 +24,4 @@ intelligence.db
 datasets/
 experiments/
 artifacts/
+services/intelligence/tmp-ollama-probe.json
