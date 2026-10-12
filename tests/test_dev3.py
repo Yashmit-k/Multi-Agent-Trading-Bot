@@ -17,9 +17,28 @@ from core_ingestion.service import MemoryEventPublisher
 from core_market_data.replay import bar_visible
 from core_paper.costs import CostSchedule
 from core_paper.cycle import kill_switch, paper_schedule, run_paper_cycle
-from test_phase4 import _prepare_buy
+from test_phase4 import _prepare_buy, _signal, _store
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _five(start: datetime, price: Decimal) -> Candle:
+    return Candle(
+        symbol="RELIANCE",
+        exchange=Exchange.NSE,
+        timeframe=Timeframe.M5,
+        open=price,
+        high=price + Decimal("1"),
+        low=price - Decimal("1"),
+        close=price,
+        volume=100,
+        start=start,
+        end=start + timedelta(minutes=5),
+    )
+
+
+def _store_signal(repository: CoreRepository, moment: datetime) -> None:
+    _store(repository, _signal(signal_id="sig-oct", timestamp=moment, valid_until=moment + timedelta(days=2)))
 
 
 def _bar(symbol: str, end: datetime, close: str, *, open_: str | None = None) -> Candle:
@@ -90,20 +109,38 @@ def test_bar_visible_hides_a_later_end() -> None:
     assert not bar_visible(as_of + timedelta(minutes=5), as_of)
 
 
-def test_kill_switch_queues_a_flatten_and_waits_for_the_next_bar(repository: CoreRepository) -> None:
-    _prepare_buy(repository)
+def test_kill_switch_queues_a_flatten_after_a_cnc_fill(repository: CoreRepository) -> None:
+    decision = datetime(2026, 10, 12, 10, 0, tzinfo=timezone.utc)
+    repository.open_paper_session(Decimal("1000000"))
+    repository.upsert_candles(
+        [
+            Candle(
+                symbol="RELIANCE",
+                exchange=Exchange.NSE,
+                timeframe=Timeframe.D1,
+                open=Decimal("99"),
+                high=Decimal("101"),
+                low=Decimal("98"),
+                close=Decimal("100"),
+                volume=1000,
+                start=decision - timedelta(hours=6),
+                end=decision,
+            )
+        ]
+    )
+    _store_signal(repository, decision)
     publisher = MemoryEventPublisher()
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"))
-    later = FIXTURE_AS_OF + timedelta(days=1)
-    repository.upsert_candles([_bar("RELIANCE", later, "2935", open_="2930")])
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"))
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"), now=decision)
+    start = datetime(2026, 10, 13, 3, 50, tzinfo=timezone.utc)
+    repository.upsert_candles([_five(start, Decimal("100"))])
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"), now=start + timedelta(minutes=5))
     assert repository.position_for("RELIANCE") is not None
     assert kill_switch(repository) is True
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"))
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"), now=start + timedelta(minutes=5))
     assert repository.position_for("RELIANCE") is not None
-    nxt = later + timedelta(days=1)
-    repository.upsert_candles([_bar("RELIANCE", nxt, "2940", open_="2936")])
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"))
+    nxt = start + timedelta(minutes=5)
+    repository.upsert_candles([_five(nxt, Decimal("100"))])
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"), now=nxt + timedelta(minutes=5))
     assert repository.position_for("RELIANCE") is None
 
 

@@ -111,4 +111,6 @@ def make_runner(
         )
 
     runner = Runner(agents, make_sink(settings, sink=sink), resolved_clock, factory, settings.trading_mode)
+    runner.news_store = news
+    runner.fund_store = funds
     return runner, router

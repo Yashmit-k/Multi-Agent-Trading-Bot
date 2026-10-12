@@ -21,14 +21,22 @@ CONFIDENCE_THRESHOLD = Decimal("0.3")
 _CENT = Decimal("0.01")
 
 
-def proposal_id_for(symbol: str, horizon: Horizon, as_of: datetime) -> str:
-    """Deterministic id from symbol, horizon, as_of, strategy_id, and strategy_version."""
+def proposal_id_for(symbol: str, horizon: Horizon, as_of: datetime, *, session_id: str | None = None) -> str:
+    """Deterministic id from symbol, horizon, as_of, strategy, and the paper session when one is set."""
     stamp = as_of.astimezone(timezone.utc).isoformat()
-    raw = "|".join([symbol.strip().upper(), horizon.value, stamp, STRATEGY_ID, STRATEGY_VERSION])
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    parts = [symbol.strip().upper(), horizon.value, stamp, STRATEGY_ID, STRATEGY_VERSION]
+    if session_id:
+        parts.append(session_id.strip())
+    return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
 
 
-def build_proposal(aggregate: Aggregate, candle: Candle, as_of: datetime) -> TradeProposal | None:
+def build_proposal(
+    aggregate: Aggregate,
+    candle: Candle,
+    as_of: datetime,
+    *,
+    session_id: str | None = None,
+) -> TradeProposal | None:
     if candle.end.astimezone(timezone.utc) != as_of.astimezone(timezone.utc):
         return None
     signal = Decimal(str(aggregate.aggregated_signal))
@@ -42,7 +50,7 @@ def build_proposal(aggregate: Aggregate, candle: Candle, as_of: datetime) -> Tra
     stop, target = _brackets(entry, side)
     moment = as_of.astimezone(timezone.utc)
     return TradeProposal(
-        proposal_id=proposal_id_for(aggregate.symbol, aggregate.horizon, moment),
+        proposal_id=proposal_id_for(aggregate.symbol, aggregate.horizon, moment, session_id=session_id),
         symbol=aggregate.symbol,
         timestamp=moment,
         horizon=aggregate.horizon,

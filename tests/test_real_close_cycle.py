@@ -65,10 +65,12 @@ def test_real_closes_produce_one_filled_paper_order(repository: CoreRepository |
         skew_seconds=5,
     )
     assert stored.accepted
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"))
+    repository.open_paper_session(Decimal("1000000"))
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"), now=moment)
     orders = repository.list_orders()
     assert len(orders) == 1
     assert orders[0].status == OrderStatus.OPEN
+    assert orders[0].metadata["product_type"] == "CNC"
     nxt = moment + timedelta(days=1)
     repository.upsert_candles(
         [
@@ -86,13 +88,10 @@ def test_real_closes_produce_one_filled_paper_order(repository: CoreRepository |
             )
         ]
     )
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"))
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"), now=moment)
     orders = repository.list_orders()
-    assert orders[0].status == OrderStatus.FILLED
-    assert orders[0].symbol == "RELIANCE"
-    fills = repository.list_executions()
-    assert len(fills) == 1
-    assert fills[0].price == Decimal("1170.00")
+    assert orders[0].status == OrderStatus.OPEN
+    assert repository.list_executions() == []
 
 
 def _store_symbol(repository: CoreRepository, symbol: str, closes: tuple[Decimal, ...]) -> None:

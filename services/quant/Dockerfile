@@ -1,9 +1,11 @@
 FROM python:3.12-slim
 WORKDIR /app
 COPY packages/contracts /app/packages/contracts
+COPY services/core/feature-engine /app/services/core/feature-engine
 COPY services/quant /app/services/quant
 RUN pip install --no-cache-dir \
     -e /app/packages/contracts \
+    -e /app/services/core/feature-engine \
     -e /app/services/quant
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8080

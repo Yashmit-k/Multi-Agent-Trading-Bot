@@ -1,6 +1,6 @@
 # Core, intelligence, quant, and the dashboard. LIVE stays off.
 
-x-nifty50-symbols: &nifty50 "ADANIENT,ADANIPORTS,APOLLOHOSP,ASIANPAINT,AXISBANK,BAJAJ-AUTO,BAJFINANCE,BAJAJFINSV,BEL,BHARTIARTL,BPCL,BRITANNIA,CIPLA,COALINDIA,DRREDDY,EICHERMOT,GRASIM,HCLTECH,HDFCBANK,HDFCLIFE,HEROMOTOCO,HINDALCO,HINDUNILVR,ICICIBANK,INDUSINDBK,INFY,ITC,JSWSTEEL,KOTAKBANK,LT,M&M,MARUTI,NESTLEIND,NTPC,ONGC,POWERGRID,RELIANCE,SBILIFE,SBIN,SHRIRAMFIN,SUNPHARMA,TATACONSUM,TATAMOTORS,TATASTEEL,TCS,TECHM,TITAN,TRENT,ULTRACEMCO,WIPRO"
+x-nifty50-symbols: &nifty50 "ADANIENT,ADANIPORTS,APOLLOHOSP,ASIANPAINT,AXISBANK,BAJAJ-AUTO,BAJFINANCE,BAJAJFINSV,BEL,BHARTIARTL,BPCL,BRITANNIA,CIPLA,COALINDIA,DRREDDY,EICHERMOT,GRASIM,HCLTECH,HDFCBANK,HDFCLIFE,HEROMOTOCO,HINDALCO,HINDUNILVR,ICICIBANK,INDUSINDBK,INFY,ITC,JSWSTEEL,KOTAKBANK,LT,M&M,MARUTI,NESTLEIND,NTPC,ONGC,POWERGRID,RELIANCE,SBILIFE,SBIN,SHRIRAMFIN,SUNPHARMA,TATACONSUM,TMPV,TATASTEEL,TCS,TECHM,TITAN,TRENT,ULTRACEMCO,WIPRO"
 
 services:
   postgres:
@@ -33,11 +33,19 @@ services:
       DATABASE_URL: postgresql+psycopg://core:core@postgres:5432/core
       REDIS_URL: redis://redis:6379/0
       SEED_HISTORY_DAYS: ${SEED_HISTORY_DAYS:-100}
+      MARKET_DATA_COLLECTOR: "true"
+      MARKET_DATA_POLL_SECONDS: "60"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
     ports:
       - "8000:8000"
 
@@ -73,7 +81,8 @@ services:
       LLM_BASE_URL: ""
       LLM_API_KEY: ""
     depends_on:
-      - core-api
+      core-api:
+        condition: service_healthy
     ports:
       - "8101:8080"
     volumes:
@@ -91,7 +100,8 @@ services:
       QUANT_EVAL_INTERVAL_SECONDS: "300"
       CORE_API_URL: http://core-api:8000
     depends_on:
-      - core-api
+      core-api:
+        condition: service_healthy
     ports:
       - "8102:8080"
 

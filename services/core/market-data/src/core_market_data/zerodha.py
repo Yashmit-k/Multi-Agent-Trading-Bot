@@ -54,6 +54,10 @@ class ZerodhaUnavailable(RuntimeError):
     """Raised when broker credentials or a client are absent."""
 
 
+class ZerodhaAuthError(ZerodhaUnavailable):
+    """The historical call was rejected because the session is missing or expired."""
+
+
 class IngestionStatus(str, Enum):
     OK = "OK"
     PARTIAL = "PARTIAL"
@@ -137,12 +141,20 @@ class ZerodhaMarketDataProvider:
         client: KiteMarketClient | None = None,
         pace: RequestPace | None = None,
         partial_gap_days: int = 10,
+        retry_attempts: int = 3,
+        retry_sleep: Callable[[float], None] = time.sleep,
+        retry_base_seconds: float = 0.5,
     ) -> None:
         self._repository = repository
         self._client = client
         self._pace = pace or RequestPace()
         self._partial_gap_days = partial_gap_days
+        self._retry_attempts = max(1, retry_attempts)
+        self._retry_sleep = retry_sleep
+        self._retry_base_seconds = retry_base_seconds
         self._broker_rows: list[dict[str, object]] = []
+        self.retry_count = 0
+        self.timeout_count = 0
 
     @classmethod
     def from_env(cls, repository: CoreRepository) -> "ZerodhaMarketDataProvider":
@@ -178,7 +190,12 @@ class ZerodhaMarketDataProvider:
             written += 1
         return written
 
-    def download_seed_candles(self, start: datetime, end: datetime) -> IngestionReport:
+    def download_seed_candles(
+        self,
+        start: datetime,
+        end: datetime,
+        on_symbol: Callable[[IngestionRow], None] | None = None,
+    ) -> IngestionReport:
         """Day and 5-minute bars for members whose interval overlaps the window."""
         written = 0
         rows: list[IngestionRow] = []
@@ -192,9 +209,12 @@ class ZerodhaMarketDataProvider:
             instrument = grouped[symbol][0][0]
             if instrument.instrument_token is None:
                 rows.append(_missing_token_row(symbol, self._broker_rows))
+                if on_symbol is not None:
+                    on_symbol(rows[-1])
                 continue
             stored: dict[Timeframe, list[Candle]] = {Timeframe.D1: [], Timeframe.M5: []}
             asked_from = window_end
+            failures: list[str] = []
             for _instrument, opened, closed in grouped[symbol]:
                 request_start = max(window_start, opened)
                 request_end = window_end if closed is None else min(window_end, closed)
@@ -202,29 +222,63 @@ class ZerodhaMarketDataProvider:
                     continue
                 asked_from = min(asked_from, request_start)
                 for timeframe in SEED_HISTORY:
-                    candles = [
-                        bar
-                        for bar in self.get_candles(symbol, timeframe, request_start, request_end)
-                        if request_start <= bar.start and bar.end <= request_end
-                    ]
+                    try:
+                        candles = [
+                            bar
+                            for bar in self.get_candles(symbol, timeframe, request_start, request_end)
+                            if request_start <= bar.start and bar.end <= request_end
+                        ]
+                    except ZerodhaAuthError:
+                        rows.append(
+                            _failed_row(
+                                symbol,
+                                stored[Timeframe.D1],
+                                stored[Timeframe.M5],
+                                f"{timeframe.value}:authentication_failed",
+                            )
+                        )
+                        if on_symbol is not None:
+                            on_symbol(rows[-1])
+                        return IngestionReport(written=written, rows=tuple(rows))
+                    except Exception as exc:
+                        failures.append(f"{timeframe.value}:{type(exc).__name__}")
+                        continue
                     if candles:
                         self._repository.upsert_candles(candles)
                         written += len(candles)
                     stored[timeframe].extend(candles)
-            rows.append(
-                _report_row(
-                    symbol,
-                    stored[Timeframe.D1],
-                    stored[Timeframe.M5],
-                    asked_from,
-                    self._partial_gap_days,
-                )
+            row = _report_row(
+                symbol,
+                stored[Timeframe.D1],
+                stored[Timeframe.M5],
+                asked_from,
+                self._partial_gap_days,
             )
+            if failures:
+                row = IngestionRow(
+                    symbol=row.symbol,
+                    daily_count=row.daily_count,
+                    intraday_count=row.intraday_count,
+                    daily_first_bar=row.daily_first_bar,
+                    daily_last_bar=row.daily_last_bar,
+                    intraday_first_bar=row.intraday_first_bar,
+                    intraday_last_bar=row.intraday_last_bar,
+                    status=IngestionStatus.PARTIAL if row.daily_count or row.intraday_count else IngestionStatus.MISSING,
+                    detail=";".join(failures),
+                )
+            rows.append(row)
+            if on_symbol is not None:
+                on_symbol(row)
         return IngestionReport(written=written, rows=tuple(rows))
 
-    def ingest_seed_history(self, start: datetime, end: datetime) -> IngestionReport:
+    def ingest_seed_history(
+        self,
+        start: datetime,
+        end: datetime,
+        on_symbol: Callable[[IngestionRow], None] | None = None,
+    ) -> IngestionReport:
         self.sync_instruments(known_only=True)
-        return self.download_seed_candles(start, end)
+        return self.download_seed_candles(start, end, on_symbol=on_symbol)
 
     def get_quote(self, symbol: str, as_of: datetime) -> Quote:
         del as_of
@@ -265,8 +319,7 @@ class ZerodhaMarketDataProvider:
                     if chunk_start <= bar.start.astimezone(timezone.utc) and bar.end.astimezone(timezone.utc) <= chunk_end
                 )
                 continue
-            self._pace.wait()
-            rows = client.historical_data(instrument.instrument_token, chunk_start, chunk_end, interval)
+            rows = self._historical_rows(client, instrument.instrument_token, chunk_start, chunk_end, interval)
             for row in rows:
                 bar = _candle_from_kite(instrument.symbol, parsed, row)
                 if bar is None:
@@ -281,6 +334,33 @@ class ZerodhaMarketDataProvider:
         if not candles:
             raise ZerodhaUnavailable(f"no candle for {symbol.strip().upper()}")
         return candles[-1]
+
+    def _historical_rows(
+        self,
+        client: KiteMarketClient,
+        instrument_token: int,
+        chunk_start: datetime,
+        chunk_end: datetime,
+        interval: str,
+    ) -> list[dict[str, object]]:
+        """Retry a transient historical read. Authentication failures are not retried."""
+        last: Exception | None = None
+        for attempt in range(1, self._retry_attempts + 1):
+            self._pace.wait()
+            try:
+                return list(client.historical_data(instrument_token, chunk_start, chunk_end, interval))
+            except Exception as exc:
+                last = exc
+                if _auth_failure(exc):
+                    raise ZerodhaAuthError("zerodha_authentication_failed") from exc
+                if _transient_failure(exc) and attempt < self._retry_attempts:
+                    self.retry_count += 1
+                    if "timeout" in type(exc).__name__.lower():
+                        self.timeout_count += 1
+                    self._retry_sleep(self._retry_base_seconds * (2 ** (attempt - 1)))
+                    continue
+                raise
+        raise ZerodhaUnavailable("historical read failed") from last
 
     def _require(self) -> KiteMarketClient:
         if self._client is None:
@@ -311,6 +391,38 @@ def format_ingestion_report(report: IngestionReport) -> str:
             )
         )
     return "\n".join(lines)
+
+
+def _failed_row(symbol: str, daily: list[Candle], intraday: list[Candle], detail: str) -> IngestionRow:
+    daily_first, daily_last = _span(daily)
+    intra_first, intra_last = _span(intraday)
+    return IngestionRow(
+        symbol=symbol,
+        daily_count=len(daily),
+        intraday_count=len(intraday),
+        daily_first_bar=daily_first,
+        daily_last_bar=daily_last,
+        intraday_first_bar=intra_first,
+        intraday_last_bar=intra_last,
+        status=IngestionStatus.PARTIAL if daily or intraday else IngestionStatus.MISSING,
+        detail=detail,
+    )
+
+
+def _transient_failure(exc: Exception) -> bool:
+    name = type(exc).__name__.lower()
+    if "timeout" in name or name in {"connectionerror", "connectionreseterror", "protocolerror"}:
+        return True
+    text = str(exc).lower()
+    return "timeout" in text or "429" in text or "too many requests" in text
+
+
+def _auth_failure(exc: Exception) -> bool:
+    name = type(exc).__name__
+    if name in {"TokenException", "PermissionException"}:
+        return True
+    text = str(exc).lower()
+    return "invalid token" in text or "token is invalid" in text or "incorrect api_key or access_token" in text
 
 
 def _missing_token_row(symbol: str, broker_rows: list[dict[str, object]]) -> IngestionRow:

@@ -10,6 +10,7 @@ from contracts.interfaces import AgentContext
 from contracts.schemas.agent_signal import AgentSignal
 
 from intelligence_agents.agents.base import BaseIntelligenceAgent
+from intelligence_agents.errors import FixtureCoverageError
 from intelligence_agents.agents.confidence import CAPS
 from intelligence_agents.agents.interpret import interpret
 from intelligence_agents.clock import Clock
@@ -27,7 +28,10 @@ class ValuationAgent(BaseIntelligenceAgent):
 
     def evaluate(self, symbol: str, as_of: datetime, context: AgentContext) -> AgentSignal:
         points = context.fundamental_provider.get_fundamentals(symbol, as_of)
-        quote = context.market_data_provider.get_quote(symbol, as_of)
+        try:
+            quote = context.market_data_provider.get_quote(symbol, as_of)
+        except (KeyError, LookupError) as exc:
+            raise FixtureCoverageError(symbol) from exc
         payload = {
             "kind": "valuation",
             "quote": quote.model_dump(mode="json"),

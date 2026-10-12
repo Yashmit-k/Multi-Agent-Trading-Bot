@@ -14,9 +14,12 @@ class Settings:
     max_clock_skew_seconds: int
     trading_mode: TradingMode
     paper_starting_cash: Decimal = Decimal("1000000")
+    market_data_collector: bool = False
+    market_data_poll_seconds: int = 60
 
     @classmethod
     def from_env(cls) -> "Settings":
+        raw = os.environ.get("MARKET_DATA_COLLECTOR", "false").strip().lower()
         return cls(
             database_url=os.environ.get("DATABASE_URL", "sqlite:///./core.db"),
             redis_url=os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
@@ -25,4 +28,6 @@ class Settings:
             max_clock_skew_seconds=int(os.environ.get("MAX_CLOCK_SKEW_SECONDS", "5")),
             trading_mode=TradingMode(os.environ.get("TRADING_MODE", TradingMode.PAPER.value)),
             paper_starting_cash=Decimal(os.environ.get("PAPER_STARTING_CASH", "1000000")),
+            market_data_collector=raw in {"1", "true", "yes"},
+            market_data_poll_seconds=int(os.environ.get("MARKET_DATA_POLL_SECONDS", "60")),
         )
