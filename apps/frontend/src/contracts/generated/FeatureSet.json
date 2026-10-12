@@ -58,6 +58,14 @@
       "format": "date-time",
       "title": "Timestamp",
       "type": "string"
+    },
+    "unavailable": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Unavailable",
+      "type": "array"
     }
   },
   "required": [
