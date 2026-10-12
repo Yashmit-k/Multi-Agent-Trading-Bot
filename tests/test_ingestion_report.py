@@ -127,6 +127,18 @@ def test_remove_membership_restores_the_prior_universe() -> None:
     assert repository.members_at(END) == before
 
 
+def test_in_process_migration_keeps_application_loggers(tmp_path, monkeypatch) -> None:
+    from alembic import command
+    from alembic.config import Config
+
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'alembic-log.db'}")
+    config = Config(os.path.join(root, "services/core/db/alembic.ini"))
+    config.set_main_option("script_location", os.path.join(root, "services/core/db/alembic"))
+    command.upgrade(config, "head")
+    assert logging.getLogger("core_api.app").disabled is False
+
+
 def test_callback_logs_the_report_on_every_run(caplog: pytest.LogCaptureFixture) -> None:
     repository = _repository("RELIANCE", "TATAMOTORS")
     with caplog.at_level(logging.INFO, logger="core_api.app"):
