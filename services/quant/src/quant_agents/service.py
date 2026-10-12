@@ -81,6 +81,9 @@ async def _publish_loop(settings: QuantSettings, sink: object) -> None:
                     "timeframe": settings.timeframe,
                     "regime_index_symbols": (),
                 },
+                ml_demo=settings.ml_demo,
+                ml_demo_dir=settings.ml_demo_dir,
+                ml_artifact_dir=settings.artifact_dir,
             )
         except Exception:
             logger.exception("quant paper pass failed")

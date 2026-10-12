@@ -124,10 +124,22 @@ class SystemEventRow(Base):
     payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
 
 
+class PaperSessionRow(Base):
+    __tablename__ = "paper_sessions"
+
+    session_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    starting_cash: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    peak_equity: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+
+
 class TradeProposalRow(Base):
     __tablename__ = "trade_proposals"
 
     proposal_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    session_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     instrument_id: Mapped[str] = mapped_column(String(64), nullable=False)
     symbol: Mapped[str] = mapped_column(String(32), nullable=False)
     horizon: Mapped[str] = mapped_column(String(16), nullable=False)
@@ -139,6 +151,7 @@ class RiskDecisionRow(Base):
     __tablename__ = "risk_decisions"
 
     risk_decision_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    session_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     proposal_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     instrument_id: Mapped[str] = mapped_column(String(64), nullable=False)
     payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
@@ -148,6 +161,7 @@ class OrderRow(Base):
     __tablename__ = "orders"
 
     order_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    session_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     proposal_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     instrument_id: Mapped[str] = mapped_column(String(64), nullable=False)
     payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
@@ -157,6 +171,7 @@ class ExecutionRow(Base):
     __tablename__ = "executions"
 
     execution_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    session_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     order_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     instrument_id: Mapped[str] = mapped_column(String(64), nullable=False)
     payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
@@ -164,8 +179,11 @@ class ExecutionRow(Base):
 
 class PositionRow(Base):
     __tablename__ = "positions"
+    __table_args__ = (UniqueConstraint("session_id", "instrument_id", name="uq_positions_session_instrument"),)
 
-    instrument_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    position_id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    session_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    instrument_id: Mapped[str] = mapped_column(String(64), nullable=False)
     symbol: Mapped[str] = mapped_column(String(32), nullable=False)
     payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
 
@@ -174,6 +192,7 @@ class PortfolioSnapshotRow(Base):
     __tablename__ = "portfolio_snapshots"
 
     snapshot_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    session_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
 
@@ -231,6 +250,60 @@ class BacktestMetricRow(Base):
 
     backtest_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class CashReservationRow(Base):
+    """One cash hold for an open BUY. Converted or released at most once."""
+
+    __tablename__ = "cash_reservations"
+
+    reservation_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    order_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    applied_debit: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ChargeLedgerRow(Base):
+    __tablename__ = "charge_ledger"
+    __table_args__ = (UniqueConstraint("session_id", "order_id", "kind", name="uq_charge_ledger_kind"),)
+
+    ledger_id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    order_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    execution_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class DpChargeRow(Base):
+    """One depository charge per scrip per trading day per session."""
+
+    __tablename__ = "dp_charges"
+    __table_args__ = (
+        UniqueConstraint("session_id", "trading_day", "exchange", "symbol", name="uq_dp_scrip_day"),
+    )
+
+    dp_id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    trading_day: Mapped[str] = mapped_column(String(10), nullable=False)
+    exchange: Mapped[str] = mapped_column(String(8), nullable=False)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
+    execution_id: Mapped[str] = mapped_column(String(128), nullable=False)
+
+
+class OrderBarCheckRow(Base):
+    __tablename__ = "order_bar_checks"
+    __table_args__ = (UniqueConstraint("order_id", "bar_key", name="uq_order_bar_check"),)
+
+    check_id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    order_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    bar_key: Mapped[str] = mapped_column(String(64), nullable=False)
 
 
 class RuntimeFlagRow(Base):

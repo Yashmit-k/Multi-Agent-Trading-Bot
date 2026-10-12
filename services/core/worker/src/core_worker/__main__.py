@@ -28,7 +28,15 @@ else:
 cost_raw = os.environ.get("PAPER_TRANSACTION_COST_BPS")
 slip_raw = os.environ.get("PAPER_SLIPPAGE_BPS", "0")
 schedule = None if cost_raw is None else CostSchedule.research(Decimal(cost_raw), Decimal(slip_raw))
+require_fresh = os.environ.get("PAPER_REQUIRE_FRESH_CANDLES", "true").strip().lower() not in {"0", "false", "no"}
 while True:
     run_once(repository, datetime.now(timezone.utc))
-    run_paper_cycle(repository, publisher, mode=mode, starting_cash=starting_cash, schedule=schedule)
+    run_paper_cycle(
+        repository,
+        publisher,
+        mode=mode,
+        starting_cash=starting_cash,
+        schedule=schedule,
+        require_fresh=require_fresh,
+    )
     time.sleep(interval)

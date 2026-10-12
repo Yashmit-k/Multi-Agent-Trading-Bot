@@ -43,7 +43,7 @@ def test_seed_has_fifty_nifty_symbols(repository: CoreRepository) -> None:
     assert len(members) == 50
     assert {item.symbol for item in members} >= {"RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK"}
     assert all(item.exchange == "NSE" and item.instrument_id == f"NSE:{item.symbol}" for item in members)
-    assert len(list(SEED_PATH.open(encoding="utf-8"))) == 51
+    assert len(list(SEED_PATH.open(encoding="utf-8"))) == 52
 
 
 def test_future_membership_is_hidden(repository: CoreRepository) -> None:

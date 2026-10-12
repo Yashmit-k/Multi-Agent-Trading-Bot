@@ -1,9 +1,11 @@
 from datetime import datetime, timezone
 
+import httpx
+
 from contracts.enums import Horizon, Timeframe, TradingMode
 from contracts.schemas.feature_set import FeatureSet
 
-from quant_agents.paper import publish_symbol_signals
+from quant_agents.paper import publish_symbol_signals, run_paper_pass
 from quant_agents.service import create_app
 from quant_agents.settings import QuantSettings
 
@@ -64,3 +66,65 @@ def test_paper_credentials_build_a_sink() -> None:
         )
     )
     assert app.state.sink is not None
+
+
+def _feature_set() -> FeatureSet:
+    moment = datetime(2024, 6, 3, 9, 0, tzinfo=timezone.utc)
+    return FeatureSet(
+        symbol="RELIANCE",
+        timestamp=moment,
+        timeframe=Timeframe.D1,
+        feature_version="1.0.0",
+        features={"return_1": 0.01, "last_close": 100.0},
+        source_data_timestamp=moment,
+    )
+
+
+def test_refused_health_does_not_fetch_or_submit() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused", request=request)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    sink = _MemorySink()
+    written = run_paper_pass(
+        "http://core-api:8000",
+        "read",
+        ("RELIANCE",),
+        sink,
+        client=client,
+        sleep=lambda _delay: None,
+        ready_attempts=2,
+    )
+    assert written == 0
+    assert sink.signals == []
+
+
+def test_health_retry_then_one_feature_fetch() -> None:
+    state = {"health": 0, "features": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/health":
+            state["health"] += 1
+            if state["health"] == 1:
+                raise httpx.ConnectError("refused", request=request)
+            return httpx.Response(200, json={"status": "ok"})
+        state["features"] += 1
+        if state["features"] == 1:
+            raise httpx.ConnectError("refused", request=request)
+        return httpx.Response(200, json=_feature_set().model_dump(mode="json"))
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    sink = _MemorySink()
+    written = run_paper_pass(
+        "http://core-api:8000",
+        "read",
+        ("RELIANCE",),
+        sink,
+        client=client,
+        sleep=lambda _delay: None,
+        ready_attempts=3,
+    )
+    assert state["health"] == 2
+    assert state["features"] == 2
+    assert written == 5
+    assert len(sink.signals) == 5

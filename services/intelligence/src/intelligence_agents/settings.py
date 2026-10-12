@@ -36,6 +36,7 @@ class IntelligenceSettings:
     rss_max_bytes: int
     rss_max_items: int
     service_mode: str
+    fundamentals_csv: str = ""
 
     @classmethod
     def from_env(cls) -> IntelligenceSettings:
@@ -66,6 +67,7 @@ class IntelligenceSettings:
             rss_max_bytes=int(os.environ.get("NEWS_RSS_MAX_BYTES", str(1024 * 1024))),
             rss_max_items=int(os.environ.get("NEWS_RSS_MAX_ITEMS", "100")),
             service_mode=os.environ.get("INTELLIGENCE_SERVICE_MODE", "oneshot").strip().lower(),
+            fundamentals_csv=os.environ.get("INTELLIGENCE_FUNDAMENTALS_CSV", "").strip(),
         )
         settings.validate()
         return settings
@@ -100,6 +102,8 @@ class IntelligenceSettings:
             raise ConfigError("BACKTEST cannot use RSS or csv-live; fixtures only")
         if self.data_source == "rss" and not self.news_rss_urls and self.trading_mode in LIVE_MODES:
             raise ConfigError("NEWS_RSS_URLS required when INTELLIGENCE_DATA_SOURCE=rss")
+        if self.data_source == "csv-live" and not self.fundamentals_csv and self.trading_mode in LIVE_MODES:
+            raise ConfigError("INTELLIGENCE_FUNDAMENTALS_CSV required when INTELLIGENCE_DATA_SOURCE=csv-live")
         if not self.symbols:
             raise ConfigError("INTELLIGENCE_SYMBOLS must list at least one symbol")
         if self.service_mode == "serve" and self.trading_mode in LIVE_MODES:

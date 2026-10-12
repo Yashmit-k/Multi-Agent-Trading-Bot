@@ -1,7 +1,9 @@
 """Core HTTP API. Unfinished product routes return 501."""
 
+import asyncio
 import logging
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -18,13 +20,14 @@ from contracts.schemas.agent_signal import AgentSignal
 from contracts.schemas.submission import SubmissionResult
 from contracts.version import __version__ as contracts_version
 from core_api.settings import Settings
+from core_db.paper_sessions import ActivePaperSessionError, ClosedPaperSessionError
 from core_db.repository import CoreRepository
 from core_db.seed import load_seed
 from core_db.session import create_schema
 from core_features.engine import build_feature_set
 from core_ingestion.service import EventPublisher, MemoryEventPublisher, RedisEventPublisher, ingest_signal
 from core_market_data import ZerodhaMarketDataProvider
-from core_market_data.zerodha import SEED_HISTORY_DAYS, format_ingestion_report
+from core_paper.operator import OperatorRejected, cancel_order, replace_order
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +56,17 @@ def create_app(
             load_seed(repository)
     if publisher is None:
         publisher = _publisher(resolved.redis_url)
-    app = FastAPI(title="Core trading API", version="1.0.0")
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        task = None
+        if resolved.market_data_collector:
+            task = asyncio.create_task(_collector_loop(_app, repository, resolved.market_data_poll_seconds))
+        yield
+        if task is not None:
+            task.cancel()
+
+    app = FastAPI(title="Core trading API", version="1.0.0", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://127.0.0.1:3000", "http://localhost:3000"],
@@ -65,6 +78,11 @@ def create_app(
     app.state.publisher = publisher
     app.state.kite_client = kite_client
     app.state.zerodha_access_token = None
+    from core_market_data.collector import HistoricalGate, IngestionState
+
+    app.state.ingestion = IngestionState()
+    app.state.historical_gate = HistoricalGate()
+    app.state.kite_pace = app.state.historical_gate.pace
 
     def require_user(credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]) -> None:
         if credentials is None or credentials.credentials != resolved.core_api_token:
@@ -73,6 +91,14 @@ def create_app(
     def require_internal(credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]) -> None:
         if credentials is None or credentials.credentials != resolved.internal_signal_token:
             raise HTTPException(status_code=401, detail="unauthorized")
+
+    @app.get("/api/v1/market/ingestion")
+    def market_ingestion(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        state = app.state.ingestion
+        body = state.snapshot()
+        body["collector_enabled"] = resolved.market_data_collector
+        body["live_enabled"] = False
+        return body
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -227,8 +253,11 @@ def create_app(
         )
 
     @app.get("/api/v1/decisions")
-    def decisions(_: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
-        return [item.model_dump(mode="json") for item in repository.list_proposals()]
+    def decisions(
+        _: Annotated[None, Depends(require_user)],
+        session_id: str | None = None,
+    ) -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in repository.list_proposals(_session_argument(repository, session_id))]
 
     @app.get("/api/v1/decisions/{proposal_id}")
     def decision(proposal_id: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
@@ -260,20 +289,38 @@ def create_app(
         return {"kill_switch": "armed" if body.armed else "disarmed"}
 
     @app.get("/api/v1/portfolio")
-    def portfolio(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
-        return _portfolio_body(repository.latest_snapshot(), resolved.paper_starting_cash)
+    def portfolio(
+        _: Annotated[None, Depends(require_user)],
+        session_id: str | None = None,
+    ) -> dict[str, object]:
+        argument = _session_argument(repository, session_id)
+        book = repository.active_paper_session() if session_id is None else repository.paper_session(session_id)
+        base = book.starting_cash if book is not None and book.starting_cash is not None else resolved.paper_starting_cash
+        body = _portfolio_body(repository.latest_snapshot(argument), base)
+        body["session_id"] = None if book is None else book.session_id
+        body["live_enabled"] = False
+        return body
 
     @app.get("/api/v1/positions")
-    def positions(_: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
-        return [item.model_dump(mode="json") for item in repository.list_positions()]
+    def positions(
+        _: Annotated[None, Depends(require_user)],
+        session_id: str | None = None,
+    ) -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in repository.list_positions(_session_argument(repository, session_id))]
 
     @app.get("/api/v1/orders")
-    def orders(_: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
-        return [item.model_dump(mode="json") for item in repository.list_orders()]
+    def orders(
+        _: Annotated[None, Depends(require_user)],
+        session_id: str | None = None,
+    ) -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in repository.list_orders(_session_argument(repository, session_id))]
 
     @app.get("/api/v1/trades")
-    def trades(_: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
-        return [item.model_dump(mode="json") for item in repository.list_executions()]
+    def trades(
+        _: Annotated[None, Depends(require_user)],
+        session_id: str | None = None,
+    ) -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in repository.list_executions(_session_argument(repository, session_id))]
 
     @app.get("/api/v1/paper/status")
     def paper_status(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
@@ -288,6 +335,116 @@ def create_app(
     def paper_stop(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
         repository.set_paper_running(False)
         return _paper_body(repository, resolved)
+
+    @app.get("/api/v1/paper/sessions")
+    def paper_sessions(_: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
+        return [_session_body(item) for item in repository.list_paper_sessions()]
+
+    @app.get("/api/v1/paper/unassigned")
+    def paper_unassigned(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        return {
+            "session_id": None,
+            "orders": [item.model_dump(mode="json") for item in repository.list_orders(None)],
+            "positions": [item.model_dump(mode="json") for item in repository.list_positions(None)],
+            "trades": [item.model_dump(mode="json") for item in repository.list_executions(None)],
+            "live_enabled": False,
+        }
+
+    @app.post("/api/v1/paper/sessions")
+    def open_session(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        try:
+            opened = repository.open_paper_session(resolved.paper_starting_cash)
+        except ActivePaperSessionError as exc:
+            raise HTTPException(status_code=409, detail="active_session_exists") from exc
+        logger.info("paper_session_opened session_id=%s", opened.session_id)
+        body = _session_body(opened)
+        body["live_enabled"] = False
+        return body
+
+    @app.get("/api/v1/paper/sessions/{session_id}")
+    def paper_session(session_id: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        book = repository.paper_session(session_id)
+        if book is None:
+            raise HTTPException(status_code=404, detail="unknown_session")
+        body = _session_body(book)
+        body["orders"] = [item.model_dump(mode="json") for item in repository.list_orders(session_id)]
+        body["positions"] = [item.model_dump(mode="json") for item in repository.list_positions(session_id)]
+        body["trades"] = [item.model_dump(mode="json") for item in repository.list_executions(session_id)]
+        body["decisions"] = [item.model_dump(mode="json") for item in repository.list_proposals(session_id)]
+        snapshot = repository.latest_snapshot(session_id)
+        body["snapshot"] = None if snapshot is None else snapshot.model_dump(mode="json")
+        body["live_enabled"] = False
+        return body
+
+    @app.post("/api/v1/paper/sessions/{session_id}/close")
+    def close_session(session_id: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        try:
+            closed = repository.close_paper_session(session_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="unknown_session") from exc
+        except ClosedPaperSessionError as exc:
+            raise HTTPException(status_code=409, detail="session_already_closed") from exc
+        logger.info("paper_session_closed session_id=%s", closed.session_id)
+        body = _session_body(closed)
+        body["live_enabled"] = False
+        return body
+
+    @app.post("/api/v1/paper/sessions/{session_id}/activate")
+    def activate_session(session_id: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        book = repository.paper_session(session_id)
+        if book is None:
+            raise HTTPException(status_code=404, detail="unknown_session")
+        if book.status == "closed":
+            raise HTTPException(status_code=409, detail="closed_session_stays_closed")
+        active = repository.active_paper_session()
+        if active is not None and active.session_id != book.session_id:
+            raise HTTPException(status_code=409, detail="active_session_exists")
+        logger.info("paper_session_active session_id=%s", book.session_id)
+        body = _session_body(book)
+        body["live_enabled"] = False
+        return body
+
+    class OrderAction(BaseModel):
+        operator_id: str
+        reason: str
+        expected_status: str
+
+    class ReplaceAction(OrderAction):
+        decision_at: datetime
+
+    @app.post("/api/v1/paper/sessions/{session_id}/orders/{order_id}/cancel")
+    def cancel_paper_order(session_id: str, order_id: str, body: OrderAction, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        try:
+            return cancel_order(
+                repository,
+                session_id=session_id,
+                order_id=order_id,
+                operator_id=body.operator_id,
+                reason=body.reason,
+                expected_status=body.expected_status,
+            )
+        except OperatorRejected as exc:
+            raise HTTPException(status_code=409, detail=exc.code) from exc
+
+    @app.post("/api/v1/paper/sessions/{session_id}/orders/{order_id}/replace")
+    def replace_paper_order(
+        session_id: str,
+        order_id: str,
+        body: ReplaceAction,
+        _: Annotated[None, Depends(require_user)],
+    ) -> dict[str, object]:
+        try:
+            return replace_order(
+                repository,
+                session_id=session_id,
+                order_id=order_id,
+                operator_id=body.operator_id,
+                reason=body.reason,
+                expected_status=body.expected_status,
+                decision_at=body.decision_at,
+            )
+        except OperatorRejected as exc:
+            raise HTTPException(status_code=409, detail=exc.code) from exc
 
     @app.get("/api/v1/zerodha/status")
     def zerodha_status(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
@@ -317,7 +474,19 @@ def create_app(
         if not token:
             raise HTTPException(status_code=502, detail="zerodha_session_failed")
         app.state.zerodha_access_token = str(token)
-        background.add_task(_ingest_seed_history, repository, client, getattr(app.state, "kite_pace", None))
+        state = app.state.ingestion
+        state.credentials_rejected = False
+        state.authenticated = True
+        state.last_error = None
+        gate = app.state.historical_gate
+        if gate.mark_queued():
+            state.seed_status = "queued"
+            logger.info("seed_queued")
+            logging.getLogger("uvicorn.error").info("seed_queued")
+            background.add_task(_ingest_seed_history, repository, client, app.state.kite_pace, state, gate)
+        else:
+            logger.info("seed_duplicate_skipped")
+            logging.getLogger("uvicorn.error").info("seed_duplicate_skipped")
         return {"authenticated": True, "live_enabled": False}
 
     class BacktestBody(BaseModel):
@@ -498,12 +667,114 @@ def _run_context(client: Any, gate: dict[str, object], app: FastAPI) -> None:
         app.state.context_running = False
 
 
-def _ingest_seed_history(repository: CoreRepository, client: Any, pace: Any | None = None) -> None:
-    provider = ZerodhaMarketDataProvider(repository, client, pace=pace)
-    end = datetime.now(timezone.utc)
-    days = int(os.environ.get("SEED_HISTORY_DAYS", str(SEED_HISTORY_DAYS)))
-    report = provider.ingest_seed_history(end - timedelta(days=days), end)
-    logger.info("%s", format_ingestion_report(report))
+def _ingest_seed_history(
+    repository: CoreRepository,
+    client: Any,
+    pace: Any | None = None,
+    state: Any | None = None,
+    gate: Any | None = None,
+) -> None:
+    """One 100-day seed. The gate keeps it from overlapping an incremental poll."""
+    ops = logging.getLogger("uvicorn.error")
+    if gate is not None and pace is not None:
+        gate.pace = pace
+    acquired = False
+    provider = ZerodhaMarketDataProvider(repository, client, pace=pace if pace is not None else (gate.pace if gate is not None else None))
+    try:
+        if gate is not None:
+            gate.begin_seed()
+            acquired = True
+        if state is not None:
+            state.seed_status = "running"
+        ops.info("seed_running")
+        logger.info("seed_running")
+        end = datetime.now(timezone.utc)
+        days = int(os.environ.get("SEED_HISTORY_DAYS", str(SEED_HISTORY_DAYS)))
+
+        def _progress(row: Any) -> None:
+            if state is None:
+                return
+            failed = row.status.value != "OK"
+            state.seed_symbols_completed += 0 if failed else 1
+            state.seed_symbols_failed += 1 if failed else 0
+            state.seed_retries = provider.retry_count
+            state.seed_timeouts = provider.timeout_count
+            state.seed_results = [
+                *state.seed_results,
+                {"symbol": row.symbol, "status": row.status.value, "detail": row.detail or ""},
+            ]
+            ops.info("seed_symbol symbol=%s status=%s detail=%s", row.symbol, row.status.value, row.detail or "-")
+
+        report = provider.ingest_seed_history(end - timedelta(days=days), end, on_symbol=_progress)
+        failed = sum(1 for row in report.rows if row.status.value != "OK")
+        status = "authentication_failed" if any((row.detail or "").endswith("authentication_failed") for row in report.rows) else ("partial" if failed else "completed")
+        if state is not None:
+            state.seed_status = status
+            state.seed_retries = provider.retry_count
+            state.seed_timeouts = provider.timeout_count
+            if status == "authentication_failed":
+                state.credentials_rejected = True
+                state.authenticated = False
+                state.last_error = "authentication_failed"
+        ops.info(
+            "seed_finished status=%s symbols=%s failed=%s retries=%s timeouts=%s",
+            status,
+            len(report.rows),
+            failed,
+            provider.retry_count,
+            provider.timeout_count,
+        )
+        logger.info("%s", format_ingestion_report(report))
+    except Exception as exc:
+        if state is not None:
+            if isinstance(exc, ZerodhaAuthError):
+                state.seed_status = "authentication_failed"
+                state.credentials_rejected = True
+                state.authenticated = False
+                state.last_error = "authentication_failed"
+            else:
+                state.seed_status = "failed"
+                state.last_error = type(exc).__name__
+        ops.error("seed_failed error_type=%s", type(exc).__name__)
+        logger.error("seed_failed error_type=%s", type(exc).__name__)
+    finally:
+        if acquired and gate is not None:
+            gate.finish_seed()
+
+
+async def _collector_loop(app: FastAPI, repository: CoreRepository, poll_seconds: int) -> None:
+    """Incremental candles only. A missing or rejected session does not call Zerodha."""
+    from core_market_data.collector import run_incremental_once
+
+    ops = logging.getLogger("uvicorn.error")
+    while True:
+        client = app.state.kite_client
+        state = app.state.ingestion
+        if client is None or not app.state.zerodha_access_token:
+            state.mark_unauthenticated()
+        elif state.credentials_rejected:
+            state.authenticated = False
+            state.last_error = "authentication_failed"
+        else:
+            gate = app.state.historical_gate
+            if app.state.kite_pace is not None:
+                gate.pace = app.state.kite_pace
+            try:
+                started = state.skipped_for_seed
+                await asyncio.to_thread(
+                    run_incremental_once,
+                    repository,
+                    client,
+                    state,
+                    pace=gate.pace,
+                    gate=gate,
+                )
+                if state.skipped_for_seed > started:
+                    ops.info("incremental_skipped reason=seed_active")
+            except Exception as exc:
+                state.last_error = type(exc).__name__
+                ops.error("market_data_collector_failed error_type=%s", type(exc).__name__)
+        await asyncio.sleep(max(1, poll_seconds))
 
 
 def _overview_body(repository: CoreRepository, moment: datetime, mode: TradingMode) -> dict[str, object]:
@@ -546,11 +817,37 @@ def _portfolio_body(snapshot: object, starting_cash: Decimal) -> dict[str, objec
 
 
 def _paper_body(repository: CoreRepository, settings: Settings) -> dict[str, object]:
+    book = repository.active_paper_session()
     return {
         "running": repository.paper_running(),
         "trading_mode": settings.trading_mode.value,
         "starting_cash": str(settings.paper_starting_cash),
         "kill_switch": "armed" if repository.kill_switch_armed() else "disarmed",
+        "session_id": None if book is None else book.session_id,
+        "session_status": None if book is None else book.status,
+        "session_starting_cash": None if book is None or book.starting_cash is None else str(book.starting_cash),
+        "live_enabled": False,
+    }
+
+
+def _session_argument(repository: CoreRepository, session_id: str | None) -> str | None | object:
+    if session_id is None:
+        from core_db.repository import _ACTIVE
+
+        return _ACTIVE
+    if repository.paper_session(session_id) is None:
+        raise HTTPException(status_code=404, detail="unknown_session")
+    return session_id
+
+
+def _session_body(book: object) -> dict[str, object]:
+    return {
+        "session_id": book.session_id,  # type: ignore[attr-defined]
+        "status": book.status,  # type: ignore[attr-defined]
+        "created_at": book.created_at.isoformat(),  # type: ignore[attr-defined]
+        "closed_at": None if book.closed_at is None else book.closed_at.isoformat(),  # type: ignore[attr-defined]
+        "starting_cash": None if book.starting_cash is None else str(book.starting_cash),  # type: ignore[attr-defined]
+        "live_enabled": False,
     }
 
 

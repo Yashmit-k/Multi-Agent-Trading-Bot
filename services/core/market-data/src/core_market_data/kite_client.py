@@ -5,6 +5,27 @@ from __future__ import annotations
 import os
 from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
+
+# Zerodha reads historical from/to as an IST wall clock with no offset.
+IST = ZoneInfo("Asia/Kolkata")
+_KITE_STAMP = "%Y-%m-%d %H:%M:%S"
+
+
+def kite_historical_bound(moment: datetime) -> datetime | str:
+    """Format one historical boundary for Kite.
+
+    A timezone-aware instant is converted to Asia/Kolkata and printed without
+    an offset. Repeating that conversion on the same instant, or on that
+    instant already expressed in IST, yields the same string.
+
+    A naive datetime is returned unchanged. Callers that omit a timezone
+    already mean an IST wall clock, which is also how naive stamps in Kite
+    responses are read. Attaching IST and converting again would move the clock.
+    """
+    if moment.tzinfo is None:
+        return moment
+    return moment.astimezone(IST).strftime(_KITE_STAMP)
 
 
 class KiteConnectMarketClient:
@@ -53,8 +74,8 @@ class KiteConnectMarketClient:
     ) -> list[dict[str, Any]]:
         rows = self._kite.historical_data(
             instrument_token,
-            from_date,
-            to_date,
+            kite_historical_bound(from_date),
+            kite_historical_bound(to_date),
             interval,
             continuous=False,
             oi=False,
