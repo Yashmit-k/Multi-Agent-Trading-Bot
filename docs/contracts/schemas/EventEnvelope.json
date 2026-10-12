@@ -1416,6 +1416,7 @@
         "CANCELLED",
         "REJECTED",
         "EXPIRED",
+        "EXPIRED_NO_DATA",
         "FAILED"
       ],
       "title": "OrderStatus",
