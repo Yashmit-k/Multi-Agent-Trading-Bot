@@ -4,7 +4,9 @@
 **Research status:** BLOCKED_PRECONDITION  
 **HOLDOUT_READY:** NO  
 
-H001 has not been run. `BLOCKED_PRECONDITION` is the same research-data blocker as `DATA NOT READY`: historical earnings and events have no trustworthy `available_at`. This is not a failed model, not evidence of poor predictive performance, and not a pass. There is no validation result and no predictive score.
+H001 has not been run. `BLOCKED_PRECONDITION` is the same research-data blocker as `DATA NOT READY`. This is not a failed model, not evidence of poor predictive performance, and not a pass. There is no validation result and no predictive score.
+
+Clarification, 2026-10-12. The method is now **PROTOCOL APPROVED — EXECUTION NOT AUTHORIZED** in `h001-protocol-approval.md`. `exchdisstime` tagged `Asia/Kolkata` is the accepted proxy clock. It does not prove public access or actionability. H001 is not implemented and has not shown an edge. Sentences below that say the method is unfrozen, or that no timestamp proxy exists, are the state of this report when it was written.
 
 Re-audit tree: `origin/main` **`b4ab1ce`**. See [`research-audit-2026-10.md`](research-audit-2026-10.md) and [`hypothesis-H001.md`](hypothesis-H001.md).
 
@@ -24,13 +26,13 @@ Samples, signals, proposals, orders, fills, gross P&L, fees, slippage, net P&L, 
 
 Cost scenarios (all **NOT RUN**): 0/0, 1/0, 2/0, 3/0, 5/0, 0/1, 2/1 (cost bp / slippage bp).
 
-2 bp validation net edge: **NOT EVALUABLE**. The gate was not modified. It has not been applied because point-in-time earnings and events are unavailable. H001 has not been run, so the gate is neither passed nor failed as a model result.
+2 bp validation net edge: **NOT EVALUABLE**. The gate was not applied. H001 has not been run, so the gate is neither passed nor failed as a model result. The later approved formula is 2 bp per fill. This report did not compute it.
 
 Required window 2024-01-01 through 2025-12-31. Frozen candles `nifty50_5m_20261005` and `nifty50_1d_20261005` are `MARKET_DATA_READY` at `snapshots 2/nifty50`, per [`data-readiness-2026-10.md`](data-readiness-2026-10.md). The short 2026 tape at `snapshots/nifty50` was **not** substituted.
 
 ## 3. New hypothesis
 
-H001: earnings/events; NIFTY 50; LogisticRegression; 2 bp gate; `period_end` never substitutes for `available_at`. Target, features, horizon: **NOT FROZEN**.
+H001: earnings/events; NIFTY 50; LogisticRegression; 2 bp gate; `period_end` never substitutes for `available_at`. Target, features, and horizon were **NOT FROZEN** in this report. The approval table later specified them. They are not implemented, and this report has no H001 result.
 
 ## 4. Dataset
 
@@ -58,7 +60,7 @@ Always-flat, always-long/passive, existing agents, H001: **NOT RUN**.
 **Research status:** BLOCKED_PRECONDITION  
 **HOLDOUT_READY:** NO  
 
-H001 has not been run. Point-in-time earnings and events with a trustworthy `available_at` are missing. The 2024–2025 market candles exist and are `MARKET_DATA_READY`. This is not a pass and not a predictive failure. Stop. Do not tune. Do not use 2026 bars to select H001.
+H001 has not been run. The 2024–2025 market candles exist and are `MARKET_DATA_READY`. This is not a pass and not a predictive failure. Stop. Do not tune. Do not use 2026 bars to select H001. The proxy clock accepted later does not turn this section into an edge.
 
 ## 10. Safety confirmation
 
