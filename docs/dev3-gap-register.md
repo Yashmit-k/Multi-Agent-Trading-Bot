@@ -96,7 +96,7 @@ Status is `PASS`, `FAIL`, `BLOCKED`, or `NOT VERIFIED`. "Later checkpoint" means
 | Production paper session. | PASS | Paper status and session list, above. Mode `PAPER`, `live_enabled` false. | Developer 3 | No session write. |
 | Intelligence live news. | BLOCKED | The isolated project kept `INTELLIGENCE_DATA_SOURCE=fixtures`, an empty LLM key, and no `NEWS_RSS_URLS`. No credentialed live run was authorized. | Developer 3 | Live news without credentials stays blocked. |
 | Frontend and Intelligence contract in an isolated stack. | PARTIAL | Fixture news passed on `127.0.0.1:18101`. The dashboard uses `GET /api/v1/portfolio`. `/performance` is labelled backtest results from `GET /api/v1/performance`. Live news remains blocked. | Developer 3 | No live-news claim until a provider is verified. |
-| H001 and the holdout. | BLOCKED | `services/quant/docs/daily-rules-result.md`: one of six pairs, `momentum_20` at horizon 5, mean excess about 9.8 bp, interval after delivery costs. That interval does not adjust for choosing the best of six. H001 stays blocked. The holdout was not opened or hashed. | Developer 3 | Checkpoint 5 audits the existing artifact. No new backtest and no holdout. |
+| H001 and the holdout. | BLOCKED | `docs/dev3-daily-rules-audit.md`: one of six pairs, `momentum_20` at horizon 5, mean excess about 9.8 bp. That interval is per pair and does not adjust for choosing the best of six. H001 stays blocked. The holdout was not opened or hashed. | Developer 3 | No new backtest and no holdout. |
 
 ## What the next review can authorize
 
@@ -106,4 +106,4 @@ Checkpoint 3 added the unavailable daily-performance route, the snapshot-writer 
 
 Checkpoint 4 checked fixture Intelligence news and the page contracts. The closure is **PARTIAL**: fixture routes pass, and live news plus daily equity history stay blocked.
 
-Checkpoint 5 may audit the existing daily-rule artifact, including the six-pair selection caveat. No new backtest, no H001 fit, and no holdout.
+Checkpoint 5 audited the existing daily-rule result in `docs/dev3-daily-rules-audit.md` and wrote `docs/dev3-demo-runbook.md`. H001 stays blocked. No new backtest was run and the holdout was not opened.
