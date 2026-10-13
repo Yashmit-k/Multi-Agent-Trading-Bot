@@ -20,13 +20,14 @@ from contracts.schemas.execution import Execution
 from contracts.schemas.order import Order
 from contracts.schemas.portfolio import PortfolioSnapshot
 from contracts.schemas.position import Position
-from core_db.repository import CoreRepository
+from core_db.repository import DAILY_ENTRY_LIMIT, CoreRepository
 from core_decision import build_proposal, proposal_id_for
 from core_fusion import fuse
 from core_paper.costs import CostSchedule, fee_on, slipped_price
-from core_paper.execute import queue_entry, settle_entries, settle_sell
+from core_paper.execute import MAX_NOTIONAL, queue_entry, settle_entries, settle_sell
 from core_paper.limits import PRODUCT_CNC, SELL_POLICY_VERSION
 from core_paper.charges import ZERODHA_EQUITY_RI
+from core_paper.trading_calendar import paper_test_entry_window
 from core_risk import assess
 
 HORIZON_TIMEFRAME: dict[Horizon, Timeframe] = {
@@ -36,7 +37,6 @@ HORIZON_TIMEFRAME: dict[Horizon, Timeframe] = {
 }
 _DRAWDOWN_QUANTUM = Decimal("0.00000001")
 _CENT = Decimal("0.01")
-MAX_NOTIONAL = Decimal("100000")
 logger = logging.getLogger(__name__)
 
 
@@ -75,7 +75,14 @@ def run_paper_cycle(
     schedule: CostSchedule | None = None,
     require_fresh: bool = False,
     now: datetime | None = None,
+    max_new_orders: int | None = None,
+    enforce_entry_window: bool = True,
+    require_universe_fresh: bool = False,
+    broker_authenticated: bool = True,
+    allow_test_extension: bool = False,
 ) -> int:
+    if max_new_orders is not None and max_new_orders < 0:
+        raise ValueError("max_new_orders must be zero or positive")
     if not repository.paper_running():
         return 0
     book = repository.active_paper_session()
@@ -92,8 +99,28 @@ def run_paper_cycle(
         _settle_open_orders(repository, publisher, costs, starting_cash, now=moment)
         return 0
     written = 0
+    blocked = _new_entry_block(
+        repository,
+        moment,
+        mode=mode,
+        enforce_entry_window=enforce_entry_window,
+        require_universe_fresh=require_universe_fresh,
+        broker_authenticated=broker_authenticated,
+        allow_test_extension=allow_test_extension,
+    )
+    if blocked is not None:
+        logger.info("new_entries_blocked reason=%s", blocked)
+        return written
+    created_orders = 0
+    capped = False
+    extension = paper_test_entry_window(moment) if allow_test_extension and mode == TradingMode.PAPER else None
     for instrument in repository.list_instruments():
+        if capped:
+            break
         for horizon, timeframe in HORIZON_TIMEFRAME.items():
+            if max_new_orders is not None and created_orders >= max_new_orders:
+                capped = True
+                break
             candle = repository.latest_candle(instrument.symbol, timeframe)
             if candle is None or repository.held_quantity(instrument.symbol) > 0:
                 continue
@@ -133,9 +160,90 @@ def run_paper_cycle(
                 continue
             if repository.order_for_proposal(proposal.proposal_id) is not None:
                 continue
-            queue_entry(repository, proposal, as_of)
+            before = {item.order_id for item in repository.list_orders()}
+            queue_entry(repository, proposal, as_of, entry_window=extension)
+            created_orders += len({item.order_id for item in repository.list_orders()} - before)
+    if capped:
+        logger.info("new_order_cap cap=%s created=%s", max_new_orders, created_orders)
     _settle_open_orders(repository, publisher, costs, starting_cash, now=moment)
     return written
+
+
+class CycleRefused(RuntimeError):
+    """The one-shot preflight refused to start a cycle."""
+
+
+REQUIRED_MEMBER_COUNT = 50
+
+
+def _new_entry_block(
+    repository: CoreRepository,
+    now: datetime,
+    *,
+    mode: TradingMode,
+    enforce_entry_window: bool,
+    require_universe_fresh: bool,
+    broker_authenticated: bool,
+    allow_test_extension: bool,
+) -> str | None:
+    """Why this cycle must not submit a new buy. Settlement has already run."""
+    if not broker_authenticated:
+        return "broker_unauthenticated"
+    if enforce_entry_window:
+        try:
+            require_entry_window(now, mode=mode, allow_extension=allow_test_extension)
+        except CycleRefused as exc:
+            return str(exc)
+    if require_universe_fresh:
+        try:
+            require_fresh_constituents(repository, now)
+        except CycleRefused as exc:
+            return str(exc)
+    if repository.daily_entry_count(now) >= DAILY_ENTRY_LIMIT:
+        return "daily_entry_cap"
+    return None
+
+
+def require_fresh_constituents(repository: CoreRepository, now: datetime) -> None:
+    """Fail closed unless every current member has a fresh five-minute bar in the database.
+
+    Freshness is `candle_is_fresh`, which uses `expected_completed_end` and the
+    90-second publication delay. The ingestion status snapshot is not read.
+    """
+    members = repository.members_at(now)
+    if len(members) != REQUIRED_MEMBER_COUNT:
+        raise CycleRefused(f"NIFTY50 membership is {len(members)}, required {REQUIRED_MEMBER_COUNT}")
+    for item in members:
+        bar = repository.latest_candle(item.symbol, Timeframe.M5)
+        if bar is None or not _candle_is_fresh(bar.end, Timeframe.M5, now):
+            raise CycleRefused(f"stale or missing 5m bar for {item.symbol}")
+
+
+def require_ordinary_entry_window(now: datetime) -> None:
+    """Ordinary cash session, 09:20 inclusive to 10:30 exclusive IST."""
+    require_entry_window(now, mode=TradingMode.PAPER, allow_extension=False)
+
+
+def require_entry_window(now: datetime, *, mode: TradingMode, allow_extension: bool) -> None:
+    """New-entry gate. The 11:00 end applies only to the opted-in 13 October 2026 paper test."""
+    from datetime import time
+
+    from core_paper.trading_calendar import ENTRY_END, IST, paper_test_entry_window, session_for
+
+    local = now.astimezone(IST)
+    window = session_for(local.date())
+    if window is None or (window.entry_start, window.entry_end) != (time(9, 20), time(10, 30)):
+        raise CycleRefused("session is not an ordinary 09:20-10:30 entry window")
+    end = ENTRY_END
+    if allow_extension and mode == TradingMode.PAPER:
+        extended = paper_test_entry_window(now)
+        if extended is not None:
+            end = extended.entry_end
+    end_at = datetime.combine(window.session_date, end, tzinfo=IST)
+    if not (window.entry_start_at <= local < end_at):
+        if end == time(11, 0):
+            raise CycleRefused("outside the 13 October 2026 paper entry window ending 11:00 IST")
+        raise CycleRefused("outside 09:20 inclusive to 10:30 exclusive IST")
 
 
 def _sized(proposal, cash: Decimal, schedule: CostSchedule):

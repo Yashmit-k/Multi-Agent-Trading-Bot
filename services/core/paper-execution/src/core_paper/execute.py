@@ -5,6 +5,8 @@ reserved in the same transaction as the order. A fill converts that reservation
 once. Expiry, rejection, and cancellation release it once.
 """
 
+import logging
+from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_DOWN
 
@@ -33,21 +35,49 @@ from core_paper.limits import (
     buy_limit,
     limit_fill_price,
 )
-from core_paper.trading_calendar import IST, CalendarUnverified, assign_entry_window, expected_bar_starts
+from core_paper.trading_calendar import (
+    IST,
+    TEST_EXTENSION_DATE,
+    TEST_EXTENSION_END,
+    TEST_EXTENSION_SOURCE,
+    CalendarUnverified,
+    EntryWindow,
+    assign_entry_window,
+    expected_bar_starts,
+    session_for,
+)
 
 _DRAWDOWN_QUANTUM = Decimal("0.00000001")
-MAX_NOTIONAL = Decimal("100000")
+MAX_NOTIONAL = Decimal("20000")
+logger = logging.getLogger(__name__)
 
 
-def affordable_quantity(cash: Decimal, limit: Decimal, schedule: EquityChargeSchedule, cap: Decimal = MAX_NOTIONAL) -> int:
-    require_schedule(schedule)
-    if limit <= 0 or cash <= 0:
+def order_notional_cap(requested: Decimal | None = None) -> Decimal:
+    """Hard per-order notional ceiling. A larger requested cap cannot raise it."""
+    if requested is None or requested > MAX_NOTIONAL:
+        return MAX_NOTIONAL
+    return requested
+
+
+def affordable_quantity(
+    cash: Decimal,
+    limit: Decimal,
+    schedule: EquityChargeSchedule | None,
+    cap: Decimal | None = None,
+) -> int:
+    """Whole shares whose limit notional fits the hard cap. Fees are reserved on top."""
+    priced = require_schedule(schedule)
+    bound = order_notional_cap(cap)
+    if limit <= 0 or cash <= 0 or bound <= 0:
         return 0
-    quantity = int((cap / limit).to_integral_value(rounding=ROUND_DOWN))
+    quantity = int((bound / limit).to_integral_value(rounding=ROUND_DOWN))
     while quantity >= 1:
         notional = limit * quantity
-        fees = delivery_buy(notional, schedule, ceiling=True).total
-        if notional + fees <= cap and notional + fees <= cash:
+        if notional > bound:
+            quantity -= 1
+            continue
+        fees = delivery_buy(notional, priced, ceiling=True).total
+        if notional + fees <= cash:
             return quantity
         quantity -= 1
     return 0
@@ -58,8 +88,9 @@ def queue_entry(
     proposal,
     as_of: datetime,
     *,
-    schedule: EquityChargeSchedule = ZERODHA_EQUITY_RI,
-    cap: Decimal = MAX_NOTIONAL,
+    schedule: EquityChargeSchedule | None = ZERODHA_EQUITY_RI,
+    cap: Decimal | None = None,
+    entry_window: EntryWindow | None = None,
 ) -> Order | None:
     """Create one CNC limit order, or a rejected order when the policy cannot be applied."""
     if proposal.side != Side.BUY:
@@ -69,16 +100,18 @@ def queue_entry(
     instrument = repository.get_by_symbol(proposal.symbol)
     if instrument is None:
         raise KeyError(proposal.symbol)
-    reason = _entry_block(repository, proposal, as_of, instrument.tick_size, schedule, cap)
+    bound = order_notional_cap(cap)
+    reason = _entry_block(repository, proposal, as_of, instrument.tick_size, schedule)
     if reason is not None:
         order = _order(repository, proposal, as_of, instrument, status=OrderStatus.REJECTED, limit=None, metadata={"reason": reason, "product_type": PRODUCT_CNC})
         repository.commit_policy_order(order, None)
         return order
+    priced = require_schedule(schedule)
     daily, candle_id = repository.completed_daily(proposal.symbol, as_of)  # type: ignore[misc]
-    window = assign_entry_window(as_of)
+    window = _requested_window(entry_window) if entry_window is not None else assign_entry_window(as_of)
     limit = buy_limit(daily.close, instrument.tick_size)
     cash = repository.available_cash(repository.active_paper_session().starting_cash)  # type: ignore[union-attr]
-    quantity = affordable_quantity(cash, limit, schedule, cap)
+    quantity = affordable_quantity(cash, limit, priced, bound)
     if quantity < 1:
         order = _order(
             repository,
@@ -91,7 +124,20 @@ def queue_entry(
         )
         repository.commit_policy_order(order, None)
         return order
-    reserve = reservation_buy(limit * quantity, schedule)
+    notional = limit * quantity
+    if notional > MAX_NOTIONAL:
+        order = _order(
+            repository,
+            proposal,
+            as_of,
+            instrument,
+            status=OrderStatus.REJECTED,
+            limit=limit,
+            metadata={"reason": "notional_cap", "product_type": PRODUCT_CNC, "policy_version": POLICY_VERSION},
+        )
+        repository.commit_policy_order(order, None)
+        return order
+    reserve = reservation_buy(notional, priced)
     metadata = {
         "reason": "entry",
         "product_type": PRODUCT_CNC,
@@ -108,7 +154,7 @@ def queue_entry(
         "entry_session_date": window.session_date.isoformat(),
         "calendar_version": window.calendar_version,
         "calendar_source": window.source,
-        "charge_version": schedule.version,
+        "charge_version": priced.version,
         "fill_model": FILL_MODEL,
         "reserved_amount": str(reserve),
         "decision_end": as_of.astimezone(timezone.utc).isoformat(),
@@ -118,8 +164,13 @@ def queue_entry(
     }
     sized = proposal.model_copy(update={"quantity": quantity})
     order = _order(repository, sized, as_of, instrument, status=OrderStatus.OPEN, limit=limit, metadata=metadata, quantity=quantity)
-    repository.commit_policy_order(order, reserve)
-    return order
+    if repository.commit_policy_order(order, reserve):
+        return order
+    existing = repository.order_for_proposal(proposal.proposal_id)
+    if existing is not None:
+        return existing
+    logger.info("daily_entry_cap day=%s", order.created_at.astimezone(IST).date().isoformat())
+    return None
 
 
 def settle_entries(
@@ -150,7 +201,7 @@ def legacy_review_required(order: Order) -> bool:
     return order.metadata.get("policy_version") not in {POLICY_VERSION, SELL_POLICY_VERSION}
 
 
-def _entry_block(repository, proposal, as_of, tick, schedule, cap) -> str | None:
+def _entry_block(repository, proposal, as_of, tick, schedule) -> str | None:
     try:
         require_schedule(schedule)
     except Exception:
@@ -163,9 +214,28 @@ def _entry_block(repository, proposal, as_of, tick, schedule, cap) -> str | None
         assign_entry_window(as_of)
     except CalendarUnverified:
         return "calendar_unverified"
-    if cap != MAX_NOTIONAL:
-        return None
     return None
+
+
+def _requested_window(window: EntryWindow) -> EntryWindow:
+    if (
+        window.source != TEST_EXTENSION_SOURCE
+        or window.session_date != TEST_EXTENSION_DATE
+        or window.entry_end != TEST_EXTENSION_END
+    ):
+        raise ValueError("entry window override is not the 13 October 2026 paper test")
+    return window
+
+
+def _window_for_order(order: Order, activation: datetime) -> EntryWindow | None:
+    if order.metadata.get("calendar_source") == TEST_EXTENSION_SOURCE:
+        if order.metadata.get("entry_session_date") != TEST_EXTENSION_DATE.isoformat():
+            return None
+        base = session_for(TEST_EXTENSION_DATE)
+        if base is None:
+            return None
+        return replace(base, entry_end=TEST_EXTENSION_END, source=TEST_EXTENSION_SOURCE)
+    return assign_entry_window(activation)
 
 
 def _settle_one(repository, order: Order, *, starting_cash: Decimal, now: datetime, schedule: EquityChargeSchedule) -> None:
@@ -175,8 +245,8 @@ def _settle_one(repository, order: Order, *, starting_cash: Decimal, now: dateti
         return
     activation = datetime.fromisoformat(str(order.metadata["activation_at"]))
     expiry = datetime.fromisoformat(str(order.metadata["entry_window_end"]))
-    window = assign_entry_window(activation)
-    if window.session_date.isoformat() != order.metadata["entry_session_date"]:
+    window = _window_for_order(order, activation)
+    if window is None or window.session_date.isoformat() != order.metadata["entry_session_date"]:
         _expire_if_due(repository, order, now, OrderStatus.EXPIRED, "entry_window_mismatch")
         return
     limit = Decimal(str(order.limit_price))

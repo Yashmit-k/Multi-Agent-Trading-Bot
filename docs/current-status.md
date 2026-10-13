@@ -42,11 +42,11 @@ Operational. It uses the same sizing, costs, next-bar fills, and stop-first rule
 
 ## 8. Paper execution
 
-Operational. A market decision on candle `t` fills at the next stored open. No later bar means the order stays unfilled. Quantity is the largest whole share whose slipped notional and fees fit in cash and in the 100,000 cap. The default cost is 2 bp. An explicit schedule, including 0 bp, overrides it. The fill price is the slipped price. Fees and slippage are stored separately. If stop and target are both inside one later bar, the stop wins. The kill switch is separate from paper start and stop. Arming it rejects new buys and queues flatten sells. A flatten with no later bar stays open.
+Operational. A market decision on candle `t` fills at the next stored open. No later bar means the order stays unfilled. A new BUY is sized so its limit price times quantity is at most 20,000. Fees are reserved on top of that notional and must also fit available cash. At most 6 new CNC entry orders are stored per IST calendar date, across cycles, worker restarts, and paper sessions. Cancelled and expired entries stay in that count. Sells do not. The default cost is 2 bp. An explicit schedule, including 0 bp, overrides it. The fill price is the slipped price. Fees and slippage are stored separately. If stop and target are both inside one later bar, the stop wins. The kill switch is separate from paper start and stop. Arming it rejects new buys and queues flatten sells. A flatten with no later bar stays open.
 
 ## 9. Risk
 
-Operational for `PAPER`. `BACKTEST`, `SHADOW`, and `LIVE` are rejected. Buys must fit cash and the 100,000 notional cap. A sell cannot exceed the shares held. Stops and targets recorded on proposals are 2% and 4%.
+Operational for `PAPER`. `BACKTEST`, `SHADOW`, and `LIVE` are rejected. Buys must fit cash and the 20,000 notional cap. A sell cannot exceed the shares held. Stops and targets recorded on proposals are 2% and 4%.
 
 ## 10. ML status
 
@@ -55,6 +55,8 @@ Operational for `PAPER`. `BACKTEST`, `SHADOW`, and `LIVE` are rejected. Buys mus
 ## 11. Research status
 
 OHLCV direction research is closed. It was evaluated and does not demonstrate tradable edge after the 2 bp cost gate. The 1-day AUC lift interval included zero. The 5-minute level was about 0.52. Five-minute rules failed the 2 bp gate. Cross-sectional rank was about 0.58 bp gross and -1.42 bp after 2 bp. A 60-minute hold was about 0.92 bp gross and -1.08 bp after 2 bp. Daily relative strength and 20-day momentum were positive only because they were long on nearly every bar. Mean reversion failed. The 2 bp gate was not changed. Always-long behavior is not alpha.
+
+The pre-registered daily rules in `services/quant/docs/daily-rules-protocol.md` were scored once on the research daily file through 2025-12-31. Only 5-session 20-day momentum cleared its own date-block interval, by about 0.4 bp at the lower bound, while holding about 56% of names. That row does not reopen OHLCV research, `snapshots/holdout_after_20261005`, or `MlAgent`. No model was fit. The result is `services/quant/docs/daily-rules-result.md`.
 
 ## 12. H001 status
 

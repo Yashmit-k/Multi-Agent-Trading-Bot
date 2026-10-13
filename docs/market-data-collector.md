@@ -24,6 +24,8 @@ An API key and secret only mean a Kite client can be constructed. `GET /api/v1/z
 
 `GET /api/v1/market/ingestion` also reports the latest stored daily and 5-minute ends seen on the last cycle, per-symbol freshness, missing bars in the incremental window, the last error type, and whether a pass is running. `live_enabled` is false. The collector never submits an order.
 
+The ingestion snapshot records each symbol's latest candle end before that pass calls `upsert_candles`. A poll can store a newer bar and still report the previous end until the next pass reads it back. A paper-cycle preflight must use the candle rows in the database and `expected_completed_end`. It must not treat this snapshot as the freshness source. The running Core API is left as it is; this note does not restart it or change the 90-second delay.
+
 ## Paper guard
 
 `core-worker` passes `require_fresh=True` unless `PAPER_REQUIRE_FRESH_CANDLES` is `false`. A new entry is skipped when that symbol's latest candle is behind the completed bar for the horizon. Intraday uses 5-minute bars. Swing and long-term use the daily bar. Existing tests call the paper cycle without that flag, so historical fixtures still fill. The worker is stopped and was not started to test this.

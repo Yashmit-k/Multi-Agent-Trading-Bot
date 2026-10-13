@@ -13,7 +13,7 @@ from contracts.schemas.risk_decision import RiskCheck, RiskDecision
 from contracts.schemas.trade_proposal import TradeProposal
 
 RISK_VERSION = "1.0.0"
-MAX_NOTIONAL = Decimal("100000")
+MAX_NOTIONAL = Decimal("20000")
 
 
 def assess(
@@ -30,7 +30,7 @@ def assess(
         _check("mode_is_paper", mode == TradingMode.PAPER, f"mode {mode.value} is not PAPER"),
         _check("universe_member", in_universe, f"{proposal.symbol} is outside the universe at as_of"),
         _check("sufficient_cash", proposal.side != Side.BUY or notional <= cash, "buy notional exceeds cash"),
-        _check("notional_cap", notional <= MAX_NOTIONAL, "order notional exceeds 100000"),
+        _check("notional_cap", notional <= MAX_NOTIONAL, "order notional exceeds 20000"),
         _check(
             "no_short",
             proposal.side != Side.SELL or proposal.quantity <= held_quantity,

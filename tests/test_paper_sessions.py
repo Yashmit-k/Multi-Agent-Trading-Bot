@@ -58,6 +58,9 @@ def test_fresh_session_uses_configured_cash_and_inherits_nothing(repository: Cor
     opened = repository.open_paper_session(CASH, created_at=FILL_AT + timedelta(days=2))
     assert opened.session_id != LEGACY_SESSION_ID
     assert opened.starting_cash == CASH
+    assert opened.peak_equity == CASH
+    assert opened.created_at == FILL_AT + timedelta(days=2)
+    assert repository.list_executions(LEGACY_SESSION_ID)[0].executed_at == FILL_AT
     assert repository.list_orders() == []
     assert repository.list_positions() == []
     assert repository.list_executions() == []
@@ -71,19 +74,39 @@ def test_fresh_session_uses_configured_cash_and_inherits_nothing(repository: Cor
     assert repository.active_paper_session().session_id == opened.session_id
 
 
+def test_new_session_peak_starts_at_cash_and_ignores_the_runtime_flag(repository: CoreRepository) -> None:
+    from core_paper.execute import _snapshot
+
+    _set_peak(repository, Decimal("100000"))
+    opened = repository.open_paper_session(CASH, created_at=FILL_AT + timedelta(days=2))
+    assert opened.peak_equity == CASH
+    assert opened.created_at == FILL_AT + timedelta(days=2)
+    assert _paper_peak(repository) == Decimal("100000")
+    snapshot = _snapshot(repository, FILL_AT + timedelta(days=2), Decimal("900000"), None)
+    assert snapshot.equity == Decimal("900000")
+    assert snapshot.drawdown == Decimal("0.1")
+    assert repository.note_peak_equity(Decimal("900000")) == CASH
+    assert repository.paper_session(opened.session_id).peak_equity == CASH
+    assert _paper_peak(repository) == Decimal("100000")
+    repository.close_paper_session(opened.session_id, closed_at=FILL_AT + timedelta(days=3))
+    assert repository.note_peak_equity(Decimal("50000")) == Decimal("50000")
+    assert repository.paper_session(opened.session_id).peak_equity == CASH
+    assert _paper_peak(repository) == Decimal("100000")
+
+
 def test_old_proposal_does_not_block_a_new_session(repository: CoreRepository) -> None:
     repository.upsert_candles(list(candles_for("RELIANCE")))
     _store(repository, _signal(signal_id="sig-session", timestamp=FIXTURE_AS_OF))
     first = repository.open_paper_session(CASH)
     publisher = MemoryEventPublisher()
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH)
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH)
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH, enforce_entry_window=False)
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH, enforce_entry_window=False)
     assert len(repository.list_orders()) == 1
     old_id = proposal_id_for("RELIANCE", repository.list_proposals()[0].horizon, FIXTURE_AS_OF, session_id=first.session_id)
     assert repository.get_proposal(old_id) is not None
     repository.close_paper_session(first.session_id)
     second = repository.open_paper_session(CASH)
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH)
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH, enforce_entry_window=False)
     new_id = proposal_id_for("RELIANCE", repository.list_proposals()[0].horizon, FIXTURE_AS_OF, session_id=second.session_id)
     assert new_id != old_id
     assert repository.get_proposal(new_id) is not None
@@ -96,7 +119,7 @@ def test_rejected_risk_does_not_change_session_cash(repository: CoreRepository) 
     repository.open_paper_session(Decimal("1"))
     repository.upsert_candles(list(candles_for("RELIANCE")))
     _store(repository, _signal(signal_id="sig-poor", timestamp=FIXTURE_AS_OF))
-    run_paper_cycle(repository, MemoryEventPublisher(), mode=TradingMode.PAPER, starting_cash=Decimal("1"))
+    run_paper_cycle(repository, MemoryEventPublisher(), mode=TradingMode.PAPER, starting_cash=Decimal("1"), enforce_entry_window=False)
     assert repository.list_orders() == []
     assert repository.latest_snapshot() is None
     assert repository.cash_balance(Decimal("1")) == Decimal("1")

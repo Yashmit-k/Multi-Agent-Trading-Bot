@@ -3,8 +3,10 @@
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from contracts.enums import Exchange, Timeframe
@@ -36,6 +38,7 @@ from core_db.models import (
     FeatureRow,
     InstrumentRow,
     MarketTickRow,
+    EntryDayGateRow,
     OrderBarCheckRow,
     OrderRow,
     PaperSessionRow,
@@ -62,6 +65,9 @@ from core_db.records import InstrumentRecord, PaperSessionRecord, TickRecord
 
 NSE = Exchange.NSE.value
 _ACTIVE = object()
+_IST = ZoneInfo("Asia/Kolkata")
+DAILY_ENTRY_LIMIT = 6
+ENTRY_POLICY_VERSION = "cnc-limit-v1"
 
 
 class NonNseWriteError(ValueError):
@@ -601,11 +607,22 @@ class CoreRepository:
             session.commit()
 
     def commit_policy_order(self, order: Order, reserve: Decimal | None) -> bool:
-        """Insert one order and, for a BUY hold, its cash reservation in one transaction."""
+        """Insert one order and, for a BUY hold, its cash reservation in one transaction.
+
+        A new CNC entry is counted under its IST calendar date before the insert.
+        The gate row and the order commit together, so a concurrent insert cannot
+        pass the same daily count.
+        """
         instrument = self._require_instrument(order.symbol)
         session_id = self._session_id_for_proposal(order.proposal_id)
+        payload = order.model_dump(mode="json")
         with self._session_factory() as session:
+            counted = _counted_entry(payload)
+            if counted:
+                _lock_entry_day(session, _ist_day(order.created_at))
             if session.scalar(select(OrderRow).where(OrderRow.proposal_id == order.proposal_id)) is not None:
+                return False
+            if counted and _entry_count(session, _ist_day(order.created_at)) >= DAILY_ENTRY_LIMIT:
                 return False
             session.add(
                 OrderRow(
@@ -613,7 +630,7 @@ class CoreRepository:
                     session_id=session_id,
                     proposal_id=order.proposal_id,
                     instrument_id=instrument.instrument_id,
-                    payload=order.model_dump(mode="json"),
+                    payload=payload,
                 )
             )
             if reserve is not None:
@@ -631,6 +648,11 @@ class CoreRepository:
                 )
             session.commit()
             return True
+
+    def daily_entry_count(self, moment: datetime) -> int:
+        """CNC entry orders whose creation instant falls on this IST date, across sessions."""
+        with self._session_factory() as session:
+            return _entry_count(session, _ist_day(moment))
 
     def dp_claimed(self, trading_day: str, exchange: str, symbol: str, session_id: str | None | object = _ACTIVE) -> bool:
         target = self._resolve_session_id(session_id)
@@ -1030,6 +1052,9 @@ class CoreRepository:
                 session.commit()
                 return peak
         with self._session_factory() as session:
+            has_session = session.scalar(select(PaperSessionRow.session_id).limit(1))
+            if has_session is not None:
+                return equity
             row = session.get(RuntimeFlagRow, "paper")
             if row is None:
                 session.add(RuntimeFlagRow(flag_id="paper", paper_running=True, peak_equity=equity))
@@ -1055,7 +1080,7 @@ class CoreRepository:
                     created_at=moment,
                     closed_at=None,
                     starting_cash=starting_cash,
-                    peak_equity=None,
+                    peak_equity=starting_cash,
                 )
             )
             session.commit()
@@ -1330,6 +1355,40 @@ def _decimal_text(value: Decimal | None) -> str | None:
     if value is None:
         return None
     return format(value, "f")
+
+
+def _ist_day(moment: datetime) -> str:
+    return as_utc(moment).astimezone(_IST).date().isoformat()
+
+
+def _counted_entry(payload: dict) -> bool:
+    """A submitted CNC buy. Rejections, sells, and legacy orders are not entries."""
+    if payload.get("side") != "BUY" or payload.get("status") == "REJECTED":
+        return False
+    metadata = payload.get("metadata") or {}
+    return metadata.get("policy_version") == ENTRY_POLICY_VERSION and metadata.get("reason") == "entry"
+
+
+def _entry_count(session: Session, day: str) -> int:
+    total = 0
+    for row in session.scalars(select(OrderRow)):
+        payload = dict(row.payload)
+        if _counted_entry(payload) and _ist_day(datetime.fromisoformat(str(payload["created_at"]))) == day:
+            total += 1
+    return total
+
+
+def _lock_entry_day(session: Session, day: str) -> None:
+    """Take a write lock on this IST date before reading the entry count."""
+    locked = session.execute(update(EntryDayGateRow).where(EntryDayGateRow.trading_day == day).values(trading_day=day))
+    if locked.rowcount == 1:
+        return
+    try:
+        with session.begin_nested():
+            session.add(EntryDayGateRow(trading_day=day))
+            session.flush()
+    except IntegrityError:
+        session.execute(update(EntryDayGateRow).where(EntryDayGateRow.trading_day == day).values(trading_day=day))
 
 
 def _candle(row: CandleRow) -> Candle:
