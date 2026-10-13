@@ -1,0 +1,46 @@
+{
+  "field_present_row_counts": {
+    "exchdisstime": 18235,
+    "exchdatetime": 0,
+    "an_dt": 18235,
+    "sort_date": 18235,
+    "dt": 18235,
+    "difference": 18235
+  },
+  "field_nonempty_row_counts": {
+    "exchdisstime": 18235,
+    "exchdatetime": 0,
+    "an_dt": 18235,
+    "sort_date": 18235,
+    "dt": 18235,
+    "difference": 18235
+  },
+  "exchdatetime_found": false,
+  "exchdatetime_note": "No `exchdatetime` field in this pipeline. Do not treat it as an alias of exchdisstime.",
+  "parse_ok": {
+    "exchdisstime": 18235,
+    "an_dt": 18235
+  },
+  "parse_fail": {
+    "sort_date_not_exch_fmt": 18235
+  },
+  "an_dt_after_exchdisstime": 0,
+  "an_dt_after_exchdisstime_gt2s": 0,
+  "duplicate_symbol_exchdisstime_pairs": 142,
+  "exchdisstime_naive_tagged_ist_count": 18235,
+  "timezone_assumption": "parse uses format %d-%b-%Y %H:%M:%S and ZoneInfo Asia/Kolkata; convention, not NSE JSON metadata",
+  "session_buckets_exchdisstime": {
+    "after_close_1530_ist": 12443,
+    "regular_session_ist": 5453,
+    "pre_open_or_before_0915_ist": 339
+  },
+  "available_at_construction": "Scope A candidate available_at = parse_exchdisstime(exchdisstime) with IST tag",
+  "not_used_for_available_at": [
+    "retrieval time",
+    "period_end / toDate",
+    "filedAt",
+    "exchdatetime (absent)",
+    "arbitrary +N hours"
+  ],
+  "limitation": "candidate IST-tagged exchange-dissemination proxy; not proven first public print; not proven immutable; insufficient for Scope B"
+}

@@ -1,0 +1,934 @@
+{
+  "status": {
+    "DATA_NOT_READY": true,
+    "BLOCKED_PRECONDITION": true,
+    "READY_TO_RUN": "NO",
+    "PROTOCOL_APPROVED_EXECUTION_NOT_AUTHORIZED": true,
+    "model_fit": false,
+    "labels_generated": false,
+    "holdout_accessed": false,
+    "announcement_count_ge_50_is_not_fit_authorization": true
+  },
+  "integrity": {
+    "freeze_id": "h001-nse-raw-20261010T140237Z",
+    "freeze_path": "datasets/h001-nse-raw-20261010T140237Z",
+    "audit_version": "h001-integrity-audit-v2",
+    "status": "MEASURED",
+    "recipe": "sha256 of sorted sha256sum-style lines (HASH two-spaces POSIX-relpath newline) over freeze .raw and .json files",
+    "recipe_v2": "JSON array of {relpath, size_bytes, sha256, artifact_class} sorted by POSIX relpath; aggregate = sha256 of canonical sha256sum listing (v1) plus a separate files_manifest_sha256 of UTF-8 JSON lines (one object per file, sorted)",
+    "n_files": 493,
+    "by_class": {
+      "historical_audit_stats": 1,
+      "announcement_concat_json": 49,
+      "announcement_raw": 392,
+      "other_json_or_raw": 1,
+      "financial_results_auxiliary": 49,
+      "retrieval_record": 1
+    },
+    "integrity_baseline_sha256": "18dbec4a4712b1430a6dabeca03a157af03cba45dac346c1a21d6b39d3f77f2d",
+    "files_manifest_sha256": "125d6dc018cb00348e38657630fd91e75fa27dd2804e2143435a08c4b292d8dc",
+    "historical_digest": "b0f4760f626f8ebd8bc030475f22fd75be5323491d33313388778fb730decaae",
+    "historical_digest_status": "UNVERIFIED",
+    "equivalent_to_b0f4760f": false,
+    "expected_baseline_if_unchanged": "18dbec4a4712b1430a6dabeca03a157af03cba45dac346c1a21d6b39d3f77f2d",
+    "matches_expected_unchanged_baseline": true,
+    "historical_note": "Do not treat integrity_baseline_sha256 as equal to b0f4760f",
+    "sidecars": {
+      "parquet": {
+        "relpath": "datasets/h001-pit-events-nse-ann-2024-2025-v1.parquet",
+        "status": "PRESENT",
+        "size_bytes": 1625375,
+        "sha256": "8ae800ef9f895e7767ff9ac582c5936d263f7492fec5ed7322f0d7b1b393e494",
+        "artifact_class": "normalized_parquet",
+        "note": "Separate from freeze listing digest; not mixed into b0f4760f or 18dbec4a"
+      },
+      "parquet_manifest": {
+        "relpath": "datasets/h001-pit-events-nse-ann-2024-2025-v1.manifest.json",
+        "status": "PRESENT",
+        "size_bytes": 501,
+        "sha256": "d0a481cbaf87ceae8679d0918f5001af76793ed5ec9b08c3a5f89876c2b9ec7a",
+        "artifact_class": "other_json_or_raw",
+        "note": "Separate from freeze listing digest; not mixed into b0f4760f or 18dbec4a"
+      }
+    },
+    "READY_TO_RUN": "NO",
+    "DATA_PREP_READY": "UNSET"
+  },
+  "freeze_absent": false,
+  "raw_announcement_rows_in_universe": 18235,
+  "universe_symbols": 49,
+  "universe": [
+    "ADANIENT",
+    "ADANIPORTS",
+    "APOLLOHOSP",
+    "ASIANPAINT",
+    "AXISBANK",
+    "BAJAJ-AUTO",
+    "BAJFINANCE",
+    "BAJAJFINSV",
+    "BEL",
+    "BHARTIARTL",
+    "BPCL",
+    "BRITANNIA",
+    "CIPLA",
+    "COALINDIA",
+    "DRREDDY",
+    "EICHERMOT",
+    "GRASIM",
+    "HCLTECH",
+    "HDFCBANK",
+    "HDFCLIFE",
+    "HEROMOTOCO",
+    "HINDALCO",
+    "HINDUNILVR",
+    "ICICIBANK",
+    "INDUSINDBK",
+    "INFY",
+    "ITC",
+    "JSWSTEEL",
+    "KOTAKBANK",
+    "LT",
+    "M&M",
+    "MARUTI",
+    "NESTLEIND",
+    "NTPC",
+    "ONGC",
+    "POWERGRID",
+    "RELIANCE",
+    "SBILIFE",
+    "SBIN",
+    "SHRIRAMFIN",
+    "SUNPHARMA",
+    "TATACONSUM",
+    "TATASTEEL",
+    "TCS",
+    "TECHM",
+    "TITAN",
+    "TRENT",
+    "ULTRACEMCO",
+    "WIPRO"
+  ],
+  "snapshot_id": "nifty50_1d_20261005",
+  "candle_sha256": "0411a89535ab50ae6488c7d93c5ce7572feba4f55fd9ecb0f73478bf33bd2a7d",
+  "unique_v1_events": 247,
+  "unique_v2_events": 434,
+  "v1_by_partition": {
+    "train": 99,
+    "validate": 148
+  },
+  "v2_by_partition": {
+    "train": 105,
+    "validate": 213,
+    "post_validation": 116
+  },
+  "v1_by_desc": {
+    "Financial Result Updates": 245,
+    "Publish Audited Results": 2
+  },
+  "v2_by_evidence_kind": {
+    "official_v1_subject": 247,
+    "source_backed_board_outcome_financial_results": 137,
+    "nse_circular_subject_nse_cml_2025_20": 50
+  },
+  "v1_gate": {
+    "train": 99,
+    "validate": 148,
+    "post_validation_reported_separately": 0,
+    "min_class_50_train": true,
+    "min_class_50_validate": true,
+    "ready_under_current_threshold": true
+  },
+  "v2_gate": {
+    "train": 105,
+    "validate": 213,
+    "post_validation_reported_separately": 116,
+    "min_class_50_train": true,
+    "min_class_50_validate": true,
+    "ready_under_current_threshold": true
+  },
+  "missing_exchdisstime": 0,
+  "excluded_v2_kinds": {
+    "excluded": 17427,
+    "board_outcome_unrelated_or_unproven": 359,
+    "related_not_in_candidate_print_class": 15
+  },
+  "v1_symbols_with_zero": [],
+  "v2_symbols_with_zero": [],
+  "post_validation_v2_not_used_for_threshold": 116,
+  "exchdisstime_limitation": "candidate IST-tagged proxy; not proven first public print; not proven immutable",
+  "section15": {
+    "rule": "hasXbrl truthy OR desc matches result|financial|earnings (case-insensitive)",
+    "kept": 3690,
+    "not_kept": 14545,
+    "historical_undocumented_3690_not_used": true,
+    "evidence": {
+      "regex_only": 315,
+      "hasXbrl_only": 3374,
+      "both": 1
+    },
+    "desc_histogram": {
+      "Analysts/Institutional Investor Meet/Con. Call Updates": 692,
+      "General Updates": 510,
+      "Updates": 367,
+      "Copy of Newspaper Publication": 290,
+      "Financial Result Updates": 245,
+      "Press Release": 210,
+      "Outcome of Board Meeting": 156,
+      "Shareholders meeting": 119,
+      "ESOP/ESOS/ESPS": 119,
+      "Investor Presentation": 90,
+      "Trading Window": 88,
+      "Action(s) taken or orders passed": 65,
+      "Change in Management": 58,
+      "Certificate under SEBI (Depositories and Participants) Regulations, 2018": 54,
+      "Acquisition": 53,
+      "Integrated Filing- Financial": 50,
+      "Credit Rating": 46,
+      "Change in Director(s)": 41,
+      "Appointment": 38,
+      "Record Date": 30,
+      "Bagging/Receiving of orders/contracts": 29,
+      "Incorporation": 28,
+      "News Verification": 26,
+      "Allotment of Securities": 24,
+      "Monthly Business Updates": 19,
+      "Pendency of Litigation(s)/dispute(s) or the outcome impacting the Company": 17,
+      "Dividend": 15,
+      "Resignation": 13,
+      "Sale or disposal": 13,
+      "Credit Rating- Revision": 12,
+      "Change in Auditors": 11,
+      "Rumour Verification - Regulation 30(11)": 8,
+      "Agreements": 8,
+      "Clarification - Financial Results": 8,
+      "Issue of Securities": 8,
+      "Action(s) initiated or orders passed": 7,
+      "Reply to Clarification- Financial results": 7,
+      "Credit Rating- New": 7,
+      "Credit Rating- Others": 7,
+      "Amalgamation/Merger": 6,
+      "Amendment to AOA/MOA": 6,
+      "Cessation": 6,
+      "Scheme of Arrangement": 5,
+      "Other Restructuring": 5,
+      "Retirement": 4,
+      "Options to purchase securities": 4,
+      "Memorandum of Understanding/Agreements": 4,
+      "Consolidated Result Updates - IFRS": 4,
+      "Disruption of Operations": 4,
+      "Capacity addition": 4,
+      "Disclosure of material issue": 4,
+      "Disclosure under SEBI Takeover Regulations": 3,
+      "Arrangements for strategic, technical, manufacturing, or marketing tie up": 3,
+      "Product launch": 3,
+      "Diversification/Disinvestment": 3,
+      "Suspension of Trading": 2,
+      "Rights Issue": 2,
+      "Commencement of commercial production/operations": 2,
+      "Registrar & Share Transfer Agent Update": 2,
+      "Publish Audited Results": 2,
+      "Monitoring Agency Report": 2,
+      "Buyback": 2,
+      "Stock split": 2,
+      "Committee Meeting Updates": 2,
+      "Postponement of commercial production/operations": 1,
+      "Addendum": 1,
+      "Awarding of order(s)/contract(s)": 1,
+      "Press Release (Revised)": 1,
+      "Resignation of Independent director": 1,
+      "Change in Company Secretary/Compliance Officer": 1,
+      "Bonus": 1,
+      "Demerger": 1,
+      "Post Buyback Public Announcement": 1,
+      "Public Announcement - Buyback of Shares": 1,
+      "Voluntary Delisting": 1,
+      "Demise": 1,
+      "Utilisation of Funds": 1,
+      "Statement of deviation(s) or variation(s) under Reg. 32": 1,
+      "Address Change": 1,
+      "Trading Plan under PIT": 1
+    },
+    "false_positive_buckets": {
+      "official_v1_subject": 247,
+      "nse_cml_2025_20_subject": 50,
+      "ambiguous_regex_or_xbrl": 3218,
+      "board_outcome_regex_hit": 156,
+      "clarification_regex_hit": 15,
+      "results_language": 4
+    },
+    "missing_or_unparseable_exchdisstime": 0,
+    "symbols_with_zero": []
+  },
+  "section16": {
+    "quarters": [
+      "2024Q1",
+      "2024Q2",
+      "2024Q3",
+      "2024Q4",
+      "2025Q1",
+      "2025Q2",
+      "2025Q3",
+      "2025Q4"
+    ],
+    "covered_cells": 345,
+    "missing_cells": [
+      {
+        "symbol": "ADANIENT",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "ADANIPORTS",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "APOLLOHOSP",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "ASIANPAINT",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "AXISBANK",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "BAJFINANCE",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "BAJAJFINSV",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "BEL",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "BHARTIARTL",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "BPCL",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "BRITANNIA",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "CIPLA",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "COALINDIA",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "DRREDDY",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "EICHERMOT",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "GRASIM",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "HCLTECH",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "HDFCBANK",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "HDFCLIFE",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "HEROMOTOCO",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "HINDALCO",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "HINDUNILVR",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "ICICIBANK",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "INDUSINDBK",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "ITC",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "JSWSTEEL",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "KOTAKBANK",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "LT",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "M&M",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "MARUTI",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "NESTLEIND",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "NTPC",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "ONGC",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "POWERGRID",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "RELIANCE",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "SBILIFE",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "SBIN",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "SHRIRAMFIN",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "SUNPHARMA",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "TATACONSUM",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "TATASTEEL",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "TCS",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "TECHM",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "TITAN",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "TRENT",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "ULTRACEMCO",
+        "quarter": "2025Q2"
+      },
+      {
+        "symbol": "WIPRO",
+        "quarter": "2025Q2"
+      }
+    ],
+    "missing_cell_count": 47,
+    "financial_results_endpoint_merged": false
+  },
+  "holdout_accessed": false,
+  "labels_generated": false,
+  "timestamps": {
+    "field_present_row_counts": {
+      "exchdisstime": 18235,
+      "exchdatetime": 0,
+      "an_dt": 18235,
+      "sort_date": 18235,
+      "dt": 18235,
+      "difference": 18235
+    },
+    "field_nonempty_row_counts": {
+      "exchdisstime": 18235,
+      "exchdatetime": 0,
+      "an_dt": 18235,
+      "sort_date": 18235,
+      "dt": 18235,
+      "difference": 18235
+    },
+    "exchdatetime_found": false,
+    "exchdatetime_note": "No `exchdatetime` field in this pipeline. Do not treat it as an alias of exchdisstime.",
+    "parse_ok": {
+      "exchdisstime": 18235,
+      "an_dt": 18235
+    },
+    "parse_fail": {
+      "sort_date_not_exch_fmt": 18235
+    },
+    "an_dt_after_exchdisstime": 0,
+    "an_dt_after_exchdisstime_gt2s": 0,
+    "duplicate_symbol_exchdisstime_pairs": 142,
+    "exchdisstime_naive_tagged_ist_count": 18235,
+    "timezone_assumption": "parse uses format %d-%b-%Y %H:%M:%S and ZoneInfo Asia/Kolkata; convention, not NSE JSON metadata",
+    "session_buckets_exchdisstime": {
+      "after_close_1530_ist": 12443,
+      "regular_session_ist": 5453,
+      "pre_open_or_before_0915_ist": 339
+    },
+    "available_at_construction": "Scope A candidate available_at = parse_exchdisstime(exchdisstime) with IST tag",
+    "not_used_for_available_at": [
+      "retrieval time",
+      "period_end / toDate",
+      "filedAt",
+      "exchdatetime (absent)",
+      "arbitrary +N hours"
+    ],
+    "limitation": "candidate IST-tagged exchange-dissemination proxy; not proven first public print; not proven immutable; insufficient for Scope B"
+  },
+  "quarter_counts": {
+    "all_in_universe_rows_by_quarter": {
+      "2024Q1": 2704,
+      "2024Q2": 2917,
+      "2024Q3": 2787,
+      "2024Q4": 2258,
+      "2025Q1": 1823,
+      "2025Q2": 2016,
+      "2025Q3": 1967,
+      "2025Q4": 1763
+    },
+    "section15_rows_by_quarter": {
+      "2024Q1": 50,
+      "2024Q2": 54,
+      "2024Q3": 59,
+      "2024Q4": 50,
+      "2025Q1": 99,
+      "2025Q3": 1613,
+      "2025Q4": 1763,
+      "2025Q2": 2
+    },
+    "unparseable": {},
+    "quarters": [
+      "2024Q1",
+      "2024Q2",
+      "2024Q3",
+      "2024Q4",
+      "2025Q1",
+      "2025Q2",
+      "2025Q3",
+      "2025Q4"
+    ]
+  },
+  "slice_inventory_2025Q2": {
+    "slice": "corporate-announcements/*_01-04-2025_30-06-2025.raw",
+    "symbols": 49,
+    "files_present": 49,
+    "files_absent": [],
+    "files_empty": [],
+    "origin_if_absent_files": "failed_or_unretrieved_source_query",
+    "origin_if_present_without_section15": "genuine_missing_qualifying_event_under_section15"
+  },
+  "missingness": {
+    "missing_cells": [
+      {
+        "symbol": "ADANIENT",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "ADANIPORTS",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "APOLLOHOSP",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "ASIANPAINT",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "AXISBANK",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "BAJFINANCE",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "BAJAJFINSV",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "BEL",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "BHARTIARTL",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "BPCL",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "BRITANNIA",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "CIPLA",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "COALINDIA",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "DRREDDY",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "EICHERMOT",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "GRASIM",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "HCLTECH",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "HDFCBANK",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "HDFCLIFE",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "HEROMOTOCO",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "HINDALCO",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "HINDUNILVR",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "ICICIBANK",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "INDUSINDBK",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "ITC",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "JSWSTEEL",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "KOTAKBANK",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "LT",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "M&M",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "MARUTI",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "NESTLEIND",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "NTPC",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "ONGC",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "POWERGRID",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "RELIANCE",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "SBILIFE",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "SBIN",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "SHRIRAMFIN",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "SUNPHARMA",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "TATACONSUM",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "TATASTEEL",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "TCS",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "TECHM",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "TITAN",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "TRENT",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "ULTRACEMCO",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      },
+      {
+        "symbol": "WIPRO",
+        "quarter": "2025Q2",
+        "origin": "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter"
+      }
+    ],
+    "origin_counts": {
+      "source_slice_present_or_rows_elsewhere_but_no_section15_in_quarter": 47
+    },
+    "section15_rows_2025Q2": 2,
+    "all_rows_2025Q2": 2016,
+    "imputed": false
+  },
+  "prepared_scope_a": {
+    "schema_version": "h001-scope-a-prep-1.0",
+    "scope": "A",
+    "scope_note": "Announcement tape only. Not restatement-safe earnings values (Scope B).",
+    "n_input_rows": 18235,
+    "n_kept": 18235,
+    "n_excluded": 0,
+    "exclusions": {},
+    "duplicate_identical": 0,
+    "duplicate_conflict": 0,
+    "output_sha256": "0b987622812e75db7570bafc51687e74c9424b7bf3c4b195aae35be3aeccaf93",
+    "time_coverage": {
+      "first_available_at": "2024-01-01T09:04:57+05:30",
+      "last_available_at": "2025-12-31T22:09:34+05:30",
+      "ist_quarters_present": [
+        "2024Q1",
+        "2024Q2",
+        "2024Q3",
+        "2024Q4",
+        "2025Q1",
+        "2025Q2",
+        "2025Q3",
+        "2025Q4"
+      ]
+    },
+    "fixture": false,
+    "labels_generated": false
+  },
+  "scope": {
+    "required": "B",
+    "available": "A",
+    "rationale": "H001 source audit requires event/value fields (EPS and restatement history). Intelligence EarningsAgent scores EPS growth from FundamentalDataPoint. The NSE freeze is an announcement tape without vintage fundamentals. Scope A is implemented; Scope B remains the blocking dependency.",
+    "researcher_approval_required": true
+  },
+  "protocol": {
+    "status": "DRAFT_UNAPPROVED",
+    "v1_event_include_list_immutable": true,
+    "target": "UNFROZEN",
+    "features": "UNFROZEN",
+    "horizon": "UNFROZEN",
+    "decision_time": "UNFROZEN",
+    "entry_price": "UNFROZEN",
+    "note": "Do not adopt quant label_v1 next_close_direction as H001 without approval."
+  },
+  "readiness": {
+    "DATA_PREP_READY": "NO",
+    "READY_TO_RUN": "NO",
+    "BLOCKED_PRECONDITION": true,
+    "checks": [
+      {
+        "name": "integrity_reproducible",
+        "status": "PASS",
+        "detail": "v1 listing 18dbec4a4712b1430a6dabeca03a157af03cba45dac346c1a21d6b39d3f77f2d; historical b0f4760f UNVERIFIED; equivalent=False"
+      },
+      {
+        "name": "historical_digest_b0f4760f",
+        "status": "BLOCKED",
+        "detail": "recipe unknown; new named measurement must not replace it"
+      },
+      {
+        "name": "exchdatetime",
+        "status": "PASS",
+        "detail": "field absent; not aliased to exchdisstime"
+      },
+      {
+        "name": "exchdisstime_semantics",
+        "status": "BLOCKED",
+        "detail": "IST convention / candidate proxy; not proven first public print; not Scope B"
+      },
+      {
+        "name": "coverage_49x8",
+        "status": "FAIL",
+        "detail": "345 / 392 covered; 47 missing (not imputed)"
+      },
+      {
+        "name": "scope",
+        "status": "BLOCKED",
+        "detail": "intended earnings values (Scope B) not available from announcement freeze (Scope A)"
+      },
+      {
+        "name": "protocol",
+        "status": "BLOCKED",
+        "detail": "DRAFT_UNAPPROVED"
+      },
+      {
+        "name": "normalized_parquet",
+        "status": "PASS",
+        "detail": "sidecar hashed separately 8ae800ef9f895e7767ff9ac582c5936d263f7492fec5ed7322f0d7b1b393e494; not mixed into freeze listing digest"
+      },
+      {
+        "name": "labels",
+        "status": "PASS",
+        "detail": "no research labels generated"
+      },
+      {
+        "name": "holdout",
+        "status": "PASS",
+        "detail": "holdout not accessed"
+      }
+    ],
+    "blockers": [
+      {
+        "name": "historical_digest_b0f4760f",
+        "status": "BLOCKED",
+        "detail": "recipe unknown; new named measurement must not replace it"
+      },
+      {
+        "name": "exchdisstime_semantics",
+        "status": "BLOCKED",
+        "detail": "IST convention / candidate proxy; not proven first public print; not Scope B"
+      },
+      {
+        "name": "coverage_49x8",
+        "status": "FAIL",
+        "detail": "345 / 392 covered; 47 missing (not imputed)"
+      },
+      {
+        "name": "scope",
+        "status": "BLOCKED",
+        "detail": "intended earnings values (Scope B) not available from announcement freeze (Scope A)"
+      },
+      {
+        "name": "protocol",
+        "status": "BLOCKED",
+        "detail": "DRAFT_UNAPPROVED"
+      }
+    ],
+    "mandatory_all_pass": false,
+    "note": "DATA_PREP_READY is not READY_TO_RUN. A written limitation is not a passed criterion. Gate 2 DATA READY remains withdrawn."
+  },
+  "DATA_PREP_READY": "NO",
+  "READY_TO_RUN": "NO"
+}

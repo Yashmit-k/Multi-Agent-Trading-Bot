@@ -1,0 +1,45 @@
+{
+  "freeze_id": "h001-nse-raw-20261010T140237Z",
+  "freeze_path": "datasets/h001-nse-raw-20261010T140237Z",
+  "audit_version": "h001-integrity-audit-v2",
+  "status": "MEASURED",
+  "recipe": "sha256 of sorted sha256sum-style lines (HASH two-spaces POSIX-relpath newline) over freeze .raw and .json files",
+  "recipe_v2": "JSON array of {relpath, size_bytes, sha256, artifact_class} sorted by POSIX relpath; aggregate = sha256 of canonical sha256sum listing (v1) plus a separate files_manifest_sha256 of UTF-8 JSON lines (one object per file, sorted)",
+  "n_files": 493,
+  "by_class": {
+    "historical_audit_stats": 1,
+    "announcement_concat_json": 49,
+    "announcement_raw": 392,
+    "other_json_or_raw": 1,
+    "financial_results_auxiliary": 49,
+    "retrieval_record": 1
+  },
+  "integrity_baseline_sha256": "18dbec4a4712b1430a6dabeca03a157af03cba45dac346c1a21d6b39d3f77f2d",
+  "files_manifest_sha256": "125d6dc018cb00348e38657630fd91e75fa27dd2804e2143435a08c4b292d8dc",
+  "historical_digest": "b0f4760f626f8ebd8bc030475f22fd75be5323491d33313388778fb730decaae",
+  "historical_digest_status": "UNVERIFIED",
+  "equivalent_to_b0f4760f": false,
+  "expected_baseline_if_unchanged": "18dbec4a4712b1430a6dabeca03a157af03cba45dac346c1a21d6b39d3f77f2d",
+  "matches_expected_unchanged_baseline": true,
+  "historical_note": "Do not treat integrity_baseline_sha256 as equal to b0f4760f",
+  "sidecars": {
+    "parquet": {
+      "relpath": "datasets/h001-pit-events-nse-ann-2024-2025-v1.parquet",
+      "status": "PRESENT",
+      "size_bytes": 1625375,
+      "sha256": "8ae800ef9f895e7767ff9ac582c5936d263f7492fec5ed7322f0d7b1b393e494",
+      "artifact_class": "normalized_parquet",
+      "note": "Separate from freeze listing digest; not mixed into b0f4760f or 18dbec4a"
+    },
+    "parquet_manifest": {
+      "relpath": "datasets/h001-pit-events-nse-ann-2024-2025-v1.manifest.json",
+      "status": "PRESENT",
+      "size_bytes": 501,
+      "sha256": "d0a481cbaf87ceae8679d0918f5001af76793ed5ec9b08c3a5f89876c2b9ec7a",
+      "artifact_class": "other_json_or_raw",
+      "note": "Separate from freeze listing digest; not mixed into b0f4760f or 18dbec4a"
+    }
+  },
+  "READY_TO_RUN": "NO",
+  "DATA_PREP_READY": "UNSET"
+}

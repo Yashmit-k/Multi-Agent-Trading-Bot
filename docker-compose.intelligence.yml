@@ -1,7 +1,10 @@
 # Overlay for local Intelligence. Does not replace docker-compose.yml.
 # Host Ollama: ollama serve && ollama pull phi3:mini
-# Bring-up:
+# Paper-serve (posts signals; not required for live news):
 #   docker compose -f docker-compose.yml -f docker-compose.intelligence.yml up --build -d postgres redis core-api core-worker intelligence
+# Live news ingest without the paper worker (do not start core-worker or intelligence):
+#   docker compose -f docker-compose.yml -f docker-compose.intelligence.yml up --build -d intelligence-news
+# Optional Core API (not required for ingest): add postgres redis core-api. Never add core-worker.
 #
 # Developer 3 still owns docker-compose.yml.
 
@@ -36,5 +39,33 @@ services:
     volumes:
       - intelligence-data:/var/lib/intelligence
 
+  intelligence-news:
+    build:
+      context: .
+      dockerfile: services/intelligence/Dockerfile
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file: services/intelligence/.env.example
+    environment:
+      INTELLIGENCE_TRADING_MODE: PAPER
+      INTELLIGENCE_SERVICE_MODE: oneshot
+      INTELLIGENCE_DATA_SOURCE: rss
+      INTELLIGENCE_NEWS_INGEST: "true"
+      INTELLIGENCE_NEWS_INTERPRET: "false"
+      INTELLIGENCE_STORE: sqlite
+      INTELLIGENCE_SQLITE_PATH: /var/lib/intelligence/news.db
+      INTELLIGENCE_SYMBOLS: "ADANIENT,ADANIPORTS,APOLLOHOSP,ASIANPAINT,AXISBANK,BAJAJ-AUTO,BAJAJFINSV,BAJFINANCE,BHARTIARTL,BPCL,BRITANNIA,CIPLA,COALINDIA,DIVISLAB,DRREDDY,EICHERMOT,GRASIM,HCLTECH,HDFCBANK,HDFCLIFE,HEROMOTOCO,HINDALCO,HINDUNILVR,ICICIBANK,INDUSINDBK,INFY,ITC,JSWSTEEL,KOTAKBANK,LT,LTIM,M&M,MARUTI,NESTLEIND,NTPC,ONGC,POWERGRID,RELIANCE,SBILIFE,SBIN,SUNPHARMA,TATACONSUM,TATAMOTORS,TATAPOWER,TATASTEEL,TCS,TECHM,TITAN,ULTRACEMCO,WIPRO"
+      NEWS_RSS_INTERVAL_SECONDS: "300"
+      NEWS_RSS_SYMBOL_BATCH: "5"
+      CORE_API_URL: http://core-api:8000
+      INTERNAL_SIGNAL_TOKEN: ""
+      LLM_BASE_URL: ""
+      LLM_API_KEY: ""
+    ports:
+      - "8080:8080"
+    volumes:
+      - intelligence-news-data:/var/lib/intelligence
+
 volumes:
   intelligence-data:
+  intelligence-news-data:

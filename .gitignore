@@ -22,3 +22,5 @@ datasets/
 experiments/
 artifacts/
 services/intelligence/tmp-ollama-probe.json
+intelligence-news*.db
+intelligence.db

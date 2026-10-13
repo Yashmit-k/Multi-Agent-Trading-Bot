@@ -58,3 +58,37 @@ def test_duplicate_content_hash():
     store.insert(article, now=FIXTURE_AS_OF)
     again = store.insert(article, now=FIXTURE_AS_OF)
     assert again.duplicate is True
+
+
+def test_same_id_different_hash_is_update():
+    store = MemoryNewsStore()
+    article = all_articles("INFY")[0]
+    store.insert(article, now=FIXTURE_AS_OF)
+    revised = article.model_copy(
+        update={
+            "title": "INFY correction",
+            "raw_text": "corrected body",
+            "content_hash": content_hash("corrected body"),
+            "metadata": {"note": "revision"},
+        }
+    )
+    result = store.insert(revised, now=FIXTURE_AS_OF)
+    assert result.updated is True
+    assert result.duplicate is False
+    visible = store.articles_for("INFY", FIXTURE_AS_OF)
+    assert len(visible) == 1
+    assert visible[0].title == "INFY correction"
+    assert visible[0].metadata["content_updated"] is True
+
+
+def test_sqlite_survives_reopen(tmp_path):
+    path = str(tmp_path / "persist.db")
+    first = SqliteNewsStore(path)
+    article = all_articles("INFY")[0]
+    assert first.insert(article, now=FIXTURE_AS_OF).inserted is True
+    second = SqliteNewsStore(path)
+    rows = second.articles_for("INFY", FIXTURE_AS_OF)
+    assert len(rows) == 1
+    assert rows[0].article_id == article.article_id
+    again = second.insert(article, now=FIXTURE_AS_OF)
+    assert again.duplicate is True
