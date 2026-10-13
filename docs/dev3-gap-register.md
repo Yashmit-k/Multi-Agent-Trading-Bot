@@ -26,7 +26,7 @@ This Compose run is scripted collector behavior. It does not prove live Zerodha 
 
 Project `dev3-cp4-intel` used only `docker-compose.checkpoint4.yml`. Intelligence listened on `127.0.0.1:18101` with fixture news, an empty LLM key, and no `NEWS_RSS_URLS`. `GET /health` reported `llm_mode` `fixture`. `GET /news/RELIANCE` returned articles that validate as `NewsArticle` from `fixture-wire`. The project was removed with `down -v`. That is fixture news, not a live provider.
 
-The frontend news page still shows the global list as unavailable and points at per-symbol Core news. The performance page still calls `GET /api/v1/performance`. Live news without credentials stays **BLOCKED**.
+The frontend news page still shows the global list as unavailable and points at per-symbol Core news. The performance page is labelled Backtest results and still calls `GET /api/v1/performance`. The dashboard calls `GET /api/v1/portfolio` for the active session. When that response has no snapshot, `total_pnl` and `gross_exposure` are null and the dashboard shows a missing-data cell and an empty equity graph. A closed session's position and snapshot stay on that session id. Live news without credentials stays **BLOCKED**. Daily equity history is still absent, so Checkpoint 4 is **PARTIAL**.
 
 ## Checkpoint 1
 
@@ -90,12 +90,12 @@ Status is `PASS`, `FAIL`, `BLOCKED`, or `NOT VERIFIED`. "Later checkpoint" means
 | Expected five-minute end after the cash close is 15:15 IST. | PASS | `schedule.py` is unchanged. `test_after_the_close_the_expected_five_minute_end_is_1515` expects 15:15 IST at 15:31:30 IST, and not 15:25 or 15:30. | Developer 3 | No. Do not change the rule. |
 | Claim that the last bar has been stuck at 15:10 since 3 August. | NOT VERIFIED | No permitted historical read of stored bars was available. The 12:58 IST snapshot's latest end was 12:50 IST on 13 October, which does not test that claim. | Developer 3 | Only with an approved read. |
 | Daily close versus five-minute close mismatch. | NOT VERIFIED | Not reproduced. Production SQL was not used. | Developer 3 | Only with an approved read. |
-| Daily paper P&L and an end-of-day snapshot writer. | PASS | `GET /api/v1/paper/daily-performance` returns unavailable. `docs/dev3-snapshot-writer-design.md` is the writer design. No end-of-day row is written. `GET /api/v1/performance` remains the latest backtest. | Developer 3 | Do not deploy a writer without approval. |
+| Daily paper P&L and an end-of-day snapshot writer. | PARTIAL | `GET /api/v1/paper/daily-performance` returns unavailable. With no snapshot, `GET /api/v1/portfolio` leaves `total_pnl` null. The dashboard does not draw a zero P&L. `docs/dev3-snapshot-writer-design.md` is still design only. | Developer 3 | Do not deploy a writer without approval. |
 | Worker heartbeat. | PASS | Branch tests cover a missing beat, a fresh beat, and a beat older than the interval. The running API was not rebuilt and `core-worker` was not started, so the live process does not serve this route yet. | Developer 3 | Deploy only with a later authorization. |
 | Production revision. | PASS | `alembic current` reported `0007_entry_day_gates (head)`. | Developer 3 | No production migration in the next checkpoint. |
 | Production paper session. | PASS | Paper status and session list, above. Mode `PAPER`, `live_enabled` false. | Developer 3 | No session write. |
 | Intelligence live news. | BLOCKED | The isolated project kept `INTELLIGENCE_DATA_SOURCE=fixtures`, an empty LLM key, and no `NEWS_RSS_URLS`. No credentialed live run was authorized. | Developer 3 | Live news without credentials stays blocked. |
-| Frontend and Intelligence contract in an isolated stack. | PASS | `tests/test_checkpoint4_intelligence.py` checked fixture news on `127.0.0.1:18101`. `apps/frontend/src/app/page-contracts.test.tsx` locks the unavailable news page and the backtest performance route. | Developer 3 | No. |
+| Frontend and Intelligence contract in an isolated stack. | PARTIAL | Fixture news passed on `127.0.0.1:18101`. The dashboard uses `GET /api/v1/portfolio`. `/performance` is labelled backtest results from `GET /api/v1/performance`. Live news remains blocked. | Developer 3 | No live-news claim until a provider is verified. |
 | H001 and the holdout. | BLOCKED | `services/quant/docs/daily-rules-result.md`: one of six pairs, `momentum_20` at horizon 5, mean excess about 9.8 bp, interval after delivery costs. That interval does not adjust for choosing the best of six. H001 stays blocked. The holdout was not opened or hashed. | Developer 3 | Checkpoint 5 audits the existing artifact. No new backtest and no holdout. |
 
 ## What the next review can authorize
@@ -104,6 +104,6 @@ Checkpoint 2 closed the ordering race in code, the 15:15 test, the disposable si
 
 Checkpoint 3 added the unavailable daily-performance route, the snapshot-writer design, and heartbeat code on this branch. It did not deploy the heartbeat, rebuild Core API, or start `core-worker`. The end-of-day writer is not implemented.
 
-Checkpoint 4 checked fixture Intelligence news in project `dev3-cp4-intel` and locked the frontend news and performance contracts. Live news without credentials stays blocked.
+Checkpoint 4 checked fixture Intelligence news and the page contracts. The closure is **PARTIAL**: fixture routes pass, and live news plus daily equity history stay blocked.
 
 Checkpoint 5 may audit the existing daily-rule artifact, including the six-pair selection caveat. No new backtest, no H001 fit, and no holdout.
