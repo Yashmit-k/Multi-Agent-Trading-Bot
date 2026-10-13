@@ -22,6 +22,12 @@ This Compose run is scripted collector behavior. It does not prove live Zerodha 
 
 `GET /api/v1/worker/heartbeat` is unavailable until a beat is recorded, and again when that beat is older than the worker interval. The worker loop calls `publish_heartbeat` once per pass. Tests do not import `core_worker.__main__`. Core API was not restarted and `core-worker` was not started, so this route is not on the running process.
 
+## Checkpoint 4
+
+Project `dev3-cp4-intel` used only `docker-compose.checkpoint4.yml`. Intelligence listened on `127.0.0.1:18101` with fixture news, an empty LLM key, and no `NEWS_RSS_URLS`. `GET /health` reported `llm_mode` `fixture`. `GET /news/RELIANCE` returned articles that validate as `NewsArticle` from `fixture-wire`. The project was removed with `down -v`. That is fixture news, not a live provider.
+
+The frontend news page still shows the global list as unavailable and points at per-symbol Core news. The performance page still calls `GET /api/v1/performance`. Live news without credentials stays **BLOCKED**.
+
 ## Checkpoint 1
 
 Recorded 2026-10-13. This checkpoint writes the register only. It does not change a cap, fix the collector, run a paper cycle, start `core-worker`, restart Core API, apply a migration, query production SQL, hash the holdout, or push.
@@ -88,8 +94,8 @@ Status is `PASS`, `FAIL`, `BLOCKED`, or `NOT VERIFIED`. "Later checkpoint" means
 | Worker heartbeat. | PASS | Branch tests cover a missing beat, a fresh beat, and a beat older than the interval. The running API was not rebuilt and `core-worker` was not started, so the live process does not serve this route yet. | Developer 3 | Deploy only with a later authorization. |
 | Production revision. | PASS | `alembic current` reported `0007_entry_day_gates (head)`. | Developer 3 | No production migration in the next checkpoint. |
 | Production paper session. | PASS | Paper status and session list, above. Mode `PAPER`, `live_enabled` false. | Developer 3 | No session write. |
-| Intelligence live news. | BLOCKED | Compose sets `INTELLIGENCE_DATA_SOURCE=fixtures` and an empty LLM key. No credentialed live run was authorized. | Developer 3 | Checkpoint 4. Live news without credentials stays blocked. |
-| Frontend and Intelligence contract in an isolated stack. | NOT VERIFIED | Contract files and the performance page exist. No isolated Compose run was started. | Developer 3 | Checkpoint 4. |
+| Intelligence live news. | BLOCKED | The isolated project kept `INTELLIGENCE_DATA_SOURCE=fixtures`, an empty LLM key, and no `NEWS_RSS_URLS`. No credentialed live run was authorized. | Developer 3 | Live news without credentials stays blocked. |
+| Frontend and Intelligence contract in an isolated stack. | PASS | `tests/test_checkpoint4_intelligence.py` checked fixture news on `127.0.0.1:18101`. `apps/frontend/src/app/page-contracts.test.tsx` locks the unavailable news page and the backtest performance route. | Developer 3 | No. |
 | H001 and the holdout. | BLOCKED | `services/quant/docs/daily-rules-result.md`: one of six pairs, `momentum_20` at horizon 5, mean excess about 9.8 bp, interval after delivery costs. That interval does not adjust for choosing the best of six. H001 stays blocked. The holdout was not opened or hashed. | Developer 3 | Checkpoint 5 audits the existing artifact. No new backtest and no holdout. |
 
 ## What the next review can authorize
@@ -98,4 +104,6 @@ Checkpoint 2 closed the ordering race in code, the 15:15 test, the disposable si
 
 Checkpoint 3 added the unavailable daily-performance route, the snapshot-writer design, and heartbeat code on this branch. It did not deploy the heartbeat, rebuild Core API, or start `core-worker`. The end-of-day writer is not implemented.
 
-Checkpoint 4 may add contract tests for Intelligence and the frontend in an isolated Compose project. Live news without credentials stays blocked.
+Checkpoint 4 checked fixture Intelligence news in project `dev3-cp4-intel` and locked the frontend news and performance contracts. Live news without credentials stays blocked.
+
+Checkpoint 5 may audit the existing daily-rule artifact, including the six-pair selection caveat. No new backtest, no H001 fit, and no holdout.
