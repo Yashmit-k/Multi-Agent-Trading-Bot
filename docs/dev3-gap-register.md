@@ -16,6 +16,12 @@ The collector status for a symbol is re-read after that timeframe's upsert. Dail
 
 This Compose run is scripted collector behavior. It does not prove live Zerodha connectivity or freshness of the production database. Production stored bars against `expected_completed_end` stay **NOT VERIFIED**. The running Core API was not rebuilt, so this ordering fix is not deployed.
 
+## Checkpoint 3
+
+`GET /api/v1/paper/daily-performance` returns `status: unavailable` and `reason: no_daily_equity_history`. It does not return realized P&L, Sharpe, drawdown, or a daily return. `GET /api/v1/performance` is still the latest backtest. `docs/dev3-snapshot-writer-design.md` describes one snapshot per IST date after the close and the 90-second delay. No job writes that row.
+
+`GET /api/v1/worker/heartbeat` is unavailable until a beat is recorded, and again when that beat is older than the worker interval. The worker loop calls `publish_heartbeat` once per pass. Tests do not import `core_worker.__main__`. Core API was not restarted and `core-worker` was not started, so this route is not on the running process.
+
 ## Checkpoint 1
 
 Recorded 2026-10-13. This checkpoint writes the register only. It does not change a cap, fix the collector, run a paper cycle, start `core-worker`, restart Core API, apply a migration, query production SQL, hash the holdout, or push.
@@ -78,8 +84,8 @@ Status is `PASS`, `FAIL`, `BLOCKED`, or `NOT VERIFIED`. "Later checkpoint" means
 | Expected five-minute end after the cash close is 15:15 IST. | PASS | `schedule.py` is unchanged. `test_after_the_close_the_expected_five_minute_end_is_1515` expects 15:15 IST at 15:31:30 IST, and not 15:25 or 15:30. | Developer 3 | No. Do not change the rule. |
 | Claim that the last bar has been stuck at 15:10 since 3 August. | NOT VERIFIED | No permitted historical read of stored bars was available. The 12:58 IST snapshot's latest end was 12:50 IST on 13 October, which does not test that claim. | Developer 3 | Only with an approved read. |
 | Daily close versus five-minute close mismatch. | NOT VERIFIED | Not reproduced. Production SQL was not used. | Developer 3 | Only with an approved read. |
-| Daily paper P&L and an end-of-day snapshot writer. | FAIL | `portfolio_snapshots` exists. No production writer was found. `GET /api/v1/performance` serves the latest backtest and returned 404 `no_backtest`. The frontend performance page calls that route. It is not session daily P&L. | Developer 3 | Checkpoint 3 is design and a read-only contract. Do not deploy a writer. |
-| Worker heartbeat. | FAIL | Core API routes do not expose a worker heartbeat. Live status must stay unavailable until a later authorized deploy. The exited container is operational state, not an API heartbeat. | Developer 3 | Checkpoint 3, branch only. Do not deploy. |
+| Daily paper P&L and an end-of-day snapshot writer. | PASS | `GET /api/v1/paper/daily-performance` returns unavailable. `docs/dev3-snapshot-writer-design.md` is the writer design. No end-of-day row is written. `GET /api/v1/performance` remains the latest backtest. | Developer 3 | Do not deploy a writer without approval. |
+| Worker heartbeat. | PASS | Branch tests cover a missing beat, a fresh beat, and a beat older than the interval. The running API was not rebuilt and `core-worker` was not started, so the live process does not serve this route yet. | Developer 3 | Deploy only with a later authorization. |
 | Production revision. | PASS | `alembic current` reported `0007_entry_day_gates (head)`. | Developer 3 | No production migration in the next checkpoint. |
 | Production paper session. | PASS | Paper status and session list, above. Mode `PAPER`, `live_enabled` false. | Developer 3 | No session write. |
 | Intelligence live news. | BLOCKED | Compose sets `INTELLIGENCE_DATA_SOURCE=fixtures` and an empty LLM key. No credentialed live run was authorized. | Developer 3 | Checkpoint 4. Live news without credentials stays blocked. |
@@ -90,4 +96,6 @@ Status is `PASS`, `FAIL`, `BLOCKED`, or `NOT VERIFIED`. "Later checkpoint" means
 
 Checkpoint 2 closed the ordering race in code, the 15:15 test, the disposable six-entry race, and the scripted Compose probe. It did not change ₹20,000, the six-entry limit, the 90-second delay, fees, or the production database, and it did not start the production worker.
 
-Checkpoint 3 may add a read-only daily-performance contract and a snapshot-writer design, plus heartbeat code on this branch only. It may not deploy that heartbeat or the collector fix. Documentation does not close the missing heartbeat or the missing daily snapshot writer.
+Checkpoint 3 added the unavailable daily-performance route, the snapshot-writer design, and heartbeat code on this branch. It did not deploy the heartbeat, rebuild Core API, or start `core-worker`. The end-of-day writer is not implemented.
+
+Checkpoint 4 may add contract tests for Intelligence and the frontend in an isolated Compose project. Live news without credentials stays blocked.

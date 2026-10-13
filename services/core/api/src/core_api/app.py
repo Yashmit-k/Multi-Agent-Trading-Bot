@@ -23,6 +23,7 @@ from core_api.settings import Settings
 from core_db.paper_sessions import ActivePaperSessionError, ClosedPaperSessionError
 from core_db.repository import CoreRepository
 from core_db.seed import load_seed
+from core_worker.heartbeat import DEFAULT_WORKER_INTERVAL_SECONDS, heartbeat_view
 from core_db.session import create_schema
 from core_features.engine import build_feature_set
 from core_ingestion.service import EventPublisher, MemoryEventPublisher, RedisEventPublisher, ingest_signal
@@ -84,6 +85,8 @@ def create_app(
     app.state.ingestion = IngestionState()
     app.state.historical_gate = HistoricalGate()
     app.state.kite_pace = app.state.historical_gate.pace
+    app.state.worker_heartbeat_at = None
+    app.state.worker_heartbeat_interval_seconds = DEFAULT_WORKER_INTERVAL_SECONDS
 
     def require_user(credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]) -> None:
         if credentials is None or credentials.credentials != resolved.core_api_token:
@@ -326,6 +329,29 @@ def create_app(
     @app.get("/api/v1/paper/status")
     def paper_status(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
         return _paper_body(repository, resolved)
+
+    @app.get("/api/v1/paper/daily-performance")
+    def paper_daily_performance(_: Annotated[None, Depends(require_user)]) -> dict[str, str]:
+        """No daily equity series exists. Closed positions are removed, so open-position P&L is not the book."""
+        return {"status": "unavailable", "reason": "no_daily_equity_history"}
+
+    @app.get("/api/v1/worker/heartbeat")
+    def worker_heartbeat(_: Annotated[None, Depends(require_user)]) -> dict[str, str]:
+        return heartbeat_view(
+            app.state.worker_heartbeat_at,
+            datetime.now(timezone.utc),
+            int(app.state.worker_heartbeat_interval_seconds),
+        )
+
+    class HeartbeatBody(BaseModel):
+        heartbeat_at: datetime
+        interval_seconds: int = DEFAULT_WORKER_INTERVAL_SECONDS
+
+    @app.post("/api/v1/worker/heartbeat")
+    def record_worker_heartbeat(body: HeartbeatBody, _: Annotated[None, Depends(require_user)]) -> dict[str, str]:
+        app.state.worker_heartbeat_at = body.heartbeat_at
+        app.state.worker_heartbeat_interval_seconds = body.interval_seconds
+        return heartbeat_view(body.heartbeat_at, body.heartbeat_at, body.interval_seconds)
 
     @app.post("/api/v1/paper/start")
     def paper_start(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:

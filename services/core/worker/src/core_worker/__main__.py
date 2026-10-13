@@ -11,6 +11,7 @@ from core_db.session import create_schema
 from core_ingestion.service import MemoryEventPublisher, RedisEventPublisher
 from core_paper.costs import CostSchedule
 from core_paper.trading_calendar import cash_session_open
+from core_worker.heartbeat import publish_heartbeat
 from core_worker.loop import run_once
 from core_worker.paper_schedule import broker_allows_entries, run_scheduled_cycle
 
@@ -35,6 +36,7 @@ api_base = os.environ.get("CORE_API_URL", "http://core-api:8000")
 api_token = os.environ.get("CORE_API_TOKEN", "")
 while True:
     now = datetime.now(timezone.utc)
+    publish_heartbeat(api_base, api_token, now, interval_seconds=interval)
     if mode != TradingMode.PAPER:
         logger.error("paper_worker_refused mode=%s", mode.value)
     elif cash_session_open(now):
