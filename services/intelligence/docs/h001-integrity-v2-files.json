@@ -1,0 +1,2960 @@
+[
+  {
+    "relpath": "audit_stats.json",
+    "size_bytes": 1979,
+    "sha256": "43fb92ba08dfc3fba0bf5d083e2f3785aa030475680134bf973744eb3d529126",
+    "artifact_class": "historical_audit_stats"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIENT.json",
+    "size_bytes": 248649,
+    "sha256": "d7c892d06648e8a94fcb422e03191dc60c3f0b5bb0d35f97e432032559be04a9",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIENT_01-01-2024_31-03-2024.raw",
+    "size_bytes": 29614,
+    "sha256": "026bf75a5556b2a845be9e8ac281c08da5fe72e918832b79d45e5255b1b173f0",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIENT_01-01-2025_31-03-2025.raw",
+    "size_bytes": 20096,
+    "sha256": "16186bf0bd898132dbbb22bd736563d3eac8ac70d51abd31b8682eccfec063a9",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIENT_01-04-2024_30-06-2024.raw",
+    "size_bytes": 23770,
+    "sha256": "cd0f2b5d56d6a953a27225dd10be21def8916799746cfe2c7e3f5b0264979b1b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIENT_01-04-2025_30-06-2025.raw",
+    "size_bytes": 28231,
+    "sha256": "29c4de7d6d9f4a3d4b93b811f7d673ac9c8d7a34e006e4e022d10ed40b810dc3",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIENT_01-07-2024_30-09-2024.raw",
+    "size_bytes": 23742,
+    "sha256": "4f09f22aeb6e2f2389fe9d084e3969c1c6cdec5714e618b935686b9d931d0fbf",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIENT_01-07-2025_30-09-2025.raw",
+    "size_bytes": 24792,
+    "sha256": "f70b2c6ef6614129ba38066e7d6f7d3ded8253f28e427be2b862b9f5a735898f",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIENT_01-10-2024_31-12-2024.raw",
+    "size_bytes": 33962,
+    "sha256": "d862cf3ad24a40a0034ee097befd1bcbbc65e7a99d37e0575dddbbde6abd620d",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIENT_01-10-2025_31-12-2025.raw",
+    "size_bytes": 51130,
+    "sha256": "bbe072c9fa52b8e2f627e9070a0c6843b4524996f5f264ff17d21ffbf4d7e343",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIPORTS.json",
+    "size_bytes": 222466,
+    "sha256": "f8579ec43f6980ad76826583824801860ae1e9f8514f28c71ba1cf785f7ae763",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIPORTS_01-01-2024_31-03-2024.raw",
+    "size_bytes": 36161,
+    "sha256": "00eec6d1fdb7d9d733b8f5b40adf9b1a148faf2babcdfe4fc395ea42f348ca5b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIPORTS_01-01-2025_31-03-2025.raw",
+    "size_bytes": 14806,
+    "sha256": "f8540a3c1e701552e6389ee07ee7f8171da559bc3d0b79fcd9638c401b51e921",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIPORTS_01-04-2024_30-06-2024.raw",
+    "size_bytes": 28507,
+    "sha256": "2df62ef250092ae86b52b3520bc16f08b66f7feb9d71ed9a1e0cd92678d70cf6",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIPORTS_01-04-2025_30-06-2025.raw",
+    "size_bytes": 37881,
+    "sha256": "723bfebf46ffee584cea72935873c3b26ee08cdccbb40be54cc089203b044e4e",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIPORTS_01-07-2024_30-09-2024.raw",
+    "size_bytes": 22551,
+    "sha256": "8c66dfbd23cb68a9e34cbd41bf15be943da58f2891e5e25952ec50de646e664e",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIPORTS_01-07-2025_30-09-2025.raw",
+    "size_bytes": 24140,
+    "sha256": "771a7f45477e4cd9cd96156e48dbf0b0ce5d7e430fc4fdc4d29b1e0abdd6cee2",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIPORTS_01-10-2024_31-12-2024.raw",
+    "size_bytes": 26691,
+    "sha256": "a6c169d0d7f5dc6fe693d6550b94eb0d79a6ecae23d42fbacafb74b51df16664",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ADANIPORTS_01-10-2025_31-12-2025.raw",
+    "size_bytes": 19857,
+    "sha256": "f2f29402e529d1b5ab15468fc8801db4bad3c3df57547dedee6ce8851da6c511",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/APOLLOHOSP.json",
+    "size_bytes": 164463,
+    "sha256": "dfc4a3c9201e0c7904d7236a815b21c4b14bfc07273b07d59d6c131de3eba914",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/APOLLOHOSP_01-01-2024_31-03-2024.raw",
+    "size_bytes": 23544,
+    "sha256": "72a7a2560f6abd22076412d1ce88d4889a535bf7490c6c5a5e861062e47105a9",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/APOLLOHOSP_01-01-2025_31-03-2025.raw",
+    "size_bytes": 13352,
+    "sha256": "9cf3391b298b6f1e1b577766c1bf04f58c34997f7fe1498550623a8cc92d7c10",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/APOLLOHOSP_01-04-2024_30-06-2024.raw",
+    "size_bytes": 26135,
+    "sha256": "49d2d2120fc2198a0e302a0e642bd0ceda9262f4f4ced3a5f93e9bd34d8b404d",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/APOLLOHOSP_01-04-2025_30-06-2025.raw",
+    "size_bytes": 21254,
+    "sha256": "8aab4d89682d2e6fbc05f605483f8b847c52d7945e1be39386b21f2d8a7788d7",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/APOLLOHOSP_01-07-2024_30-09-2024.raw",
+    "size_bytes": 30069,
+    "sha256": "703ef3970122c18ea5462c68fd67eb9f5e0467e2d23ebc08067a572808f18154",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/APOLLOHOSP_01-07-2025_30-09-2025.raw",
+    "size_bytes": 18544,
+    "sha256": "b35df25e35c8f15dfb87a6319759efd24d1cb6a7b02187daec1bbcdc2df5b4f7",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/APOLLOHOSP_01-10-2024_31-12-2024.raw",
+    "size_bytes": 13648,
+    "sha256": "0b945d8d695142bd760995b8a13b5b187196ccf820c30be74b4e8d980735c7ce",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/APOLLOHOSP_01-10-2025_31-12-2025.raw",
+    "size_bytes": 8885,
+    "sha256": "e1663090152f0e29928d819fc3d82f67174f87af709891c06c7e66e78ad8f3a8",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ASIANPAINT.json",
+    "size_bytes": 272033,
+    "sha256": "1da74c488b63b2b977f367c06eb71f9c094f32dff7cafa01d1a9731c97e23137",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/ASIANPAINT_01-01-2024_31-03-2024.raw",
+    "size_bytes": 43292,
+    "sha256": "c5566560917dda853c98fc462a9e9ed8c3ff06adbb306b294f488262a1975939",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ASIANPAINT_01-01-2025_31-03-2025.raw",
+    "size_bytes": 21817,
+    "sha256": "16368ccb1ee9b730dcc21da1f522f7f005c8d2d552bea5df6342c3f1683fa9e6",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ASIANPAINT_01-04-2024_30-06-2024.raw",
+    "size_bytes": 49871,
+    "sha256": "fb29f8699c7d398cf80e962defc276be79645efa94521854132584311d54f84e",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ASIANPAINT_01-04-2025_30-06-2025.raw",
+    "size_bytes": 32338,
+    "sha256": "39b79cf63f93a0cf1d2d61f342bbc7048f0b666ae076018341a115a4a5e977b5",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ASIANPAINT_01-07-2024_30-09-2024.raw",
+    "size_bytes": 34120,
+    "sha256": "574d241fd2c59d4867a8e89940cf25bf9392268c261ab3f2a962398c5d41fc96",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ASIANPAINT_01-07-2025_30-09-2025.raw",
+    "size_bytes": 16565,
+    "sha256": "fa4701c83a0d67ce8cbbc528558447e04db0eb5640e79f5d114363bf21ae1c41",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ASIANPAINT_01-10-2024_31-12-2024.raw",
+    "size_bytes": 41200,
+    "sha256": "46c0de2ede2c28f12291fa63d8659b547c073aeab9286ead3039145fb7616247",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ASIANPAINT_01-10-2025_31-12-2025.raw",
+    "size_bytes": 20398,
+    "sha256": "122d4abc6833c88d3da7d5a5de1e9dbec219d938c7613657f41fcb3a5dcb6484",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/AXISBANK.json",
+    "size_bytes": 313964,
+    "sha256": "cfe669ae44ab4c9ba1e56410886c6964e0e8c4fec4438b275e7eb051017d15d5",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/AXISBANK_01-01-2024_31-03-2024.raw",
+    "size_bytes": 41889,
+    "sha256": "21981a73fdce794cf5ebd91509516697be09f431a8f8ba1057de6a48b4497061",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/AXISBANK_01-01-2025_31-03-2025.raw",
+    "size_bytes": 25252,
+    "sha256": "b6237aad7f4436df869d353081845c9692a5794fc35e4444d5e02263e8353c58",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/AXISBANK_01-04-2024_30-06-2024.raw",
+    "size_bytes": 55296,
+    "sha256": "5686ad40ac36e1fdcf73726dc40a69dccbf5fd84cb739080f9d1f413ddacf18d",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/AXISBANK_01-04-2025_30-06-2025.raw",
+    "size_bytes": 34481,
+    "sha256": "927beaf06f66399db733e227ac7bb60523d50ad7d06f41f947909d3b9161085c",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/AXISBANK_01-07-2024_30-09-2024.raw",
+    "size_bytes": 38068,
+    "sha256": "34dbe4292b73fa15ccaa7580b756e98fb42a34156ac3737339eea7675e1aa7b3",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/AXISBANK_01-07-2025_30-09-2025.raw",
+    "size_bytes": 33803,
+    "sha256": "4c58267548dbb29043aca9aa07f01031a99d91a0574afcbce73579449a78d5a5",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/AXISBANK_01-10-2024_31-12-2024.raw",
+    "size_bytes": 34354,
+    "sha256": "2e088a4a2726eed6d06052a0fd1fd5b224550dc480d274d61fce9a53bd565951",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/AXISBANK_01-10-2025_31-12-2025.raw",
+    "size_bytes": 32429,
+    "sha256": "1637afc619ce23995fff71592241839f61e666d7b6738a7e6eab123bec94d84b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJ-AUTO.json",
+    "size_bytes": 205328,
+    "sha256": "6ac36d58e78c76f377aa47217cc13e405d8427f01c317113f98294fc5cf68ea0",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJ-AUTO_01-01-2024_31-03-2024.raw",
+    "size_bytes": 30741,
+    "sha256": "08b418914072da85e2d36573365525504c41be59b3ef3c56f2a20eb5ffbca579",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJ-AUTO_01-01-2025_31-03-2025.raw",
+    "size_bytes": 22869,
+    "sha256": "4247ae0a13ebbc872d24817b9e95f8ed4ca3e68a1cc48bda7cd54d23145ccab3",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJ-AUTO_01-04-2024_30-06-2024.raw",
+    "size_bytes": 28103,
+    "sha256": "7fa32bc708e37b3c5d36709f0445b95ac027d79a1d62f1bd8367bc74552acdd0",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJ-AUTO_01-04-2025_30-06-2025.raw",
+    "size_bytes": 28369,
+    "sha256": "27bc696dc9587808f001298bfd51fdc75fa073c7772ab77994af485adc01d35c",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJ-AUTO_01-07-2024_30-09-2024.raw",
+    "size_bytes": 24039,
+    "sha256": "ccb94e185fb30b87c7a6aaed506e148b1d3274f56ad82b186e23fe55ccf3a166",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJ-AUTO_01-07-2025_30-09-2025.raw",
+    "size_bytes": 26393,
+    "sha256": "3e12b059b2832634e4fb3b1f23571eb2df723fc2f0d7caf17fa2330e5406aa16",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJ-AUTO_01-10-2024_31-12-2024.raw",
+    "size_bytes": 10813,
+    "sha256": "1290052dbcd82d798589ee477a4af7e1532bfce17e5190f01ae20422c8d8c956",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJ-AUTO_01-10-2025_31-12-2025.raw",
+    "size_bytes": 22809,
+    "sha256": "bb737d5fcf74e8d7ba081aed92a5a3fc85ff4e59331d83c939d52f9306ff0f75",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJFINSV.json",
+    "size_bytes": 129481,
+    "sha256": "48b74e4fe1cc264592117bca3aafcfe9f4e4d7d2e4accae405e0e708085e6601",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJFINSV_01-01-2024_31-03-2024.raw",
+    "size_bytes": 13386,
+    "sha256": "9f35b88e3b987f82cc87038af8dec8aa85dffe534bebee5df0d44b709fad67e9",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJFINSV_01-01-2025_31-03-2025.raw",
+    "size_bytes": 15445,
+    "sha256": "bb6052349b707f0f096083faf9d876a0dc1f311a5042c3115392225a6b413e79",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJFINSV_01-04-2024_30-06-2024.raw",
+    "size_bytes": 17952,
+    "sha256": "582ae15697dc4737150f5713fa6f947fba16dc70d277ce7b2f16212f306eb343",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJFINSV_01-04-2025_30-06-2025.raw",
+    "size_bytes": 19221,
+    "sha256": "1f50ea34977775011c430ed1c967ed3b709cf1f1ad970218849f3695bb1cfe45",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJFINSV_01-07-2024_30-09-2024.raw",
+    "size_bytes": 10656,
+    "sha256": "a6b68f51753b5584dedb31d57c8c521f06801708b57b92135e1a45003e8ea02f",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJFINSV_01-07-2025_30-09-2025.raw",
+    "size_bytes": 20814,
+    "sha256": "434b400494c42a5350de27a6313cbe77dd5c1a8ba24b94166fabacd38eaf4074",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJFINSV_01-10-2024_31-12-2024.raw",
+    "size_bytes": 11207,
+    "sha256": "3d910cd6c2ec0e67477f15d5a0f258b75a5a6364699d25b22153250c3fef2424",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJAJFINSV_01-10-2025_31-12-2025.raw",
+    "size_bytes": 13488,
+    "sha256": "3e7ff7bff4841a7630de37d83c18946232259e4397e5ef2ca5381ea5bfeda3b1",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJFINANCE.json",
+    "size_bytes": 204350,
+    "sha256": "980fc311ef46e878ff0261c312c1438f06dc68e1eb688fa073631b5197462495",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/BAJFINANCE_01-01-2024_31-03-2024.raw",
+    "size_bytes": 27718,
+    "sha256": "c4a460825ceae786e12b2ce261a466999beef3c305188aefca99d69f0920821f",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJFINANCE_01-01-2025_31-03-2025.raw",
+    "size_bytes": 23310,
+    "sha256": "0d56bd88e402d6e8d55ea3d2d71815fe5cb571db6a69138472b0a913b0232945",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJFINANCE_01-04-2024_30-06-2024.raw",
+    "size_bytes": 30786,
+    "sha256": "e0ed1483bbf66d742d04f5867b0cf2e717b30614da60b51200af87cf02b10b6d",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJFINANCE_01-04-2025_30-06-2025.raw",
+    "size_bytes": 30829,
+    "sha256": "80f5aa25e20bba6b796a1424a539676166cd407ebee7944c238686d54f1cbc27",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJFINANCE_01-07-2024_30-09-2024.raw",
+    "size_bytes": 20034,
+    "sha256": "5733afa02817a67128a5b35a1be73289b7a17e7855db14c9ba000030ccc6cb6e",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJFINANCE_01-07-2025_30-09-2025.raw",
+    "size_bytes": 27017,
+    "sha256": "41f90157fef83e2633b1ca6b217a4eb3868d2afa004cb7157916a180954d5c52",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJFINANCE_01-10-2024_31-12-2024.raw",
+    "size_bytes": 17169,
+    "sha256": "2e0713cf81ce89217213479059b16f4b43bc439077a77521434acc0b3e7930dc",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BAJFINANCE_01-10-2025_31-12-2025.raw",
+    "size_bytes": 16135,
+    "sha256": "49b5de3f37c27fc9c1014336024e20206800107672ecafb612fd37acf16d48d6",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BEL.json",
+    "size_bytes": 128498,
+    "sha256": "b0b6a0fc435265b46248d92b056da61b9bbab9026f141438b345bbcaf483531a",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/BEL_01-01-2024_31-03-2024.raw",
+    "size_bytes": 14450,
+    "sha256": "93e2db5dce827c6a0a6a70b6a8d85094428c29f3ad913a51d921a89877b34090",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BEL_01-01-2025_31-03-2025.raw",
+    "size_bytes": 18754,
+    "sha256": "ea4874b8711e3800c14371e4f5311d773bc8529d468376dcc5068ccb5d9fe2cd",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BEL_01-04-2024_30-06-2024.raw",
+    "size_bytes": 11899,
+    "sha256": "28453a4181edcedf4cdaf51ce4086cedb2a383bf763602ba155c19684d2da581",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BEL_01-04-2025_30-06-2025.raw",
+    "size_bytes": 17310,
+    "sha256": "6c99bc47dce92c60be688a3ceddd3c9ca18f69f1e07b2b42d5c15672523b9f96",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BEL_01-07-2024_30-09-2024.raw",
+    "size_bytes": 16671,
+    "sha256": "c4f9699a2906092c942e8095cf177446d29fd3ea1ceb79a310906c2d561d405d",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BEL_01-07-2025_30-09-2025.raw",
+    "size_bytes": 20507,
+    "sha256": "8a435f3bb6c77554c40c9494328382d1105e2fb436e2ad42900d0a5cfa73fa89",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BEL_01-10-2024_31-12-2024.raw",
+    "size_bytes": 10923,
+    "sha256": "cc84465c03c13d6a000369f985034e69e5d46f3016a7a3e8889dbde79b47c6ac",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BEL_01-10-2025_31-12-2025.raw",
+    "size_bytes": 10832,
+    "sha256": "6ccf00610500c75f46e3e38abc718b3cbaae68963d968850a12a4d5895761de7",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BHARTIARTL.json",
+    "size_bytes": 503664,
+    "sha256": "ebdc83b8f0b415682c76bdca994db1e7d9b71c2ba7afee7f3aa4e570ab75a8d1",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/BHARTIARTL_01-01-2024_31-03-2024.raw",
+    "size_bytes": 95020,
+    "sha256": "d2140cfcd451332987fdf5caf45cf42bc828d068431a85b03f142d158a0a1f84",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BHARTIARTL_01-01-2025_31-03-2025.raw",
+    "size_bytes": 48447,
+    "sha256": "f36abb321f25f1ab1ead1275a61834a62873e5d4b3bfc17af39de1d65c05c209",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BHARTIARTL_01-04-2024_30-06-2024.raw",
+    "size_bytes": 90249,
+    "sha256": "7d00f199ce511844778c42886308fe70dc326fc6978ba40a6c58cf6326c71490",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BHARTIARTL_01-04-2025_30-06-2025.raw",
+    "size_bytes": 31152,
+    "sha256": "f05cedd60d765b14dc09568c19bd19bd0e7606e0cc397f55acb283106def0010",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BHARTIARTL_01-07-2024_30-09-2024.raw",
+    "size_bytes": 81942,
+    "sha256": "76571afb2922fde52af525b0e4d4f8454d055a65ca0d0970fb1478a82acb4104",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BHARTIARTL_01-07-2025_30-09-2025.raw",
+    "size_bytes": 31659,
+    "sha256": "be783d4692f705e77b16f5b47eb724502a554b5ad6b17388c282d061f7536176",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BHARTIARTL_01-10-2024_31-12-2024.raw",
+    "size_bytes": 62441,
+    "sha256": "dc8cb3ba857b2a6bb11a381f3a4f2f79b381c7c0417855f9f889e7dbb788de5f",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BHARTIARTL_01-10-2025_31-12-2025.raw",
+    "size_bytes": 36162,
+    "sha256": "318432fa4a49c83be62f25da86b61742ce281bc146252dab0501bd2eabf351c4",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BPCL.json",
+    "size_bytes": 202442,
+    "sha256": "721f6a3e79444fab8443975ae5d54a38f56ffff21ad6b523fc41851b4592b6e1",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/BPCL_01-01-2024_31-03-2024.raw",
+    "size_bytes": 23938,
+    "sha256": "7f1ad37ff3fd9ce882e5ce4bc42b24e5a9d2feabda477ab1a693875a98d0d129",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BPCL_01-01-2025_31-03-2025.raw",
+    "size_bytes": 18203,
+    "sha256": "23c9b52159ee970ba27fe1c82dc113dbcf751bfef5fde4fa0548c2b5a2637cac",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BPCL_01-04-2024_30-06-2024.raw",
+    "size_bytes": 32806,
+    "sha256": "f241309e2e412ca827efe2cde612d5b35311353c6d412b8ffbddff4b6019c7f1",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BPCL_01-04-2025_30-06-2025.raw",
+    "size_bytes": 16939,
+    "sha256": "2492f5b31280eb3e0677f446ffbc84b0c46310844233ee20bb4adf84f8c4de05",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BPCL_01-07-2024_30-09-2024.raw",
+    "size_bytes": 39446,
+    "sha256": "cadee821c3d7b62f3b631d81ce0f6a25d3495da0d3af9f66002e37a0f1f5579e",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BPCL_01-07-2025_30-09-2025.raw",
+    "size_bytes": 19960,
+    "sha256": "c190cc38c8d843be66ea5bb06f5a629ea6bd77633bf64d4ded8fecc4fe6459d3",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BPCL_01-10-2024_31-12-2024.raw",
+    "size_bytes": 24518,
+    "sha256": "3724b095ea6da89a51adc711282a0db499ff3d59f9f583d379f1a576addcf3a7",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BPCL_01-10-2025_31-12-2025.raw",
+    "size_bytes": 15400,
+    "sha256": "555991c5fe95a113ddeda6d6fabb5aa60c18e3eea30adf5c4754fc1b0a62ee27",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BRITANNIA.json",
+    "size_bytes": 159376,
+    "sha256": "1ad6880dddcb383de8835a7ceeddf621597f07b10e4cc1f2920610b2c8800b3a",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/BRITANNIA_01-01-2024_31-03-2024.raw",
+    "size_bytes": 12638,
+    "sha256": "05fde1756cc236c8a0414b569584f3c1c0e32b9dba9dbd96a3b9f18e90db8e8b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BRITANNIA_01-01-2025_31-03-2025.raw",
+    "size_bytes": 16033,
+    "sha256": "8e57a09d513409e433680a8fdd08fb6e6b098c243d62744ef2e681897341de12",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BRITANNIA_01-04-2024_30-06-2024.raw",
+    "size_bytes": 18537,
+    "sha256": "a137b54bd4053d49d38431f50f901e2d9d4951e2cab8474d3c872473653b3ef8",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BRITANNIA_01-04-2025_30-06-2025.raw",
+    "size_bytes": 19040,
+    "sha256": "9c38ea359e22f974e4a7f175c478262a572590137c0f79972ee414cd882c16e2",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BRITANNIA_01-07-2024_30-09-2024.raw",
+    "size_bytes": 22533,
+    "sha256": "52ead444b1fef6bff9f34415e52e3144cb9f442852cbe7161a2cd761b09a2d52",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BRITANNIA_01-07-2025_30-09-2025.raw",
+    "size_bytes": 23884,
+    "sha256": "44bd15848611392f3cdc0fed365d0e139fb8d36749222864baa1b01b578948e2",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BRITANNIA_01-10-2024_31-12-2024.raw",
+    "size_bytes": 14822,
+    "sha256": "690f8aff8a530f21491bccbde41c29227079169915d747046b4fe2792717cbfb",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/BRITANNIA_01-10-2025_31-12-2025.raw",
+    "size_bytes": 24017,
+    "sha256": "9dc3c35c8112726ed3883d71d2ddd699c0438b21f8ec29e6ece8689dd7191684",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/CIPLA.json",
+    "size_bytes": 184377,
+    "sha256": "09f33827d547f7125c6f479b4a4fc6d35b781939a43f82d2d5ab27d7eee4b7c0",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/CIPLA_01-01-2024_31-03-2024.raw",
+    "size_bytes": 27574,
+    "sha256": "d0d08fa08a9cc3e3d669cf2b3f5b0fcf189271d928d23b880cd8e9a94d990cfd",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/CIPLA_01-01-2025_31-03-2025.raw",
+    "size_bytes": 15277,
+    "sha256": "c01764fd34c295e7f04c31cb2006995cc0b73bbfd3c9084e035934d3e731617b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/CIPLA_01-04-2024_30-06-2024.raw",
+    "size_bytes": 31459,
+    "sha256": "fc787e4e4028fc7d24e71437de7c34be80573f5a8af9ef1b40aa7c51442a8980",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/CIPLA_01-04-2025_30-06-2025.raw",
+    "size_bytes": 25681,
+    "sha256": "1ff7fdd236d5b9a3877597f91ecfbfd8c4d78931455fdac8aa6fd54ff7261ada",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/CIPLA_01-07-2024_30-09-2024.raw",
+    "size_bytes": 25031,
+    "sha256": "cedcb34b28b66db7c3bd193adad08590c1938901ad1092768eb4737f2fac025a",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/CIPLA_01-07-2025_30-09-2025.raw",
+    "size_bytes": 19178,
+    "sha256": "6bb5d4c7086d5aad7c1663f5f8e5a9f4497e58a0bd896a97b7eae99413510bf5",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/CIPLA_01-10-2024_31-12-2024.raw",
+    "size_bytes": 14748,
+    "sha256": "7652b95b7f29699abe4b0c258dc345cbc08273628aaa970a33811867bef43ea0",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/CIPLA_01-10-2025_31-12-2025.raw",
+    "size_bytes": 14717,
+    "sha256": "dfff9b94012c3f2ead7f267bd8f8d1d940be590966d59e631ae73c9ab7f3db34",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/COALINDIA.json",
+    "size_bytes": 209788,
+    "sha256": "8f2abaf074728ddc1ad705a4cca354eff5c9d1ebe4ac741306e81969b0426145",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/COALINDIA_01-01-2024_31-03-2024.raw",
+    "size_bytes": 23015,
+    "sha256": "f6b6816497e7b90061f0a54bbe0000798e1ebafcfc735ecdf51650a2a2721f0d",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/COALINDIA_01-01-2025_31-03-2025.raw",
+    "size_bytes": 26813,
+    "sha256": "6dfdcbd8eb7a7de0d2aeafa09a401688d252f14078cb4d293707813862c5b684",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/COALINDIA_01-04-2024_30-06-2024.raw",
+    "size_bytes": 16617,
+    "sha256": "53a49a94f29a9652772a6620e80493e799dcbf7e8351fd5ccf99df6513f11501",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/COALINDIA_01-04-2025_30-06-2025.raw",
+    "size_bytes": 28585,
+    "sha256": "533178d9557b3158e2d07f6d6914a3a843dee6cb54f2aa303676d09ccb0ecfe7",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/COALINDIA_01-07-2024_30-09-2024.raw",
+    "size_bytes": 23594,
+    "sha256": "2a0fa9db9a693cfc367e99902d34e830d1a96ed757c2d6863957d95d352c698b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/COALINDIA_01-07-2025_30-09-2025.raw",
+    "size_bytes": 35162,
+    "sha256": "d279aab96186747d141c54133fb29edb3c5ddaede65ae578f49edbd85fc2f3c7",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/COALINDIA_01-10-2024_31-12-2024.raw",
+    "size_bytes": 16026,
+    "sha256": "11060930b815f5690d7f73a25e1c5f1891fc849c48c04dd05daafb79fef51324",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/COALINDIA_01-10-2025_31-12-2025.raw",
+    "size_bytes": 28424,
+    "sha256": "3281be58947e44625bfe1e09dfb2b0ac31aa6a3e3c06cc88b6d5550d2fae3f4f",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/DRREDDY.json",
+    "size_bytes": 276243,
+    "sha256": "6df9559e39b872ed4b73e2a30aaef9c8eb8d910d48cde9d04aa37da4f5327674",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/DRREDDY_01-01-2024_31-03-2024.raw",
+    "size_bytes": 38499,
+    "sha256": "101caa3f27e310233625913b6736ecd15ab5475a3593d3a73bbf26541a187570",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/DRREDDY_01-01-2025_31-03-2025.raw",
+    "size_bytes": 21903,
+    "sha256": "24e9cebdc906bb6bd452a6261099814a3ba8b44eeaa34b00358fb6f3f8d599e1",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/DRREDDY_01-04-2024_30-06-2024.raw",
+    "size_bytes": 53939,
+    "sha256": "00f279ac51ca4d3e54f7c14b892305a165c01bd44842d920c8b066be022c9c29",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/DRREDDY_01-04-2025_30-06-2025.raw",
+    "size_bytes": 26389,
+    "sha256": "9033a5968e184b649a493e4ac59e19cd973f89c40d62c847cca0cf776e4921bf",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/DRREDDY_01-07-2024_30-09-2024.raw",
+    "size_bytes": 37565,
+    "sha256": "769c3696959ddec0c4e589f3f78b7cdbfd51729d1fbb0f0c64b9007ffe51e8cf",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/DRREDDY_01-07-2025_30-09-2025.raw",
+    "size_bytes": 28820,
+    "sha256": "c3adc95f6d7838e35469fef1c6b20c3e2d953f2838858c11839ef38d257bbfad",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/DRREDDY_01-10-2024_31-12-2024.raw",
+    "size_bytes": 30128,
+    "sha256": "451da3b3fc55941a1cf91dd738d7c4a052f4b9b9db3de89af8d76e69ea6276f1",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/DRREDDY_01-10-2025_31-12-2025.raw",
+    "size_bytes": 24008,
+    "sha256": "8ccb2163beb840d2c77fccc26a73b928c7525c2654184a8d59a97d9928f08d21",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/EICHERMOT.json",
+    "size_bytes": 256038,
+    "sha256": "bc108b5ec4640db70cf5248a7c5b973e970b1c7fe3ae84f277673500b95a1553",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/EICHERMOT_01-01-2024_31-03-2024.raw",
+    "size_bytes": 28174,
+    "sha256": "a4fe57fed74cccbe5113530969d53f32c569f9114b0692cef804f629f5cca155",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/EICHERMOT_01-01-2025_31-03-2025.raw",
+    "size_bytes": 29149,
+    "sha256": "88f9dacb509f6bcccbc082945ab59e164a84f536a130751eaba545652d014d06",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/EICHERMOT_01-04-2024_30-06-2024.raw",
+    "size_bytes": 40419,
+    "sha256": "90a22d9a0cf50c3b66d33ccaa18a51a2dbffba551d7bee2509ee3ca050892d34",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/EICHERMOT_01-04-2025_30-06-2025.raw",
+    "size_bytes": 22051,
+    "sha256": "67bbc034d1faf4ce0775f831d1044d1bed7d473c78393bef2944f3e20265f42e",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/EICHERMOT_01-07-2024_30-09-2024.raw",
+    "size_bytes": 40243,
+    "sha256": "277cca5eec9a88619ec024c4bd39321094ec1defc6bb736930f200a5edf444c0",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/EICHERMOT_01-07-2025_30-09-2025.raw",
+    "size_bytes": 31140,
+    "sha256": "004057ac5bec24ede78bd0ab9e7596cd967775209eb693a0edb6fa644234feb2",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/EICHERMOT_01-10-2024_31-12-2024.raw",
+    "size_bytes": 30542,
+    "sha256": "e9f7995ae31e162100cfb6974d15683a13d2717299d392774ef199d27ac53e9e",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/EICHERMOT_01-10-2025_31-12-2025.raw",
+    "size_bytes": 20528,
+    "sha256": "43c6f66a089b095ea37c121319cd505f50ae054d914872cc75fd403a482a3fef",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/GRASIM.json",
+    "size_bytes": 362915,
+    "sha256": "78ba3cd0cd1481e7e6bad3c761a8714f40e0eef0f0c1c8864f5c0b60e9c16bdc",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/GRASIM_01-01-2024_31-03-2024.raw",
+    "size_bytes": 66265,
+    "sha256": "748f9c4b80dbb3fe647ffc7173c28651453bc74afcf23a6a293589bfc62fa8bc",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/GRASIM_01-01-2025_31-03-2025.raw",
+    "size_bytes": 22189,
+    "sha256": "cfb5d968fe9c39901838d603aee401d84b84a281cab16cdfa887c281ab56c88a",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/GRASIM_01-04-2024_30-06-2024.raw",
+    "size_bytes": 65403,
+    "sha256": "f693a5c26b6303403c25dfee799e6b945c90599f3c59f13b73ef1d8294ee682e",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/GRASIM_01-04-2025_30-06-2025.raw",
+    "size_bytes": 25105,
+    "sha256": "c8adc383652b3a63345b689d741795ef7561b2dee0369f8dae358051ab162c43",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/GRASIM_01-07-2024_30-09-2024.raw",
+    "size_bytes": 58118,
+    "sha256": "a0e4f7bf8bb7d1762d67f84ebff29d99e05f5b4703181370695158f309bbe8e7",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/GRASIM_01-07-2025_30-09-2025.raw",
+    "size_bytes": 26931,
+    "sha256": "0a6530ee2b02add64696d7f4b8908b860e73af7f01d99b70cb4ee4e2606b43d0",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/GRASIM_01-10-2024_31-12-2024.raw",
+    "size_bytes": 55970,
+    "sha256": "96cf508a40239372975d69d17bb3b083a15dfee00da24ee790e213519adc819e",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/GRASIM_01-10-2025_31-12-2025.raw",
+    "size_bytes": 22462,
+    "sha256": "e77e9c324ead6fb6a08196d858718d014d440e9df59d2fd2fb5c55b28f13b043",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HCLTECH.json",
+    "size_bytes": 286565,
+    "sha256": "dfc1c85a0fff75c186b2a1655e548d78eec372a647df6c261425b40c83dbd19c",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/HCLTECH_01-01-2024_31-03-2024.raw",
+    "size_bytes": 27542,
+    "sha256": "9d69f06e236dfe4aedfbd74ad8133cdab63f50719633fab88448091a8ca48721",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HCLTECH_01-01-2025_31-03-2025.raw",
+    "size_bytes": 27989,
+    "sha256": "f37c4560975aacda27ee459912d51466f2c8787b09c8cd7a99ba5f80fe8145c1",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HCLTECH_01-04-2024_30-06-2024.raw",
+    "size_bytes": 31391,
+    "sha256": "9962569919f25487ef1b4911c3afa71563fdfd375a76bd278d397a03ebecbc4a",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HCLTECH_01-04-2025_30-06-2025.raw",
+    "size_bytes": 44248,
+    "sha256": "be72cd1926ea6dbe00119a26359d6a3d34ca3d842f109073627396c92c863848",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HCLTECH_01-07-2024_30-09-2024.raw",
+    "size_bytes": 37109,
+    "sha256": "5690221209fc8e11338de35c3edae39a3c9c553424fd8bc7414af31be19c0f62",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HCLTECH_01-07-2025_30-09-2025.raw",
+    "size_bytes": 35341,
+    "sha256": "cb7f468c4860d2aa82074dd115ccf53ecf67e25253092a8b0927479d201bdfc0",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HCLTECH_01-10-2024_31-12-2024.raw",
+    "size_bytes": 29650,
+    "sha256": "58877175fbfa70509359554db10202962d6a308d672445ad649132a20badc490",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HCLTECH_01-10-2025_31-12-2025.raw",
+    "size_bytes": 37583,
+    "sha256": "8e488f13762b6b89c5fe88a64972e486a0818acae04de085018848cb538e682a",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCBANK.json",
+    "size_bytes": 261660,
+    "sha256": "387ca1581ed0da9fc43745d2b38afdcb44024062c5071e182457a877db721378",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCBANK_01-01-2024_31-03-2024.raw",
+    "size_bytes": 43840,
+    "sha256": "06235e71fb4a75fee97a1766bd4fbb520730f2dd5d2e42f790dd045f89ece955",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCBANK_01-01-2025_31-03-2025.raw",
+    "size_bytes": 18318,
+    "sha256": "d509f85af4f9cca4c190357cac32288ab1767ba082f28fc2195db5a463b43eec",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCBANK_01-04-2024_30-06-2024.raw",
+    "size_bytes": 45229,
+    "sha256": "ccfb5d0fb928008d87a7330767cb11da76d7b1a94e6dd8151d90113327714f0b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCBANK_01-04-2025_30-06-2025.raw",
+    "size_bytes": 21870,
+    "sha256": "94bbc06ee335b92017fbcdcc409f466a60dc31a6526a0454b84974cca0bc70d8",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCBANK_01-07-2024_30-09-2024.raw",
+    "size_bytes": 40523,
+    "sha256": "72b05a1ce37c3ed4ac48b3abf83f961fe5fc2eb9ef83af8d21f43a30d1fe87ca",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCBANK_01-07-2025_30-09-2025.raw",
+    "size_bytes": 26999,
+    "sha256": "8be935702d83ea6ff7c6e86e7e6b7ff1e25613c63311338b3a16d6589d020212",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCBANK_01-10-2024_31-12-2024.raw",
+    "size_bytes": 30716,
+    "sha256": "6708f42179b1838e37cdb006fbccb01b383af4880008561eae4b7f761c0e1a81",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCBANK_01-10-2025_31-12-2025.raw",
+    "size_bytes": 19053,
+    "sha256": "b5040f8562ee8c4a9210a92a43939502f549b6ce86b9e8a8a8f79ff6430c28f7",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCLIFE.json",
+    "size_bytes": 165035,
+    "sha256": "f36d301f5237d9093fd16ad6d5aaba753e3621eb192c52d312a01c49555229ab",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCLIFE_01-01-2024_31-03-2024.raw",
+    "size_bytes": 22100,
+    "sha256": "7faceaba2450f4b86c13b4c5a7a10c46998ead6d4aac41198fd02caba22e1624",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCLIFE_01-01-2025_31-03-2025.raw",
+    "size_bytes": 18173,
+    "sha256": "23dff19e703311f25404c4d33b1fb1a55fd5616f7afa26444ed75089359ecc7b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCLIFE_01-04-2024_30-06-2024.raw",
+    "size_bytes": 28335,
+    "sha256": "4893ad7cdbf08d73ce84f665f5600e9156aca00b464b60c5faed8fff60489fb0",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCLIFE_01-04-2025_30-06-2025.raw",
+    "size_bytes": 14042,
+    "sha256": "1397cf907fb80266878d21df83713c39e9f01ef3111a640c0b5dd653631b8c93",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCLIFE_01-07-2024_30-09-2024.raw",
+    "size_bytes": 31195,
+    "sha256": "0579ac3c6d9400fc30bd3d54f2c9c2762886f6ba46bb679690ee18ccc0830350",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCLIFE_01-07-2025_30-09-2025.raw",
+    "size_bytes": 11587,
+    "sha256": "3dc17c993186a43ead2405cc9e24767d7079dabdef31c1df86f7f754440c1452",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCLIFE_01-10-2024_31-12-2024.raw",
+    "size_bytes": 18538,
+    "sha256": "fb4d61b66939fc4c00a014a434fec9b595275019d9abb88c915a4542d07d6bce",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HDFCLIFE_01-10-2025_31-12-2025.raw",
+    "size_bytes": 11753,
+    "sha256": "1fcc5062b3120bf157a942fba25dd4393eac7725ac923e0c7efcd84701049689",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HEROMOTOCO.json",
+    "size_bytes": 278825,
+    "sha256": "cf51b600b57550e9bfbad802d70a8edad208bfe6575c87d551f7a8caf3e130e1",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/HEROMOTOCO_01-01-2024_31-03-2024.raw",
+    "size_bytes": 34176,
+    "sha256": "7d67af9526f3295e222b413e32778cc2cb414b81735df8bfb27d886e20baff17",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HEROMOTOCO_01-01-2025_31-03-2025.raw",
+    "size_bytes": 30486,
+    "sha256": "24d1eb530248469233fe3872fbabbff022eb3f80614f6ccbfbaee139d6477b1f",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HEROMOTOCO_01-04-2024_30-06-2024.raw",
+    "size_bytes": 40139,
+    "sha256": "2e9cb71dfa8cd7ade9933a66a939776f8ba21f8952a8cbe35405d90059622c68",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HEROMOTOCO_01-04-2025_30-06-2025.raw",
+    "size_bytes": 31761,
+    "sha256": "ef2195d8ce728ab16d1016f3d2eb4c2ba094824071114e803848687d017fa5e7",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HEROMOTOCO_01-07-2024_30-09-2024.raw",
+    "size_bytes": 37474,
+    "sha256": "b012fba75df4b07e55a88f1ee8540712ebc636dd87b005253f67ba37b5020dde",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HEROMOTOCO_01-07-2025_30-09-2025.raw",
+    "size_bytes": 30926,
+    "sha256": "ba1b50d5d96fc759429fdc448d1c0d881ce144c4b1a7696873ace334a2d71124",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HEROMOTOCO_01-10-2024_31-12-2024.raw",
+    "size_bytes": 30424,
+    "sha256": "8e0d010a76681e528debc7d05246aa17317e5a5134309717a12f7c409e2d5412",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HEROMOTOCO_01-10-2025_31-12-2025.raw",
+    "size_bytes": 29647,
+    "sha256": "09637d2ca0c386e85d556ac9cfc0965174832b8a282153abafacb72bc2472e24",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HINDALCO.json",
+    "size_bytes": 263456,
+    "sha256": "5ce2ee675692eac42533db2c6716ef9364f4cdf43f8d12dd1310b57de9cc7cc8",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/HINDALCO_01-01-2024_31-03-2024.raw",
+    "size_bytes": 38365,
+    "sha256": "cc5a54fe188c3e49ce52aacab1f495a203049bb3c0f97696f94f050d49361aa8",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HINDALCO_01-01-2025_31-03-2025.raw",
+    "size_bytes": 21873,
+    "sha256": "b6a0ad086833677935aec8bbeae1992786d06eb6d79ce1a444994ecc564b99cc",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HINDALCO_01-04-2024_30-06-2024.raw",
+    "size_bytes": 33860,
+    "sha256": "7581b223d39c1857bcecf91b54c66c1335c2c4c499cc9c877c9481296d36b0df",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HINDALCO_01-04-2025_30-06-2025.raw",
+    "size_bytes": 20861,
+    "sha256": "a1f1e282e9792d72cec6f75f6dfe0128861ce95ac74bded0f94906fc7592145e",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HINDALCO_01-07-2024_30-09-2024.raw",
+    "size_bytes": 47934,
+    "sha256": "a94009b640667823bd124d178fe8288b781752c56d37014bfa718d69f6ebb73b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HINDALCO_01-07-2025_30-09-2025.raw",
+    "size_bytes": 24869,
+    "sha256": "ae7ed15244205cc32e94f110cba8de206d556eca77af4a5a3b294a2d4b030714",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HINDALCO_01-10-2024_31-12-2024.raw",
+    "size_bytes": 35259,
+    "sha256": "a8d46395d31f33f5acf5cde51779c6c574855125fd86b28abe77176a52d6baaa",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HINDALCO_01-10-2025_31-12-2025.raw",
+    "size_bytes": 25763,
+    "sha256": "8e9b49af01d634e3da09d0db6b5d7e53eadef646f085a086b3dbd7f6e1e8b379",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HINDUNILVR.json",
+    "size_bytes": 239536,
+    "sha256": "ef97ba7d862e82f0b2737b1c180ae20890888994a668f434e54c895331a03ede",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/HINDUNILVR_01-01-2024_31-03-2024.raw",
+    "size_bytes": 34434,
+    "sha256": "2c890ca3e6c1bab20bac9194b298af1b13fbaf262d5c4e9f667414baf425a3a5",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HINDUNILVR_01-01-2025_31-03-2025.raw",
+    "size_bytes": 17015,
+    "sha256": "b8a17d2161f047fca6f523375a7f08b6f7a735235ce5b16a35dc4efd4b67af1a",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HINDUNILVR_01-04-2024_30-06-2024.raw",
+    "size_bytes": 37812,
+    "sha256": "ed888873298a3c71a9c5e3fa957e0d6d598b0137e8421ed320ba783dc7a057bb",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HINDUNILVR_01-04-2025_30-06-2025.raw",
+    "size_bytes": 20373,
+    "sha256": "75af57b20e8f5f0e0ab65e05b13a9e287a47d7889380e0cba60bee687a789d7c",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HINDUNILVR_01-07-2024_30-09-2024.raw",
+    "size_bytes": 30621,
+    "sha256": "1db1bb3997f439a2aae638b7f929b1429f7237f8991c1c32c493ae5f9c05bb25",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HINDUNILVR_01-07-2025_30-09-2025.raw",
+    "size_bytes": 25315,
+    "sha256": "0c1886b5f16b38852eb57b9c854bd3412f0d928d17e71c3006ee2cb48f45044c",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HINDUNILVR_01-10-2024_31-12-2024.raw",
+    "size_bytes": 35878,
+    "sha256": "507632e55676bc9b8c48655f7f44900164ef755be4f5b8144ad9e997dfeab567",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/HINDUNILVR_01-10-2025_31-12-2025.raw",
+    "size_bytes": 24816,
+    "sha256": "4d35785a709fdf99fbfb01c6c5740c669a0165eebc87fb3233e72ec234404b2d",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ICICIBANK.json",
+    "size_bytes": 567050,
+    "sha256": "2d7ce30cdb90ff5ccdfb6a7e1be04002a10349f4a919afeabf8dae7ad80e0349",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/ICICIBANK_01-01-2024_31-03-2024.raw",
+    "size_bytes": 100735,
+    "sha256": "32e50731bf5f608da142d1086efd3459b557743c15cf79d226a5c032f1016a76",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ICICIBANK_01-01-2025_31-03-2025.raw",
+    "size_bytes": 45405,
+    "sha256": "5c788c089e0fe603f7e12a00242a8de82077b3d07a2cef5ee768ddf17a16cdd5",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ICICIBANK_01-04-2024_30-06-2024.raw",
+    "size_bytes": 93952,
+    "sha256": "cdf3139f3c6c9051f34b443deceb4bb44e1db42ab35977d364a2104a655f4d10",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ICICIBANK_01-04-2025_30-06-2025.raw",
+    "size_bytes": 39242,
+    "sha256": "9ba6292ecc57da500045cfdf45d985cd0897e5bca5535be13ab37e87c3c7bd09",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ICICIBANK_01-07-2024_30-09-2024.raw",
+    "size_bytes": 92471,
+    "sha256": "9d0efb18118f0419bd9415dbdcd849a4bddbfdf526aee4156e0cc523732e140a",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ICICIBANK_01-07-2025_30-09-2025.raw",
+    "size_bytes": 37710,
+    "sha256": "733eb2fc3dcb284ff6bc6b2844d471f25435e28d121bb1f8f42bae3a33f42f4c",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ICICIBANK_01-10-2024_31-12-2024.raw",
+    "size_bytes": 87141,
+    "sha256": "73fd382d127ab30533c7d221cff2bd029ee9d535a0d6f0703dae786e9378efce",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ICICIBANK_01-10-2025_31-12-2025.raw",
+    "size_bytes": 38442,
+    "sha256": "9c797275c4c1264c1ee34114f288588512a4106c30c33b6afb92cd9102d68c26",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/INDUSINDBK.json",
+    "size_bytes": 334651,
+    "sha256": "b05929e205ab830820193ee92a37bcc4bb139072204a8e07670e2893f99aa8f4",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/INDUSINDBK_01-01-2024_31-03-2024.raw",
+    "size_bytes": 56923,
+    "sha256": "d61eaf46c57ca7a37574e138d1054c2d42f489e0dbc0a4049beeebede188d391",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/INDUSINDBK_01-01-2025_31-03-2025.raw",
+    "size_bytes": 29285,
+    "sha256": "7d31b75aed6c50bb132eb3707f0a694dee9313da5d8c61d7ab8cb8a68ca603a4",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/INDUSINDBK_01-04-2024_30-06-2024.raw",
+    "size_bytes": 50846,
+    "sha256": "81fa60bcaefa4ef900a8ba7b3fe7c48a78f3c4440ab7757b4cb7baa51e3dfffd",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/INDUSINDBK_01-04-2025_30-06-2025.raw",
+    "size_bytes": 32250,
+    "sha256": "a8d7040a948c69c0ec8fb878fdafbe445d017d293df25a084e3c58e7a2f0f757",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/INDUSINDBK_01-07-2024_30-09-2024.raw",
+    "size_bytes": 53488,
+    "sha256": "88bd6b84c2a8776c3470131299f7bee5108027e4631df3f9e04ca6b1f1c9ef67",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/INDUSINDBK_01-07-2025_30-09-2025.raw",
+    "size_bytes": 36859,
+    "sha256": "7f62cca2c382e2c2944343087703f6bcc1a46c7e61c395733c3dd8b6e33eea16",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/INDUSINDBK_01-10-2024_31-12-2024.raw",
+    "size_bytes": 32885,
+    "sha256": "24c83a3a68633bf04e46ed19e6449f212ccf572fd0e2c75a5e73dbafd639c3b4",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/INDUSINDBK_01-10-2025_31-12-2025.raw",
+    "size_bytes": 23323,
+    "sha256": "3c2aae6a2bfaf77322379c573feabd63199e859b80815696125ef272d3d2241b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/INFY.json",
+    "size_bytes": 371463,
+    "sha256": "7ed82091ea86655a58f077a3a0bb00720372f1a049aee0fd0451f6fb90d4c79d",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/INFY_01-01-2024_31-03-2024.raw",
+    "size_bytes": 44088,
+    "sha256": "421586299a07565cf92fd5bc619862722450bc461b1a6065243eda619411b532",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/INFY_01-01-2025_31-03-2025.raw",
+    "size_bytes": 33743,
+    "sha256": "eea9efe69cd9cca5c48ba36eba95b261836199fb30c7b2a8406cc6e3f6dbae27",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/INFY_01-04-2024_30-06-2024.raw",
+    "size_bytes": 61487,
+    "sha256": "7f1b3c1c246fafc0c08ac16a9ea201de01adde0d47f65a2a0a92402279e3e3f6",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/INFY_01-04-2025_30-06-2025.raw",
+    "size_bytes": 64777,
+    "sha256": "4f9de9b065e30d573ec3a0cefd432e54a64cb85832ef12e6f0c57fe054ba1887",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/INFY_01-07-2024_30-09-2024.raw",
+    "size_bytes": 39660,
+    "sha256": "40cd4b52317dbe60bdd7c06a3ee29ead4ecebb66a9f5fe50353b64df9bf5a762",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/INFY_01-07-2025_30-09-2025.raw",
+    "size_bytes": 34110,
+    "sha256": "d18ec261595649ac632983cc51c67d5a5ed76aa9507ddb0427c3ebc29c2a872b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/INFY_01-10-2024_31-12-2024.raw",
+    "size_bytes": 37686,
+    "sha256": "43fcceb1ea22b59af70438f1e7048d46ba41243e76dcae321d2616d266fac15d",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/INFY_01-10-2025_31-12-2025.raw",
+    "size_bytes": 34760,
+    "sha256": "a7feb38542152f0bf1ac6ec991f46e52431a886a2b9c8df2daa9c30596e1cd86",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ITC.json",
+    "size_bytes": 190040,
+    "sha256": "b2abadea27ea234e7de189e322ca96810b29b5b3d96f4fcd9d96b4f47be36cbb",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/ITC_01-01-2024_31-03-2024.raw",
+    "size_bytes": 30303,
+    "sha256": "8c9b4b832774f8a65020c587d278526c1dc5a1888009f96ec937e08cbbe2b8a4",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ITC_01-01-2025_31-03-2025.raw",
+    "size_bytes": 16135,
+    "sha256": "c309420d4c70906a94922cf3c5a485b9e760eb4ec81fa40a363441236342b07d",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ITC_01-04-2024_30-06-2024.raw",
+    "size_bytes": 25362,
+    "sha256": "3b7bb93ebaa991c5fef05db57b475137750b168c007810a5881e6f9d531f02b4",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ITC_01-04-2025_30-06-2025.raw",
+    "size_bytes": 17566,
+    "sha256": "3a0bbf5e3b6e5c7df603ad2516dbd04bcc8d45f10b294744ad091a860203a3d9",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ITC_01-07-2024_30-09-2024.raw",
+    "size_bytes": 33210,
+    "sha256": "f323f79787d537e1f9961bb8bd672f9c911d75d059e8d03bf47ce4ddc0cbb236",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ITC_01-07-2025_30-09-2025.raw",
+    "size_bytes": 13718,
+    "sha256": "3eaf041bbbd3f8a70de42fb5fd361ae4bd80fa37642104f56b8143e797e1f412",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ITC_01-10-2024_31-12-2024.raw",
+    "size_bytes": 28205,
+    "sha256": "4268c6f6188a0b8433d5952a271c6aa4f56d1957478d9b95554f7f79ef9ff935",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ITC_01-10-2025_31-12-2025.raw",
+    "size_bytes": 14029,
+    "sha256": "cccfad0651b4556a54685d035a0a1f30f6f87cfcb62760aad6c8f28ebd8dc655",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/JSWSTEEL.json",
+    "size_bytes": 207640,
+    "sha256": "f10f1b8b4be9a746665908105d05515b5dff143aabf8e559f1cea8daf7163a5e",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/JSWSTEEL_01-01-2024_31-03-2024.raw",
+    "size_bytes": 21284,
+    "sha256": "6c1de7766ffbdb27066611df673db890dab1cbddfd0c4dc11e606f4097fd48a6",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/JSWSTEEL_01-01-2025_31-03-2025.raw",
+    "size_bytes": 25651,
+    "sha256": "f6a9976100822384c1b9a902a317c0d10e051e8e1565a1f4140547021f4e09bc",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/JSWSTEEL_01-04-2024_30-06-2024.raw",
+    "size_bytes": 22019,
+    "sha256": "824c08ef8116d03a3335de3545744c4a3aaa2a86ccb0c58ec1221ce85b71da48",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/JSWSTEEL_01-04-2025_30-06-2025.raw",
+    "size_bytes": 22870,
+    "sha256": "dc626f80912f0be488695110e57a7fe4932154c6bcb3b8dd1492f39549096348",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/JSWSTEEL_01-07-2024_30-09-2024.raw",
+    "size_bytes": 25098,
+    "sha256": "15d0666aaa39d61142ace19b24494e55f16e84eb3455ca9e9ba2bf9a5033f4bd",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/JSWSTEEL_01-07-2025_30-09-2025.raw",
+    "size_bytes": 27299,
+    "sha256": "e222107a98e5408668b096569e06710f0a41924c05977de10807ccc4bedda4cb",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/JSWSTEEL_01-10-2024_31-12-2024.raw",
+    "size_bytes": 29709,
+    "sha256": "0d8e2169e534924b1f604f45c55169861380fbb9dedfb47a8d6b373eea1d27bc",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/JSWSTEEL_01-10-2025_31-12-2025.raw",
+    "size_bytes": 22238,
+    "sha256": "85baf0fa1e3694fc9790326969f0736e02e8674441490f784052d60d9ff3e63e",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/KOTAKBANK.json",
+    "size_bytes": 255523,
+    "sha256": "ed20e6e91d836b0ed6fdb6802752b75b426ab0f02fe50533cf4dbf453e92ee07",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/KOTAKBANK_01-01-2024_31-03-2024.raw",
+    "size_bytes": 44330,
+    "sha256": "1bfccd09d5484ee6f046e92d94e2736ed8d66602fc05a44f006c974c81d7bb34",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/KOTAKBANK_01-01-2025_31-03-2025.raw",
+    "size_bytes": 27078,
+    "sha256": "8ff392127c888d88e2d8cbf7fbc39f23b8f27abcc65c5dfac1af5280023cf184",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/KOTAKBANK_01-04-2024_30-06-2024.raw",
+    "size_bytes": 33506,
+    "sha256": "82ee2881a1612724088ae50d76a14f8d3fe92c486dda60531511a147c551b6fe",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/KOTAKBANK_01-04-2025_30-06-2025.raw",
+    "size_bytes": 23767,
+    "sha256": "f77e68ae0db838b2bcf2c41bf5977affd948bd234b2d1d07c7824be2a77e80f7",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/KOTAKBANK_01-07-2024_30-09-2024.raw",
+    "size_bytes": 32578,
+    "sha256": "917fd95126be1fe3896a1893c057821a756425ef5a72926146aa85e8888d3c5b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/KOTAKBANK_01-07-2025_30-09-2025.raw",
+    "size_bytes": 29478,
+    "sha256": "abfcf2853f43cce2140ab0d6e1243ab61d5b800290d7940b104ba4fdcd55590a",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/KOTAKBANK_01-10-2024_31-12-2024.raw",
+    "size_bytes": 19795,
+    "sha256": "bbbe19102007948af1147bfb9be1ebe22db4ae401195901033654c164b1c1db1",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/KOTAKBANK_01-10-2025_31-12-2025.raw",
+    "size_bytes": 31399,
+    "sha256": "4b04ca68763abd763b12aca2558c7734c7ed48e99bed49697fca8251a9778341",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/LT.json",
+    "size_bytes": 256966,
+    "sha256": "585ae688f46a586a976a23366f0b5b268548ef3a5d850be9735751e0d083cd1e",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/LT_01-01-2024_31-03-2024.raw",
+    "size_bytes": 41215,
+    "sha256": "c5111be05cbad83475ecca09d2f3b65157417e02a526e83ef770c0850cf4d217",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/LT_01-01-2025_31-03-2025.raw",
+    "size_bytes": 27130,
+    "sha256": "130acfc3cc9675e7f0f5f0accb8a77f41fbc00c4dcfc4c33cf37b1abeb768284",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/LT_01-04-2024_30-06-2024.raw",
+    "size_bytes": 38620,
+    "sha256": "1f17974c436eabc0f7c5218b49d855e8544ebb7ea703ab643e5de1553bfb2703",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/LT_01-04-2025_30-06-2025.raw",
+    "size_bytes": 27901,
+    "sha256": "530aff61ce5241aac0c48e2c9fe0c35f506307f04f3733a9d0e7b061e16ebd3d",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/LT_01-07-2024_30-09-2024.raw",
+    "size_bytes": 34164,
+    "sha256": "7fd3d7f71d71f63bf84dea299f1c12a8712767494adb1235196d693932fa1124",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/LT_01-07-2025_30-09-2025.raw",
+    "size_bytes": 24930,
+    "sha256": "c62ed113dd83b9e360d04be26ab1768a3e1ac810c1eb8310ff36a71d257210ab",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/LT_01-10-2024_31-12-2024.raw",
+    "size_bytes": 23997,
+    "sha256": "9987896553fef71a82d0a7552a4a89094e419accb32a6adc3dae896891aad81c",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/LT_01-10-2025_31-12-2025.raw",
+    "size_bytes": 24537,
+    "sha256": "91ab8de3acaa6cc2b935451db8ca0aac8154b2ff9a2a75cb56750c0701756838",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/M&M.json",
+    "size_bytes": 480404,
+    "sha256": "d18ad359dd0abfa32627c9a71b6b2d2cdcfa8ed1279deeedb70f00d7e2c46425",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/M&M_01-01-2024_31-03-2024.raw",
+    "size_bytes": 60552,
+    "sha256": "e3492617d2a6a011cf6d79afbee3af4b7ac3bfb444ddfb46647932576ecef7a0",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/M&M_01-01-2025_31-03-2025.raw",
+    "size_bytes": 37006,
+    "sha256": "b915cf299d0d421165a8fd6991d9a23aa765fd5e9d7842c93dc0f619b6f8b205",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/M&M_01-04-2024_30-06-2024.raw",
+    "size_bytes": 72200,
+    "sha256": "1976fa2c639a652898d693b813cf249ea55fee700143d3351ec3c624d31248a8",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/M&M_01-04-2025_30-06-2025.raw",
+    "size_bytes": 57662,
+    "sha256": "6401481fc0cc928425f47c8bec5fce3ca60d8718c1c0c831d44ea3f568c7c2a2",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/M&M_01-07-2024_30-09-2024.raw",
+    "size_bytes": 70181,
+    "sha256": "0058e81af73e9405ffec6e3bd2392d823b03c693d3ab24de48a08cdd26d765e6",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/M&M_01-07-2025_30-09-2025.raw",
+    "size_bytes": 55677,
+    "sha256": "bc613a0520188f56d5f2fa6b474a9b81ff9cb59001683688fa87a909066d8fa9",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/M&M_01-10-2024_31-12-2024.raw",
+    "size_bytes": 51664,
+    "sha256": "eeae3a510b290405b1816315778570a7ad6966624117d4a7da9dd5e505b2dcd3",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/M&M_01-10-2025_31-12-2025.raw",
+    "size_bytes": 49510,
+    "sha256": "7e2d5251b41328d0e00f8f4e7242df64526b1a39dff5e0859fbac686df011ba8",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/MARUTI.json",
+    "size_bytes": 251110,
+    "sha256": "034e49a47d6d33e134737d458a4afbb0da5ddd9c68422b6c33c4f52ddea52160",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/MARUTI_01-01-2024_31-03-2024.raw",
+    "size_bytes": 38191,
+    "sha256": "13f44557a746d3ddfc08c964d37b72018f3cf23cbdc2792f8657ab55ea9efce8",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/MARUTI_01-01-2025_31-03-2025.raw",
+    "size_bytes": 28421,
+    "sha256": "61b586085b0b574a8b4f229d4a809d781ba85f4f4ccce2003ad7ae85a2e5ec00",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/MARUTI_01-04-2024_30-06-2024.raw",
+    "size_bytes": 23988,
+    "sha256": "154e25ea72b7609908f3ce7903f39ffbe2b572d9c2766db402b88851e33f94ad",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/MARUTI_01-04-2025_30-06-2025.raw",
+    "size_bytes": 29946,
+    "sha256": "dfe526fc7802ccef5c1d8fff5f27604684c392f0a9e967dbdf38897d9584a902",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/MARUTI_01-07-2024_30-09-2024.raw",
+    "size_bytes": 31360,
+    "sha256": "f0c526253e944dfae3ab86105b833040c33f802994b085cd6bcf0053b9d5f97c",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/MARUTI_01-07-2025_30-09-2025.raw",
+    "size_bytes": 36690,
+    "sha256": "deb5a4d49fa5608438ae2a0f8b765da885626c5d0500d5faf579d602a1ed583a",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/MARUTI_01-10-2024_31-12-2024.raw",
+    "size_bytes": 22418,
+    "sha256": "6c42a478c98afbf31f9a91871207de384b368a033d83eec9053b52b3b7c96fed",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/MARUTI_01-10-2025_31-12-2025.raw",
+    "size_bytes": 26664,
+    "sha256": "d5d7a71e704ec89d9580906ba994556dacc115584e7fa78febfd6ea320126dbb",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/NESTLEIND.json",
+    "size_bytes": 195143,
+    "sha256": "012e65533a0741bfb6cf638f6be483c9c2f5e7ff0780c466f5cada3c43c73295",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/NESTLEIND_01-01-2024_31-03-2024.raw",
+    "size_bytes": 19853,
+    "sha256": "6a244e040549fb711e31db09b3e0863dae7a4ea61d25610c5a2439c8d0ba1d0a",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/NESTLEIND_01-01-2025_31-03-2025.raw",
+    "size_bytes": 17238,
+    "sha256": "c7fcf4616aef28b381adcdf22d20513dc9f2435deac28298bae6dc3f0c61639b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/NESTLEIND_01-04-2024_30-06-2024.raw",
+    "size_bytes": 41869,
+    "sha256": "715b51723a741875d6a8fd4f58b2ac3cf3d3042a7ea69ff1ac0106adffd55892",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/NESTLEIND_01-04-2025_30-06-2025.raw",
+    "size_bytes": 23555,
+    "sha256": "ed9488fdc70bd861b38987a346cbea7895ac3ad36796d030cf4a0d62bbc5f144",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/NESTLEIND_01-07-2024_30-09-2024.raw",
+    "size_bytes": 14736,
+    "sha256": "69b0d78a8bc545dbae3c2d8efea548125c2988811e80c0915e77a307fed1f887",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/NESTLEIND_01-07-2025_30-09-2025.raw",
+    "size_bytes": 29730,
+    "sha256": "d80f238bc261e0c489489342b4309da8dcaf0d5322fa69c321ca1ee30c6d5d79",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/NESTLEIND_01-10-2024_31-12-2024.raw",
+    "size_bytes": 15232,
+    "sha256": "a53a41de3f2d27ae711b135ad7086d2d1bc17c967ee1dd4438d9d5af7ba87175",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/NESTLEIND_01-10-2025_31-12-2025.raw",
+    "size_bytes": 22778,
+    "sha256": "4c81c44c1845cf2d22816ebf4eeda5050641daaacf9239a060e8734c3e720c7c",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/NTPC.json",
+    "size_bytes": 238054,
+    "sha256": "25eb5ef66d315f74085620ad7188a5df191285201115c252e7d2caf782133baa",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/NTPC_01-01-2024_31-03-2024.raw",
+    "size_bytes": 25329,
+    "sha256": "d8b05c5299a11fbf1d799429726ac3c0a5fa1560c541ae477709b9598630dd38",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/NTPC_01-01-2025_31-03-2025.raw",
+    "size_bytes": 28296,
+    "sha256": "36a5f510cef9aa8f7525a010312613e0e0347323f2390ece3afc6befbf10b14a",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/NTPC_01-04-2024_30-06-2024.raw",
+    "size_bytes": 26585,
+    "sha256": "123771af6bca3b6d03391b733677e762304954696f0acb88a2f5336d3d68709c",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/NTPC_01-04-2025_30-06-2025.raw",
+    "size_bytes": 31114,
+    "sha256": "3952135288cba49495b55cd32760f364e36cbf4d019fd8f1549d019e1fc3f0b7",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/NTPC_01-07-2024_30-09-2024.raw",
+    "size_bytes": 26563,
+    "sha256": "95bdb1d8902f13b34a9083f4eecd44fa77be73176aa57ed2154710eb6e2aadb2",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/NTPC_01-07-2025_30-09-2025.raw",
+    "size_bytes": 37706,
+    "sha256": "d9165160cf0184b0624b6187648a35e9a5143bf7e7d38c0d68c9c92b757d01d7",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/NTPC_01-10-2024_31-12-2024.raw",
+    "size_bytes": 21226,
+    "sha256": "5f132ce10ee3ea8a88a306152ccea30684db03f14eb21d52c1ced9bfa46d77d7",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/NTPC_01-10-2025_31-12-2025.raw",
+    "size_bytes": 27883,
+    "sha256": "3e5d0dd07066da8b4202d26bacbc44a6daeb1989c69a92bff845a6e275f366de",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ONGC.json",
+    "size_bytes": 197908,
+    "sha256": "4be513f6d77ecdbef460e82555a80cc163ac00ee97f1abb3656f4a0aa748dcc3",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/ONGC_01-01-2024_31-03-2024.raw",
+    "size_bytes": 30193,
+    "sha256": "b013e80a941fabef3cd7ac4ab1a4bad99e6cb06e4e386bd034cc6b38259c03d0",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ONGC_01-01-2025_31-03-2025.raw",
+    "size_bytes": 32979,
+    "sha256": "022ef921c4c43b8a04da0fd61e9b185139ba8ef96ae304baedac2cb346e83446",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ONGC_01-04-2024_30-06-2024.raw",
+    "size_bytes": 15286,
+    "sha256": "73a41d96da85a039bbe0d0fa426782c23a9469b73a2f4be7caf853a8fae3a37f",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ONGC_01-04-2025_30-06-2025.raw",
+    "size_bytes": 16892,
+    "sha256": "4873d4764cad16f7a545129c9617f033a023d0c2ea714a7538a47af49c53cc42",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ONGC_01-07-2024_30-09-2024.raw",
+    "size_bytes": 31256,
+    "sha256": "c9133ef86d24f2292051eaa516100a22881331d6da3be60c2d85c1338ac80459",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ONGC_01-07-2025_30-09-2025.raw",
+    "size_bytes": 25241,
+    "sha256": "e535ea323c3ca950d11ed962b872367c43a39d6c2a2b7a0a97ec35c4c71a7665",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ONGC_01-10-2024_31-12-2024.raw",
+    "size_bytes": 15149,
+    "sha256": "d28276bff358c1c04687e63cf554eedc6f69ae6d626e98ebb534ecb205ed812f",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ONGC_01-10-2025_31-12-2025.raw",
+    "size_bytes": 20360,
+    "sha256": "6fb3e578aad0c3691e0f4191892f0cf2255dcb31ae4c5b6621bda0cee2ff4717",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/POWERGRID.json",
+    "size_bytes": 219458,
+    "sha256": "57ca89a944772c3d9909c9858a3bc2bba796a840a30276ef48d29a2f60c974c6",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/POWERGRID_01-01-2024_31-03-2024.raw",
+    "size_bytes": 23280,
+    "sha256": "0dcd3c30cc248f3e3669da12788c2e59c1a28b7298dbf8d02e023a89bd24a67b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/POWERGRID_01-01-2025_31-03-2025.raw",
+    "size_bytes": 28104,
+    "sha256": "9550ac5bc22347fdadb82c12a2d798c8089863dfc4da92f8b429398c720b6455",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/POWERGRID_01-04-2024_30-06-2024.raw",
+    "size_bytes": 24632,
+    "sha256": "80b77ec2e1f7fe3bdf02f327ab40bd57e0a258b45c2a6c38d1b49fdba3a82e5e",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/POWERGRID_01-04-2025_30-06-2025.raw",
+    "size_bytes": 24098,
+    "sha256": "8eced181d3840e020862e1beb2dcfee19c6142b6c58e72cfa467eed4feb04471",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/POWERGRID_01-07-2024_30-09-2024.raw",
+    "size_bytes": 29408,
+    "sha256": "5ec0703b3a5f6c4eb8846fc6395ef89c749cbf625e747db669ba6b8350d610b4",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/POWERGRID_01-07-2025_30-09-2025.raw",
+    "size_bytes": 26413,
+    "sha256": "ea59e04063d8c0dc09b89fcff0ed0e8ba97340958dd097d393576f84cde9171c",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/POWERGRID_01-10-2024_31-12-2024.raw",
+    "size_bytes": 32213,
+    "sha256": "79433fe291ea786a0d24653f1318d932e4ea045ead4522e613526147e97d76e3",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/POWERGRID_01-10-2025_31-12-2025.raw",
+    "size_bytes": 19558,
+    "sha256": "e99b67013d44379b94bb460aa6d0f43738a5012495232716caaa05a4e3a46071",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/RELIANCE.json",
+    "size_bytes": 517056,
+    "sha256": "7a6f92157decbecd874100b8711f7668dd4ab22588293149980139dcbcdabd46",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/RELIANCE_01-01-2024_31-03-2024.raw",
+    "size_bytes": 89603,
+    "sha256": "760be7b6f41b9332daa4d6dc02ebb05a88822c780c9ba99dcc42fa9cc961c0ce",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/RELIANCE_01-01-2025_31-03-2025.raw",
+    "size_bytes": 26155,
+    "sha256": "b13b118cb49effb51e0b4727768668f6c8069c84f827e502443997a06a5b3fd0",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/RELIANCE_01-04-2024_30-06-2024.raw",
+    "size_bytes": 92178,
+    "sha256": "415826b088d8a7b850443f4296186c507dca17989a0af6e2f6bcb48cbd795d8b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/RELIANCE_01-04-2025_30-06-2025.raw",
+    "size_bytes": 34818,
+    "sha256": "58f3979e236bf979868c00454b07aa5847c69b629aeea51d5c77691232941144",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/RELIANCE_01-07-2024_30-09-2024.raw",
+    "size_bytes": 105585,
+    "sha256": "803cd83f6b1c53d0fc96431670f056ab678b6a05512edaa18a26b8e22dd6e595",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/RELIANCE_01-07-2025_30-09-2025.raw",
+    "size_bytes": 35432,
+    "sha256": "dd740480bd4978dac0e858e606e1c058453059e000fea098eba8f9e2231f72a0",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/RELIANCE_01-10-2024_31-12-2024.raw",
+    "size_bytes": 84083,
+    "sha256": "40d91d4c20a3f601bdc208abb40761bb02e27ae8729ea203831c9038891ead80",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/RELIANCE_01-10-2025_31-12-2025.raw",
+    "size_bytes": 26770,
+    "sha256": "b3c9604a5a73226d5dff7ccea7190d115931416af1ad922ef8fba2836fe7b6ce",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SBILIFE.json",
+    "size_bytes": 159950,
+    "sha256": "323b0bf80065f04a60a38c6f5365103deb37476731864326318c7ecf1d45116c",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/SBILIFE_01-01-2024_31-03-2024.raw",
+    "size_bytes": 20123,
+    "sha256": "f1b560d20c5b4a93cbc1799c5e797f99627f0ef0ba16323dabcc82da00426076",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SBILIFE_01-01-2025_31-03-2025.raw",
+    "size_bytes": 27210,
+    "sha256": "4139f98b14265cbb1a6f8b96acd38484dad85c8c99fefb278d17ac9f5392d931",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SBILIFE_01-04-2024_30-06-2024.raw",
+    "size_bytes": 16510,
+    "sha256": "4ba78478185d03fefb12ad3ab64c70a25fba3241c573f7a232864354036a90b1",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SBILIFE_01-04-2025_30-06-2025.raw",
+    "size_bytes": 9029,
+    "sha256": "a622259c34d5d06ca73b09b505f201a73cbc1f1a2ab0aa6e320ed2dab2d86156",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SBILIFE_01-07-2024_30-09-2024.raw",
+    "size_bytes": 33009,
+    "sha256": "4dd360cbaec4144357376a297bac547b8a6aa125534061bb19bfe27ae618c504",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SBILIFE_01-07-2025_30-09-2025.raw",
+    "size_bytes": 16398,
+    "sha256": "5b5691b58f396e162b761eec63ad0a8f5cec99f47e83feb9ed3ea66b9a63266a",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SBILIFE_01-10-2024_31-12-2024.raw",
+    "size_bytes": 15734,
+    "sha256": "0046fc214120c439772bd58cdffc041b20c7c9bf392df750bb88952b791b2588",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SBILIFE_01-10-2025_31-12-2025.raw",
+    "size_bytes": 13105,
+    "sha256": "92d4d55922e84f886631a3e5892ab3ee21d1e89397f205c91729b32ae6a8458b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SBIN.json",
+    "size_bytes": 327789,
+    "sha256": "086ea1da34b450df172e181cc684f98f2676bf344dafd02586a912ef3474a7a6",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/SBIN_01-01-2024_31-03-2024.raw",
+    "size_bytes": 48623,
+    "sha256": "12335ecf820a8437e330ee010bcefebf0caee3739d47cd1d49a62aa666cc65c4",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SBIN_01-01-2025_31-03-2025.raw",
+    "size_bytes": 29706,
+    "sha256": "47d80b4bcabcabbcbac782ec2db9d82172f08fa46da31ced0670923a207d2aed",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SBIN_01-04-2024_30-06-2024.raw",
+    "size_bytes": 46380,
+    "sha256": "0b429ef22f0e496c3b5d831e15b731c8171850bc1e9b3db3180a880415d205be",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SBIN_01-04-2025_30-06-2025.raw",
+    "size_bytes": 44182,
+    "sha256": "a93bc89b8e61fac25ca0093248d3f05f24c6a63d4822e0c3e2f3a67432accbb3",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SBIN_01-07-2024_30-09-2024.raw",
+    "size_bytes": 44899,
+    "sha256": "3b0ade80e138426054e9614cc3773942308a4aa0d2a802f7277dbd52e754b65c",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SBIN_01-07-2025_30-09-2025.raw",
+    "size_bytes": 31613,
+    "sha256": "6b27792b7da05bbcd4b37fd9153ef910a7df22add1f8136c65af17f1a3bf22e9",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SBIN_01-10-2024_31-12-2024.raw",
+    "size_bytes": 34224,
+    "sha256": "c915dd08e564651657c75765fa9ea8f1a3ad21321d75ec6af6b84a1b5b1dc667",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SBIN_01-10-2025_31-12-2025.raw",
+    "size_bytes": 29050,
+    "sha256": "ef7a7318e221c1a12ce4d2f284d54dd203ccf1c01400e9d9c78a82d593b12b58",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SHRIRAMFIN.json",
+    "size_bytes": 630673,
+    "sha256": "b301f756093d7e3d1532beeedf2ded0bc0f7182c4132724f6272cb15c077a68f",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/SHRIRAMFIN_01-01-2024_31-03-2024.raw",
+    "size_bytes": 100882,
+    "sha256": "42fe719a9af423744c12b09a5efffd9d7f6fa1f4acb6d225728f1038a33274ab",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SHRIRAMFIN_01-01-2025_31-03-2025.raw",
+    "size_bytes": 60000,
+    "sha256": "e138286bcc870fb3e1a7a827b559dde3f1a08bbe9ff80d08507b2a816929abbd",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SHRIRAMFIN_01-04-2024_30-06-2024.raw",
+    "size_bytes": 100765,
+    "sha256": "185145a0bc40cd55f665806a6cde9876e3a1a775528a2ec868dd3659f4a4a252",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SHRIRAMFIN_01-04-2025_30-06-2025.raw",
+    "size_bytes": 65601,
+    "sha256": "f091016d9c1ad05c492e99111d66bd3331f414805c354f1905e606e12245fc79",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SHRIRAMFIN_01-07-2024_30-09-2024.raw",
+    "size_bytes": 83238,
+    "sha256": "47f353f2e6c6eddf860a06b67b3c1b0ce5f46634aecdae49bdee6e28ad2162ec",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SHRIRAMFIN_01-07-2025_30-09-2025.raw",
+    "size_bytes": 61298,
+    "sha256": "6ec9e99c541cb60e2b97d8d3f2fbe6a542b7f0ecc7413e03461d9f5a6fbadc97",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SHRIRAMFIN_01-10-2024_31-12-2024.raw",
+    "size_bytes": 62097,
+    "sha256": "4be15d70e1d8bed8d1efc722efa554df78bd4c5f6de52d923d187d97d1181b14",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SHRIRAMFIN_01-10-2025_31-12-2025.raw",
+    "size_bytes": 61240,
+    "sha256": "63ffc0433d6a7f80b5c202a184d90b925ce1c611483f23019ff90251ee6c4d7f",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SUNPHARMA.json",
+    "size_bytes": 218758,
+    "sha256": "d17e0ed951ea47230f0ba4022963dba2ad2d59c1be727e1a9df7b2ef0ea21ac2",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/SUNPHARMA_01-01-2024_31-03-2024.raw",
+    "size_bytes": 30453,
+    "sha256": "f7c17cce1b47a57b36c3435d92a19fed9b1b904e2dc88c0e6ccd7809cd2a605c",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SUNPHARMA_01-01-2025_31-03-2025.raw",
+    "size_bytes": 19149,
+    "sha256": "a27088ca55b03a6d6cca53f648287659c01f659a2cdcc24c588e0e74d02bbfe2",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SUNPHARMA_01-04-2024_30-06-2024.raw",
+    "size_bytes": 35557,
+    "sha256": "872ad69f848d96e0db457609fbfd53731f973726413cf25f59ec8a400f7a96aa",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SUNPHARMA_01-04-2025_30-06-2025.raw",
+    "size_bytes": 19038,
+    "sha256": "9d5318a8509adee7813ab4a7c70bb55f0177dbe98ef10ad3673f505b4e888987",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SUNPHARMA_01-07-2024_30-09-2024.raw",
+    "size_bytes": 40287,
+    "sha256": "f44d5ae2a6ca6cf4b31743e136c94afb0eb99978ebf49f1a14f8aff4b8c959ba",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SUNPHARMA_01-07-2025_30-09-2025.raw",
+    "size_bytes": 19555,
+    "sha256": "70f4994b58efee54ac3aef8f91125b3275e2c40ecbd8c75ac0891e4efda6626e",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SUNPHARMA_01-10-2024_31-12-2024.raw",
+    "size_bytes": 26582,
+    "sha256": "60db62051c9aab46931871827b052384deb721423f01789c6a35a157e189788a",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/SUNPHARMA_01-10-2025_31-12-2025.raw",
+    "size_bytes": 16625,
+    "sha256": "6885beca55ae80b8f6a1c5eaa4ec5c5c9bdf55ae2997123d063e58d61e39145b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TATACONSUM.json",
+    "size_bytes": 218623,
+    "sha256": "f3fac63c54bd54b3e3615747619afa226b59a57b9474c459c93c5aa684c0f80c",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/TATACONSUM_01-01-2024_31-03-2024.raw",
+    "size_bytes": 24111,
+    "sha256": "4abc2baf85219387b97bfa349d8ad7150b470d70d12343b9105a6cdef0b551c0",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TATACONSUM_01-01-2025_31-03-2025.raw",
+    "size_bytes": 18026,
+    "sha256": "09982ca77411ff586112ef44655b593042e471dc5a916bbaa5081e298008f973",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TATACONSUM_01-04-2024_30-06-2024.raw",
+    "size_bytes": 34737,
+    "sha256": "09126840971f5769cf44d164657d25849f7603bb2d4c0b1a9edf053ca6d67dd0",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TATACONSUM_01-04-2025_30-06-2025.raw",
+    "size_bytes": 26318,
+    "sha256": "39f80cdbda1665e3b8b0ffdb4f2c575e048ba9ad5ad41aa5490c169059ab6d32",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TATACONSUM_01-07-2024_30-09-2024.raw",
+    "size_bytes": 38714,
+    "sha256": "42d9dd672b18ab823958d5826b44eb961b539ec5aaf76791f75703c78c6aac8a",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TATACONSUM_01-07-2025_30-09-2025.raw",
+    "size_bytes": 15696,
+    "sha256": "e723305b3f67e1024bea19e1ec5767d5da32a342eec422b9e84ce1f5ff68e47e",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TATACONSUM_01-10-2024_31-12-2024.raw",
+    "size_bytes": 32384,
+    "sha256": "9399a2b667d45ea1b6815d3d82c1c36b52367602edee8e5d6f8ca3e08954038e",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TATACONSUM_01-10-2025_31-12-2025.raw",
+    "size_bytes": 16445,
+    "sha256": "9e1bdb39d42a6368baaec8eaad93bbd7bdd52f4c0c95db59d803f42eac674a84",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TATASTEEL.json",
+    "size_bytes": 403193,
+    "sha256": "96228821d1354ee74fffae5e940697c287a1dc6a7c495da298bda2c94e465ccc",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/TATASTEEL_01-01-2024_31-03-2024.raw",
+    "size_bytes": 73110,
+    "sha256": "eda965a183b970100519d15dc655ce38809c42a6c8103a5c51e35241268d636d",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TATASTEEL_01-01-2025_31-03-2025.raw",
+    "size_bytes": 19928,
+    "sha256": "bf7be8a481cc63972b72c2989637732f2e27aaa985eb9a975839daff1cd39759",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TATASTEEL_01-04-2024_30-06-2024.raw",
+    "size_bytes": 72174,
+    "sha256": "e495d2c8fa93df855ce6ec98b4148ced6b1748cfe7c0947b69468ae736ed1c58",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TATASTEEL_01-04-2025_30-06-2025.raw",
+    "size_bytes": 33083,
+    "sha256": "d70f21c3f2b1bb51e9eddf5d61869b34cf4bba38927d02ce2832775d18efc6b7",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TATASTEEL_01-07-2024_30-09-2024.raw",
+    "size_bytes": 76493,
+    "sha256": "3346f79b31e1202640e73370b8b7811321a97b55982230b08ab8dd421b26f9f3",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TATASTEEL_01-07-2025_30-09-2025.raw",
+    "size_bytes": 28137,
+    "sha256": "88cacfaa5587739ab1123794b4b189ef6497f8dd022cefe13b683f0cbea3e02c",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TATASTEEL_01-10-2024_31-12-2024.raw",
+    "size_bytes": 48279,
+    "sha256": "31f6cabf54a707ce700883bc5664f27c9620e4ae093bedb02d656fa9c40152e2",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TATASTEEL_01-10-2025_31-12-2025.raw",
+    "size_bytes": 28717,
+    "sha256": "51ff67dd3fa196f271a540ccba9ee242a9747ffb02be9a5778c8c1157beeb543",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TCS.json",
+    "size_bytes": 287602,
+    "sha256": "df12948eefeb4c2b320611016c8f28e18d63aa33e9f234a9c8d7b5dedd2324c6",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/TCS_01-01-2024_31-03-2024.raw",
+    "size_bytes": 29314,
+    "sha256": "2e2d192f37963be765593b18f2b9279c2e709fb71f48223f07f1fe7f23b7f3f1",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TCS_01-01-2025_31-03-2025.raw",
+    "size_bytes": 27981,
+    "sha256": "464a66471dce004ad00fbfb64528a733aca3cc1166d6f3c2bd5167099171377b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TCS_01-04-2024_30-06-2024.raw",
+    "size_bytes": 40082,
+    "sha256": "5e78c2a9cbb5b0d9ad0839c0bf2a5d695817029f80456a3fd8efd361c3c03dd3",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TCS_01-04-2025_30-06-2025.raw",
+    "size_bytes": 37305,
+    "sha256": "cb89f3c4a0c6001754d1c1ddfef3d8c36e30c9a1e88f2a5ff3b8f7206e85156a",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TCS_01-07-2024_30-09-2024.raw",
+    "size_bytes": 32263,
+    "sha256": "34d2d44f38cf3bc8eaf48218978c8c4292b82266afd1e5799eec2f364ef65340",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TCS_01-07-2025_30-09-2025.raw",
+    "size_bytes": 30672,
+    "sha256": "562c726973c1511ff1012bb517066381409621dc66b8ac0ff6bb3e2e41ecaff1",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TCS_01-10-2024_31-12-2024.raw",
+    "size_bytes": 33067,
+    "sha256": "85cb6b84b41966f3bf8b88d77e581f44f53f5b367a415ae2f2d3ceb982c083fd",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TCS_01-10-2025_31-12-2025.raw",
+    "size_bytes": 41446,
+    "sha256": "b21291fc721dba0692bd33d5890cedf9092c2b09ed344f062ef87d5eb6885338",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TECHM.json",
+    "size_bytes": 200839,
+    "sha256": "5ae84c89acdb928214a2e7e3e40fa80a7ec17852f640901de9f3ed4db8140fd1",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/TECHM_01-01-2024_31-03-2024.raw",
+    "size_bytes": 18030,
+    "sha256": "1945057b105a8ab4671a72956c4e5cbf75b8c1c56a7af60d5840882c527e7a74",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TECHM_01-01-2025_31-03-2025.raw",
+    "size_bytes": 14854,
+    "sha256": "20d934e03eb85b312ffd700c4ab5bae93deabf6fdaad418e5e09aaab1f0dcaf1",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TECHM_01-04-2024_30-06-2024.raw",
+    "size_bytes": 29622,
+    "sha256": "011b104521d4e69e5f1d9cbee780db9255515cf2440a29b9db3179eb134b4a0d",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TECHM_01-04-2025_30-06-2025.raw",
+    "size_bytes": 26687,
+    "sha256": "42afa74ec442d44dad2d875a25ed2ee93fc62719ca3452c87eb47ef8560c00b7",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TECHM_01-07-2024_30-09-2024.raw",
+    "size_bytes": 24686,
+    "sha256": "78b90b992f3892ccde548fd02423d15ca7e24420c0741df13a23a69d4b2b4d82",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TECHM_01-07-2025_30-09-2025.raw",
+    "size_bytes": 27586,
+    "sha256": "802e29cba7e9851c940ff5d89e9aa2f3e0c091184960a9d2a6368daf680e1ced",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TECHM_01-10-2024_31-12-2024.raw",
+    "size_bytes": 22999,
+    "sha256": "c68f5153e0b96674278296ef1c4bbf18168a694b24601a643517f74c793f36b8",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TECHM_01-10-2025_31-12-2025.raw",
+    "size_bytes": 25263,
+    "sha256": "953cd579fc8be4aa85cff07c67ece934745ee172e4a3cb82450f6d190931bd6b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TITAN.json",
+    "size_bytes": 214198,
+    "sha256": "c123463819220ffae3d054d24228e8e75923916aee3fad8b44e91ce33231d0bf",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/TITAN_01-01-2024_31-03-2024.raw",
+    "size_bytes": 29749,
+    "sha256": "dafcdf5ca6a492585b1edcbfae05ea50bd84b3818d218e45c9eebf3108e4d47b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TITAN_01-01-2025_31-03-2025.raw",
+    "size_bytes": 14005,
+    "sha256": "46b7ecc7b5acf4786c5d2264889eb2f39089db32651f5066148e859c7183ed7f",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TITAN_01-04-2024_30-06-2024.raw",
+    "size_bytes": 36519,
+    "sha256": "2f538e3485b1729dca54db2cc5888e19ff5481d73284e687ade1bff6cc245bda",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TITAN_01-04-2025_30-06-2025.raw",
+    "size_bytes": 22828,
+    "sha256": "fdc7adf4dc3dea6322b0826f07e18553782d1c291223ebeee7266e418c55f44d",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TITAN_01-07-2024_30-09-2024.raw",
+    "size_bytes": 32650,
+    "sha256": "794e090a4f1e9444daa109374e46ed50d5536b67cd6e1c7f6da2f1255e65e8ba",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TITAN_01-07-2025_30-09-2025.raw",
+    "size_bytes": 24950,
+    "sha256": "ddff24bbc083173901883434f7ad93e9c3e7baa1a8851dd772e41d22e154232d",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TITAN_01-10-2024_31-12-2024.raw",
+    "size_bytes": 23422,
+    "sha256": "5972925aa549f0f9ed7214a0cec1e6f9f0254e4845d8efa5c77df241900269a7",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TITAN_01-10-2025_31-12-2025.raw",
+    "size_bytes": 18043,
+    "sha256": "6d61ff2b23473d906b20363734cc9fe027cea75886b401d6ef261f295c4de5a4",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TRENT.json",
+    "size_bytes": 249222,
+    "sha256": "ad6ae153b8d8d5dad0848cce69c81916c41c5fb34c8bfe958d5ecd8eeda8c018",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/TRENT_01-01-2024_31-03-2024.raw",
+    "size_bytes": 15829,
+    "sha256": "6302cc25464a239860ea9821549b4520c6badbd68564f28d9e3dfec900bb247a",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TRENT_01-01-2025_31-03-2025.raw",
+    "size_bytes": 21780,
+    "sha256": "29b030e1a886c9de7dfd9e281cab661f8c9ca1c18eee4815d943c2970effdbc0",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TRENT_01-04-2024_30-06-2024.raw",
+    "size_bytes": 52110,
+    "sha256": "d0e83ad62d240214adf66ad8aec948d00ff8d79dfdea6c1baf24296a83f58611",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TRENT_01-04-2025_30-06-2025.raw",
+    "size_bytes": 21672,
+    "sha256": "899454213467840964b939f6230c70203873f4cf50896bcfe02d29ac75008af2",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TRENT_01-07-2024_30-09-2024.raw",
+    "size_bytes": 47451,
+    "sha256": "ec3640f00c07d7b2de67bdc3919e52c89a0ae0f5b5251592dfc5afe891c78503",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TRENT_01-07-2025_30-09-2025.raw",
+    "size_bytes": 20823,
+    "sha256": "76049fa62c617390a127c73daa340c27a6c81890dc028ebb71bc198e3b40fbf3",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TRENT_01-10-2024_31-12-2024.raw",
+    "size_bytes": 38767,
+    "sha256": "ea46ecb2cbedc397b6b225a9318bcc092ddcc8eac10cba9bb531017c4e7e77aa",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/TRENT_01-10-2025_31-12-2025.raw",
+    "size_bytes": 18998,
+    "sha256": "1aae433140f51a622ddd06aab98f079458f45f9ab7ac0775c88bd6018960251e",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ULTRACEMCO.json",
+    "size_bytes": 334673,
+    "sha256": "a224365579b863990c5045692320fd19e3bbcc7779f54e018ed3318f9b83370d",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/ULTRACEMCO_01-01-2024_31-03-2024.raw",
+    "size_bytes": 47763,
+    "sha256": "ab9bf80c05dc44fdd7e313256a46653c99e2c2bde505115d26adb86d610ce2f7",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ULTRACEMCO_01-01-2025_31-03-2025.raw",
+    "size_bytes": 41387,
+    "sha256": "7e78ce83999ce59bf4fffb4ea53017dd3493774bdfa1c19efdf99446fd98574b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ULTRACEMCO_01-04-2024_30-06-2024.raw",
+    "size_bytes": 51567,
+    "sha256": "e3c6c76d8e73efc204aa131e95e2bc2393857f7de318da887588ead8f72cc21b",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ULTRACEMCO_01-04-2025_30-06-2025.raw",
+    "size_bytes": 23904,
+    "sha256": "a40b4c75fe8fbb4f03bbbf7f105110da72cfdebe87036a747134c8215aa79729",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ULTRACEMCO_01-07-2024_30-09-2024.raw",
+    "size_bytes": 57077,
+    "sha256": "3d92ddc13fdd57f082a2e21f76a3f016037e639e58c5c82a165b500ed0120d17",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ULTRACEMCO_01-07-2025_30-09-2025.raw",
+    "size_bytes": 27462,
+    "sha256": "01a6fc8346534e6dfc42643c3223e44656623abc394bb071ba1075b423916fd9",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ULTRACEMCO_01-10-2024_31-12-2024.raw",
+    "size_bytes": 42561,
+    "sha256": "9af4c187b068e844e04e04d9d3dda7508978494384d1fc7a67b6826e5827ab06",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/ULTRACEMCO_01-10-2025_31-12-2025.raw",
+    "size_bytes": 24200,
+    "sha256": "9476c844334935ec9447d2cbcb6e9ddbf4e4e10f0e8153d991bdced6c138aa29",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/WIPRO.json",
+    "size_bytes": 343873,
+    "sha256": "32c4f717524ab690ffe3118f5d9e392239b0024a6da1d11c48e1fcb63a8c66a0",
+    "artifact_class": "announcement_concat_json"
+  },
+  {
+    "relpath": "corporate-announcements/WIPRO_01-01-2024_31-03-2024.raw",
+    "size_bytes": 35998,
+    "sha256": "11d56eb3a0fb97703304661acc2cb5bbfc09178356f4c8c278e26ef83748f2f3",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/WIPRO_01-01-2025_31-03-2025.raw",
+    "size_bytes": 43907,
+    "sha256": "36245e5d49a02ddd32486cdf9b089149e4e74b988788cc8f5ed9f1e0fdb04d73",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/WIPRO_01-04-2024_30-06-2024.raw",
+    "size_bytes": 59706,
+    "sha256": "d79c85a15db3eda3289faaa6e68eb3b63040171ab2069057d0f4c60afaacb3be",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/WIPRO_01-04-2025_30-06-2025.raw",
+    "size_bytes": 35474,
+    "sha256": "ce82b537cb9b34e23e98e30a453c6f160b64e14d0c50f4f2c30fde4a60bfc42a",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/WIPRO_01-07-2024_30-09-2024.raw",
+    "size_bytes": 36878,
+    "sha256": "0f5786331a8d4c40fe1c34b6620299d3dec145c4ffc0971f94cb0bf23d73e4ec",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/WIPRO_01-07-2025_30-09-2025.raw",
+    "size_bytes": 33868,
+    "sha256": "142fc601bb08e8dee8cc9014085684512b64ecb322922e3149a07f02b022f26a",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/WIPRO_01-10-2024_31-12-2024.raw",
+    "size_bytes": 49670,
+    "sha256": "a1932cd267896f94ddb7577f9acb45cee016921bca0812506f4a91533bf1ad95",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "corporate-announcements/WIPRO_01-10-2025_31-12-2025.raw",
+    "size_bytes": 30700,
+    "sha256": "f374d9de470c2e1332eb93fb1f27cc5090db7da92d4b0dc753f9799e6cf6e4b9",
+    "artifact_class": "announcement_raw"
+  },
+  {
+    "relpath": "fetch_log.json",
+    "size_bytes": 87397,
+    "sha256": "183fa158744971403e8d04728920cd0008c71cfa3951b93344c36dade5951b04",
+    "artifact_class": "other_json_or_raw"
+  },
+  {
+    "relpath": "financial-results/ADANIENT.raw",
+    "size_bytes": 123492,
+    "sha256": "003fb396b38b67620ef68aba596717d21641e0df117299e433fcc6b2e42fbbcf",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/ADANIPORTS.raw",
+    "size_bytes": 99679,
+    "sha256": "a5a4a98413b9247675676ff8ddc890dd6ddeb2edb8f1e5ed833a55e04ce38ce7",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/APOLLOHOSP.raw",
+    "size_bytes": 83684,
+    "sha256": "27307764765f212675bb6fd1781e8559eced5c450d7a52ed0df7bd3ed5bf7c06",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/ASIANPAINT.raw",
+    "size_bytes": 127812,
+    "sha256": "c574686007d43377d785c420b7e251fecdb34b4f824105857fcce1503579b160",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/AXISBANK.raw",
+    "size_bytes": 77489,
+    "sha256": "a7eb33ec072f3045959704803a62914c8834c1286004721a6363e89cfcd5016e",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/BAJAJ-AUTO.raw",
+    "size_bytes": 85934,
+    "sha256": "6c3b422fc75c656535fe03e8602168a70917c8b51fa12d538d4919c89f1e48c9",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/BAJAJFINSV.raw",
+    "size_bytes": 105095,
+    "sha256": "114fcc05248e77961856b092f02ec4d234fdf2c7a15da8ee6fcaf524d5458d80",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/BAJFINANCE.raw",
+    "size_bytes": 84998,
+    "sha256": "6b23ff2c2b8790351aec1a6fde1cf160292b574082e39fa53224953c321d0f8e",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/BEL.raw",
+    "size_bytes": 81834,
+    "sha256": "508afc353b7d7fca9598453e18ed852b89a7f623ac3d338c936f41fb5b73beb3",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/BHARTIARTL.raw",
+    "size_bytes": 106220,
+    "sha256": "ccad5e4320a8c01add81cf62009f9933c56a8972be302f4fe27e4b484f0e3885",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/BPCL.raw",
+    "size_bytes": 84665,
+    "sha256": "80ef00baf3666194207c59e6f2353b44ac072c9c1b8010ed89914fb2c4b1566c",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/BRITANNIA.raw",
+    "size_bytes": 101638,
+    "sha256": "de3d620dcfca21a24698f13f9650b52fabdad8e71de7a80efa44f4a29a7b4829",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/CIPLA.raw",
+    "size_bytes": 101569,
+    "sha256": "03e53a4efa1cb18b5a086badfc7626fad688e25ef40b481d8943c8a1c38d4427",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/COALINDIA.raw",
+    "size_bytes": 93821,
+    "sha256": "21093e2b670682d6c5d63776d15282799f9df4f92b2119c737d2134b7e3fc86e",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/DRREDDY.raw",
+    "size_bytes": 107797,
+    "sha256": "04ab4870b28cbf5c657cf91fe8aa2d3bced6c7d427660620fb5c45787702c12a",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/EICHERMOT.raw",
+    "size_bytes": 119435,
+    "sha256": "61f99d727fc9f62ca8ca4d3014848168405b9e6719acb051e23b56e0dca33715",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/GRASIM.raw",
+    "size_bytes": 127537,
+    "sha256": "a42301d9414a01c8eb4be389ef9934adc657191d5ea19504e487882ebafc432a",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/HCLTECH.raw",
+    "size_bytes": 91910,
+    "sha256": "68346ba40e4c9f87f6248487cbc51309ffaac090bb9914a2a8c417ae9b2b63d2",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/HDFCBANK.raw",
+    "size_bytes": 79047,
+    "sha256": "6eb918bdac37aba23950b11b34352a0b2266f6637533851bc98dd73a1a1c0531",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/HDFCLIFE.raw",
+    "size_bytes": 2,
+    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/HEROMOTOCO.raw",
+    "size_bytes": 83195,
+    "sha256": "5944e0714751211dbe187c227fef8765dfa538ea1cebfcc6cfdf697a54988a36",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/HINDALCO.raw",
+    "size_bytes": 82415,
+    "sha256": "bde211cf831e5f05eaf44be7c6c2aa06f408e49996983e972f8bd5948a576c81",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/HINDUNILVR.raw",
+    "size_bytes": 82975,
+    "sha256": "ae63d1eeab4b2b51d2e58d6afc1174785b388d3bfac5fa193f98e02e4cbd7f01",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/ICICIBANK.raw",
+    "size_bytes": 88669,
+    "sha256": "4e1df093c60fc8fef4a8ed0f1f3e1bf1940586c937a4920e77b10a13b00a17fe",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/INDUSINDBK.raw",
+    "size_bytes": 78376,
+    "sha256": "eccab86dbe04d4cc828e9ebbc0e60fb033380825832cc104631dfd642ca8c170",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/INFY.raw",
+    "size_bytes": 108132,
+    "sha256": "2d1e248a0b55eab66ed36fa833349c65a94d61db372646f52f4c5a1d1e822c60",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/ITC.raw",
+    "size_bytes": 80168,
+    "sha256": "fec6d4e1270e31ae3ec4f0a67b219b2fd509b4127630e0198a73329936f97837",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/JSWSTEEL.raw",
+    "size_bytes": 122923,
+    "sha256": "73cdb2cfd47d9e714495458ad506c415e29a32fdf61f4bd55b862a6b42eac047",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/KOTAKBANK.raw",
+    "size_bytes": 124433,
+    "sha256": "f7875e86c1e479ac753d0367d47da55a47a7150ac88e2136b5487c3de19c4f9e",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/LT.raw",
+    "size_bytes": 98465,
+    "sha256": "82a7e65f0734ccb829ab477f89b55e089c84dd26af9305f4985f377d39c5c249",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/M&M.raw",
+    "size_bytes": 81848,
+    "sha256": "67ae24f3e65fc702bcfbb20dd38eef01718c568eef484c3df08ff7e99b7a0808",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/MARUTI.raw",
+    "size_bytes": 83450,
+    "sha256": "a3cfc9156706a1521212ba72b5a7837e90f1a1cf52f62e7f40416828e3a2ce32",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/NESTLEIND.raw",
+    "size_bytes": 6879,
+    "sha256": "4507329dce5044f3509caee465008b2ed881404e33b183ae2c5cd4f94228dc4b",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/NTPC.raw",
+    "size_bytes": 81223,
+    "sha256": "af61691a79277de46ac7e649f9a6d62dd7c74a75bb9bde7f6792ec4e31b6cdb7",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/ONGC.raw",
+    "size_bytes": 82483,
+    "sha256": "235e28c1bbe83240e653fcab7690d89b2a5fb6a95a333cb374d5d7772eb6f269",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/POWERGRID.raw",
+    "size_bytes": 74077,
+    "sha256": "e2271fd6cc334cf5aa7fd30bf06587ed5f4fa04fbd207ba7f706be84b863b254",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/RELIANCE.raw",
+    "size_bytes": 101760,
+    "sha256": "ddcc87095ecb31bf94df441c84bfbe073790fa89f694c231f29e8aab8ccd051a",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/SBILIFE.raw",
+    "size_bytes": 2,
+    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/SBIN.raw",
+    "size_bytes": 110541,
+    "sha256": "12d01f461fbe90670e28b6976fb9991d88ca9c2345fe7b919db96a66ecbb9495",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/SHRIRAMFIN.raw",
+    "size_bytes": 94158,
+    "sha256": "b0c87cfe5213f95ba2d27d28b8e827e03ec212a6d38bbd53534d328c851e7c65",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/SUNPHARMA.raw",
+    "size_bytes": 129274,
+    "sha256": "c260c71d691c9ae4cf5122613ddaa919c543fc367f3feabc6b22d6870b349ebe",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/TATACONSUM.raw",
+    "size_bytes": 123238,
+    "sha256": "35fc145fc5986fa0e8db2c807878aec8bdaf800c34566359f1f56b155549ddc0",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/TATASTEEL.raw",
+    "size_bytes": 120531,
+    "sha256": "6f8f908e824eef2dc5afe42a72749e1d2a44ba97a92b4f0bc105f9f1e6d5428a",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/TCS.raw",
+    "size_bytes": 124738,
+    "sha256": "746a848759b266faeec6de9ec011be11488e4fedda635146b3f3e2748e2be3f5",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/TECHM.raw",
+    "size_bytes": 113785,
+    "sha256": "a16ac5a6f6bd5920842ef2dea94a45148755c15f8a578cfd2fb537c842a6e87d",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/TITAN.raw",
+    "size_bytes": 87955,
+    "sha256": "66b7befee97bd7c4b1dc1896caa6be33c5f7def8b1f859481616990c350588ba",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/TRENT.raw",
+    "size_bytes": 77977,
+    "sha256": "38323b92032dc8e7dfcee7bce3d9d019a615c5c0373de7e39df06a90b85e568c",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/ULTRACEMCO.raw",
+    "size_bytes": 100411,
+    "sha256": "ff1e1477c2f6405e468a6b2accd0d708b91283fae6432003c8d0d8150fc95064",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "financial-results/WIPRO.raw",
+    "size_bytes": 101298,
+    "sha256": "e73fca826d1f7aebbbab0b8b75f75ec520ec2d19520f7f8e5e18805abc338a0a",
+    "artifact_class": "financial_results_auxiliary"
+  },
+  {
+    "relpath": "retrieval.json",
+    "size_bytes": 1384,
+    "sha256": "123670b11f58d378388f06e23df119838eb6123faf73304e6c35bc10e6b91023",
+    "artifact_class": "retrieval_record"
+  }
+]

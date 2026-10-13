@@ -8,9 +8,11 @@ from dataclasses import dataclass
 from contracts.enums import TradingMode
 
 from intelligence_agents.errors import ConfigError
+from intelligence_agents.news.universe import DEFAULT_MARKET_FEEDS, NIFTY50_SYMBOLS
 
 LIVE_SOURCES = frozenset({"rss", "csv-live"})
 LIVE_MODES = frozenset({TradingMode.PAPER, TradingMode.SHADOW, TradingMode.LIVE})
+_FIXTURE_SYMBOLS = "RELIANCE,TCS,INFY,HDFCBANK,ICICIBANK"
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,14 +38,30 @@ class IntelligenceSettings:
     rss_max_bytes: int
     rss_max_items: int
     service_mode: str
+    news_ingest: bool
+    news_interpret: bool
+    rss_symbol_batch: int
 
     @classmethod
     def from_env(cls) -> IntelligenceSettings:
         mode = TradingMode(os.environ.get("INTELLIGENCE_TRADING_MODE", "BACKTEST"))
         source = os.environ.get("INTELLIGENCE_DATA_SOURCE", "fixtures").strip().lower()
         store = os.environ.get("INTELLIGENCE_STORE", "sqlite").strip().lower()
-        symbols_raw = os.environ.get("INTELLIGENCE_SYMBOLS", "RELIANCE,TCS,INFY,HDFCBANK,ICICIBANK")
+        if "INTELLIGENCE_SYMBOLS" in os.environ:
+            symbols_raw = os.environ["INTELLIGENCE_SYMBOLS"]
+        elif source == "rss":
+            symbols_raw = ",".join(NIFTY50_SYMBOLS)
+        else:
+            symbols_raw = _FIXTURE_SYMBOLS
         rss_raw = os.environ.get("NEWS_RSS_URLS", "")
+        rss_urls = tuple(item.strip() for item in rss_raw.split(",") if item.strip())
+        if source == "rss" and not rss_urls:
+            rss_urls = DEFAULT_MARKET_FEEDS
+        ingest_raw = os.environ.get("INTELLIGENCE_NEWS_INGEST")
+        if ingest_raw is None:
+            news_ingest = source == "rss"
+        else:
+            news_ingest = ingest_raw.strip().lower() == "true"
         settings = cls(
             data_source=source,
             trading_mode=mode,
@@ -60,12 +78,15 @@ class IntelligenceSettings:
             llm_tier2_model=os.environ.get("LLM_TIER2_MODEL", "fixture"),
             llm_daily_budget_usd=float(os.environ.get("LLM_DAILY_BUDGET_USD", "0")),
             llm_timeout_seconds=float(os.environ.get("LLM_TIMEOUT_SECONDS", "30")),
-            news_rss_urls=tuple(item.strip() for item in rss_raw.split(",") if item.strip()),
+            news_rss_urls=rss_urls,
             tier2_enabled=os.environ.get("INTELLIGENCE_TIER2_ENABLED", "false").lower() == "true",
             rss_interval_seconds=int(os.environ.get("NEWS_RSS_INTERVAL_SECONDS", "300")),
             rss_max_bytes=int(os.environ.get("NEWS_RSS_MAX_BYTES", str(1024 * 1024))),
             rss_max_items=int(os.environ.get("NEWS_RSS_MAX_ITEMS", "100")),
             service_mode=os.environ.get("INTELLIGENCE_SERVICE_MODE", "oneshot").strip().lower(),
+            news_ingest=news_ingest,
+            news_interpret=os.environ.get("INTELLIGENCE_NEWS_INTERPRET", "false").lower() == "true",
+            rss_symbol_batch=int(os.environ.get("NEWS_RSS_SYMBOL_BATCH", "5")),
         )
         settings.validate()
         return settings
@@ -98,10 +119,14 @@ class IntelligenceSettings:
             raise ConfigError("BACKTEST is oneshot only; do not serve it from uvicorn")
         if self.trading_mode is TradingMode.BACKTEST and self.data_source in LIVE_SOURCES:
             raise ConfigError("BACKTEST cannot use RSS or csv-live; fixtures only")
-        if self.data_source == "rss" and not self.news_rss_urls and self.trading_mode in LIVE_MODES:
+        if self.data_source == "rss" and not self.news_rss_urls:
             raise ConfigError("NEWS_RSS_URLS required when INTELLIGENCE_DATA_SOURCE=rss")
         if not self.symbols:
             raise ConfigError("INTELLIGENCE_SYMBOLS must list at least one symbol")
+        if self.rss_interval_seconds < 30:
+            raise ConfigError("NEWS_RSS_INTERVAL_SECONDS must be >= 30 to respect provider limits")
+        if self.news_ingest and self.data_source != "rss":
+            raise ConfigError("INTELLIGENCE_NEWS_INGEST=true requires INTELLIGENCE_DATA_SOURCE=rss")
         if self.service_mode == "serve" and self.trading_mode in LIVE_MODES:
             if not self.internal_signal_token or not self.core_api_url:
                 raise ConfigError("PAPER/SHADOW/LIVE serve requires CORE_API_URL and INTERNAL_SIGNAL_TOKEN")

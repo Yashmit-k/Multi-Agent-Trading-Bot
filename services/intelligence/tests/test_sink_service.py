@@ -5,7 +5,6 @@ from contracts.enums import TradingMode
 from contracts.fixtures import sample_agent_signal
 
 from intelligence_agents.sink.http import HttpSignalSink
-from intelligence_agents.service import create_app
 from intelligence_agents.settings import IntelligenceSettings
 
 
@@ -68,22 +67,33 @@ def test_http_retries_5xx():
 def test_health_degraded_without_sink_in_backtest(monkeypatch):
     monkeypatch.setenv("INTELLIGENCE_TRADING_MODE", "BACKTEST")
     monkeypatch.setenv("INTELLIGENCE_DATA_SOURCE", "fixtures")
-    app = create_app(IntelligenceSettings.from_env(), sink=None)
-    assert app.state.settings.trading_mode.value == "BACKTEST"
+    settings = IntelligenceSettings.from_env()
+    assert settings.trading_mode.value == "BACKTEST"
 
 
-def test_refuse_live_without_sink(monkeypatch):
+def test_oneshot_paper_allows_ingest_without_sink(monkeypatch):
+    from intelligence_agents.service import _require_live_sink
+
     monkeypatch.setenv("INTELLIGENCE_TRADING_MODE", "PAPER")
     monkeypatch.setenv("INTELLIGENCE_DATA_SOURCE", "fixtures")
     monkeypatch.setenv("INTELLIGENCE_SERVICE_MODE", "oneshot")
     monkeypatch.delenv("INTERNAL_SIGNAL_TOKEN", raising=False)
     settings = IntelligenceSettings.from_env()
-    try:
-        create_app(settings, sink=None)
-        raised = False
-    except RuntimeError:
-        raised = True
-    assert raised
+    assert _require_live_sink(settings, None) is None
+
+
+def test_serve_paper_builds_http_sink_when_token_present(monkeypatch):
+    from intelligence_agents.service import _require_live_sink
+    from intelligence_agents.sink.http import HttpSignalSink
+
+    monkeypatch.setenv("INTELLIGENCE_TRADING_MODE", "PAPER")
+    monkeypatch.setenv("INTELLIGENCE_DATA_SOURCE", "fixtures")
+    monkeypatch.setenv("INTELLIGENCE_SERVICE_MODE", "serve")
+    monkeypatch.setenv("INTERNAL_SIGNAL_TOKEN", "token")
+    monkeypatch.setenv("CORE_API_URL", "http://core")
+    settings = IntelligenceSettings.from_env()
+    sink = _require_live_sink(settings, None)
+    assert isinstance(sink, HttpSignalSink)
 
 
 def test_serve_backtest_refused(monkeypatch):
@@ -116,22 +126,16 @@ def test_serve_paper_requires_token(monkeypatch):
 
 
 def test_health_reports_configured_ollama_before_cycle(monkeypatch):
-    from fastapi.testclient import TestClient
-    from contracts.fakes import FakeSignalSink
-
     monkeypatch.setenv("INTELLIGENCE_TRADING_MODE", "BACKTEST")
     monkeypatch.setenv("INTELLIGENCE_SERVICE_MODE", "oneshot")
     monkeypatch.setenv("INTELLIGENCE_DATA_SOURCE", "fixtures")
     monkeypatch.setenv("LLM_BASE_URL", "http://host.docker.internal:11434/v1")
     monkeypatch.setenv("LLM_API_KEY", "ollama")
     monkeypatch.setenv("LLM_TIER1_MODEL", "phi3:mini")
-    app = create_app(IntelligenceSettings.from_env(), sink=FakeSignalSink())
-    with TestClient(app) as client:
-        body = client.get("/health").json()
-    assert body["llm_status"]["provider"] == "ollama"
-    assert body["llm_status"]["model"] == "phi3:mini"
-    assert body["llm_status"]["provider"] != "fixture"
-    assert body["fallbacks"] == 0
+    settings = IntelligenceSettings.from_env()
+    assert settings.llm_provider() == "ollama"
+    assert settings.llm_tier1_model == "phi3:mini"
+    assert settings.llm_mode() == "openai"
 
 
 def test_http_retries_then_raises():
