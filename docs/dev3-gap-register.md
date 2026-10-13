@@ -1,4 +1,22 @@
-# Developer 3 gap register — Checkpoint 1
+# Developer 3 gap register
+
+Checkpoint 2 is recorded below the original Checkpoint 1 baseline. It stays in this folder on `developer-3`. The production stack was not queried, migrated, or started.
+
+## Checkpoint 2
+
+The collector status for a symbol is re-read after that timeframe's upsert. Daily and five-minute candles are read separately. `PUBLICATION_DELAY` is still 90 seconds, and `expected_completed_end` is unchanged.
+
+`tests/test_market_collector.py::test_returned_status_matches_the_bar_just_persisted` failed first: the returned daily end was `2026-10-09T10:00:00+00:00` while the stored bar was `2026-10-12T10:00:00+00:00`. After the re-read, the same test passed. The returned daily end, five-minute end, and freshness match the bars persisted at the controlled clock `2026-10-13T05:00:00Z`.
+
+`test_after_the_close_the_expected_five_minute_end_is_1515` passed. At 15:31:30 IST on 2026-10-13 the expected five-minute end is 15:15 IST, not 15:25 or 15:30.
+
+`tests/test_entry_gate_postgres.py` passed on disposable PostgreSQL 16, bound only to `127.0.0.1:55434`, database `dev3_entry_gate`. Five qualifying entries were stored, then two `queue_entry` calls ran on independent connections. Exactly one more qualifying entry was stored. The final count was 6. The container was removed.
+
+`tests/test_collector_isolation.py` passed against project `dev3-cp2-collector` using only `docker-compose.checkpoint2.yml`. Postgres was on `127.0.0.1:15432`, the probe on `127.0.0.1:18000`, with network `dev3-cp2-collector-net` and volume `dev3-cp2-collector-data`. The file has no `core-worker`. The scripted client does not call Zerodha. The probe persisted at least two five-minute bars through `run_incremental_once`. After `collector-api` stopped, the isolated candle count did not change. The project was removed with `down -v`.
+
+This Compose run is scripted collector behavior. It does not prove live Zerodha connectivity or freshness of the production database. Production stored bars against `expected_completed_end` stay **NOT VERIFIED**. The running Core API was not rebuilt, so this ordering fix is not deployed.
+
+## Checkpoint 1
 
 Recorded 2026-10-13. This checkpoint writes the register only. It does not change a cap, fix the collector, run a paper cycle, start `core-worker`, restart Core API, apply a migration, query production SQL, hash the holdout, or push.
 
@@ -47,17 +65,17 @@ Status is `PASS`, `FAIL`, `BLOCKED`, or `NOT VERIFIED`. "Later checkpoint" means
 | Research backtests still use ₹1,00,000. | PASS | `backtest.py` `MAX_NOTIONAL = Decimal("100000")` is passed into `assess` as `max_notional`. `fd9a0de`. | Developer 3 | No. Do not fold it into the paper cap. |
 | Older policy text still says ₹1,00,000 for the paper order. | FAIL | `docs/paper-execution-policy.md` still says the per-order cap remains ₹1,00,000. `144bc08` (2026-10-12) still had `MAX_NOTIONAL = Decimal("100000")` in `execute.py` and `assess.py`. `docs/architecture.md` and `docs/current-status.md` already say 20,000. | Developer 3 | Documentation only, after review. The code cap stays ₹20,000. |
 | Six qualifying CNC buys per IST date. | PASS | `repository.py` `DAILY_ENTRY_LIMIT = 6`. Counted rows are BUY, not `REJECTED`, `policy_version` `cnc-limit-v1`, reason `entry`. Lock is `entry_day_gates` in the same transaction. Migration `0007_entry_day_gates`. Introduced in `7604ea9`. Live revision is `0007_entry_day_gates`. | Developer 3 | PostgreSQL concurrency only. Do not change the limit. |
-| PostgreSQL concurrency of the six-entry gate. | NOT VERIFIED | SQLite coverage exists in the daily-entry tests. No disposable PostgreSQL race was run. Production SQL was not used. | Developer 3 | Checkpoint 2, isolated database only. |
+| PostgreSQL concurrency of the six-entry gate. | PASS | `tests/test_entry_gate_postgres.py` on PostgreSQL 16 at `127.0.0.1:55434`, database `dev3_entry_gate`. Five qualifying rows, then two concurrent connections. Final count 6. | Developer 3 | No. Do not change the limit. |
 | Collector host is Core API, not a collector service and not `core-worker`. | PASS | `docker-compose.yml` sets `MARKET_DATA_COLLECTOR=true` on `core-api`. `app.py` starts `_collector_loop` in that process. `core-worker` is a separate service whose command is `python -m core_worker`. | Developer 3 | No. |
 | One poll succeeded while `core-worker` stayed exited. | PASS | Worker container was exited 137 before and during the read. Ingestion `last_success_at` was `2026-10-13T07:28:56Z`. The worker was not started. | Developer 3 | No. A repeated isolated poll is still Checkpoint 2. |
 | Poll interval 60 seconds and publication delay 90 seconds. | PASS | Compose `MARKET_DATA_POLL_SECONDS=60`. `schedule.py` `PUBLICATION_DELAY` is 90 seconds. The loop sleeps after each pass. | Developer 3 | No. Do not change either number. |
-| Ingestion "fresh" count is not proof of the stored bar. | PASS | `collector.py` `_one_symbol` records `latest_candle` before `upsert_candles`. The snapshot can describe the previous bar. The 12:58 IST read reported 0 fresh and 50 stale with latest end 12:50 IST. That is the snapshot, not a stored-bar proof. | Developer 3 | Checkpoint 2 fixes the ordering. It does not treat this snapshot as the proof. |
-| Persisted candles versus `expected_completed_end`. | NOT VERIFIED | Proving the stored bar needs a database read. Production SQL was not run. | Developer 3 | Checkpoint 2, on an isolated database or a later approved read. |
+| Returned ingestion status matches the bar just written. | PASS | After each upsert, `_one_symbol` re-reads that timeframe only. `test_returned_status_matches_the_bar_just_persisted` uses a controlled clock. The 12:58 IST production snapshot was taken before this change and is not a stored-bar proof. | Developer 3 | No. Do not deploy it in this checkpoint. |
+| Persisted production candles versus `expected_completed_end`. | NOT VERIFIED | The controlled-clock test checks the scripted bars it writes. Production SQL was not run, and Core API was not rebuilt. | Developer 3 | Only with an approved production read. |
 | Zerodha token is process memory and starts empty. | PASS | `app.py` sets `app.state.zerodha_access_token = None` at startup. The login callback writes the token onto that state. | Developer 3 | No code change required for the fact. |
 | Live re-authentication after an API restart. | NOT VERIFIED | Core API was not restarted. The current process is authenticated. A restart would clear the token. | Developer 3 | Do not restart production to prove it. |
-| Collection stops when Core API is down. | PASS | The loop lives in the API process. There is no second collector process to keep polling. | Developer 3 | Checkpoint 2 documents the same fact in the isolated project. |
-| Snapshot-before-upsert race. | FAIL | `collector.py` `_one_symbol` publishes freshness from the candle read that happens before `upsert_candles`. | Developer 3 | Checkpoint 2: failing regression, then the smallest ordering fix. |
-| Expected five-minute end after the cash close is 15:15 IST. | PASS | `schedule.py`: after the session is ready, the expected intraday end is close minus the 15-minute grace. 15:25 and 15:30 are not expected ends. | Developer 3 | Close-of-session tests in Checkpoint 2. Do not change the rule. |
+| Collection stops when the collector process is down. | PASS | Source: the loop lives in the API process. Isolated proof: after `collector-api` stopped in `dev3-cp2-collector`, the scripted candle count stayed unchanged. That proof is not live Zerodha and not the production database. | Developer 3 | No. |
+| Snapshot-before-upsert race. | PASS | The new test failed on the pre-write end, then passed after the per-timeframe re-read in `collector.py`. | Developer 3 | No. The fix is not deployed. |
+| Expected five-minute end after the cash close is 15:15 IST. | PASS | `schedule.py` is unchanged. `test_after_the_close_the_expected_five_minute_end_is_1515` expects 15:15 IST at 15:31:30 IST, and not 15:25 or 15:30. | Developer 3 | No. Do not change the rule. |
 | Claim that the last bar has been stuck at 15:10 since 3 August. | NOT VERIFIED | No permitted historical read of stored bars was available. The 12:58 IST snapshot's latest end was 12:50 IST on 13 October, which does not test that claim. | Developer 3 | Only with an approved read. |
 | Daily close versus five-minute close mismatch. | NOT VERIFIED | Not reproduced. Production SQL was not used. | Developer 3 | Only with an approved read. |
 | Daily paper P&L and an end-of-day snapshot writer. | FAIL | `portfolio_snapshots` exists. No production writer was found. `GET /api/v1/performance` serves the latest backtest and returned 404 `no_backtest`. The frontend performance page calls that route. It is not session daily P&L. | Developer 3 | Checkpoint 3 is design and a read-only contract. Do not deploy a writer. |
@@ -70,8 +88,6 @@ Status is `PASS`, `FAIL`, `BLOCKED`, or `NOT VERIFIED`. "Later checkpoint" means
 
 ## What the next review can authorize
 
-Checkpoint 2 may add a failing regression for the snapshot-before-upsert race, the smallest ordering fix, close-of-session tests, a disposable PostgreSQL concurrency test for the six-entry gate, and an isolated Compose project that polls more than once while its own paper worker stays stopped. That project must not join this network or this database.
+Checkpoint 2 closed the ordering race in code, the 15:15 test, the disposable six-entry race, and the scripted Compose probe. It did not change ₹20,000, the six-entry limit, the 90-second delay, fees, or the production database, and it did not start the production worker.
 
-Checkpoint 2 may not change ₹20,000, the six-entry limit, the 90-second delay, fees, or the production database. It may not start the production worker.
-
-Documentation does not close the collector race, the missing heartbeat, or the missing daily snapshot writer.
+Checkpoint 3 may add a read-only daily-performance contract and a snapshot-writer design, plus heartbeat code on this branch only. It may not deploy that heartbeat or the collector fix. Documentation does not close the missing heartbeat or the missing daily snapshot writer.

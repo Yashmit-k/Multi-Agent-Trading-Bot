@@ -15,6 +15,7 @@ from core_db.repository import CoreRepository
 from core_db.session import create_schema
 from core_ingestion.service import MemoryEventPublisher, ingest_signal
 from core_market_data.collector import IngestionState, run_incremental_once
+from core_market_data.nse_sessions import IST
 from core_market_data.schedule import candle_is_fresh, expected_completed_end, incremental_range
 from core_market_data.zerodha import RequestPace, ZerodhaMarketDataProvider
 from core_paper import run_paper_cycle
@@ -77,6 +78,15 @@ def test_daily_bar_stays_incomplete_until_after_the_close_delay() -> None:
     assert expected_completed_end(Timeframe.D1, during) == datetime(2026, 10, 9, 10, 0, tzinfo=UTC)
     after = datetime(2026, 10, 12, 10, 2, tzinfo=UTC)
     assert expected_completed_end(Timeframe.D1, after) == datetime(2026, 10, 12, 10, 0, tzinfo=UTC)
+
+
+def test_after_the_close_the_expected_five_minute_end_is_1515() -> None:
+    ready = datetime(2026, 10, 13, 15, 31, 30, tzinfo=IST)
+    expected = expected_completed_end(Timeframe.M5, ready)
+    close_grace = datetime(2026, 10, 13, 15, 15, tzinfo=IST).astimezone(UTC)
+    assert expected == close_grace
+    assert expected != datetime(2026, 10, 13, 15, 25, tzinfo=IST).astimezone(UTC)
+    assert expected != datetime(2026, 10, 13, 15, 30, tzinfo=IST).astimezone(UTC)
 
 
 def test_weekend_and_holiday_use_the_previous_session() -> None:
@@ -199,6 +209,61 @@ def test_collector_status_hides_credentials_and_reports_freshness() -> None:
     assert "access_token" not in str(body)
     assert body["symbols"][0]["daily_fresh"] is True
     assert candle_is_fresh(end, Timeframe.D1, datetime(2026, 10, 9, 10, 30, tzinfo=UTC))
+
+
+def test_returned_status_matches_the_bar_just_persisted() -> None:
+    """The status row is the stored candle, not the candle read before the upsert."""
+    clock = datetime(2026, 10, 13, 5, 0, tzinfo=UTC)
+    repository = _repo("RELIANCE", 1)
+    old_daily_end = datetime(2026, 10, 9, 10, 0, tzinfo=UTC)
+    old_intraday_end = datetime(2026, 10, 13, 3, 50, tzinfo=UTC)
+    repository.upsert_candles(
+        [
+            Candle(
+                symbol="RELIANCE",
+                exchange=Exchange.NSE,
+                timeframe=Timeframe.D1,
+                open=Decimal("10"),
+                high=Decimal("11"),
+                low=Decimal("9"),
+                close=Decimal("10"),
+                volume=1,
+                start=datetime(2026, 10, 9, 3, 45, tzinfo=UTC),
+                end=old_daily_end,
+            ),
+            _bar("RELIANCE", old_intraday_end - timedelta(minutes=5), old_intraday_end),
+        ]
+    )
+    state = IngestionState()
+    assert run_incremental_once(repository, _FreshBars(), state, now=clock, pace=RequestPace(0)) is True
+    row = state.symbols[0]
+    stored_daily = repository.latest_candle("RELIANCE", Timeframe.D1)
+    stored_intraday = repository.latest_candle("RELIANCE", Timeframe.M5)
+    assert stored_daily is not None and stored_intraday is not None
+    assert stored_daily.end > old_daily_end
+    assert stored_intraday.end > old_intraday_end
+    assert row.daily_end == stored_daily.end.isoformat()
+    assert row.intraday_end == stored_intraday.end.isoformat()
+    assert row.daily_fresh is candle_is_fresh(stored_daily.end, Timeframe.D1, clock)
+    assert row.intraday_fresh is candle_is_fresh(stored_intraday.end, Timeframe.M5, clock)
+    assert row.daily_fresh is True
+    assert row.intraday_fresh is True
+
+
+class _FreshBars:
+    """Returns one completed daily bar and one completed five-minute bar. No network."""
+
+    def historical_data(self, instrument_token: int, from_date: datetime, to_date: datetime, interval: str):
+        if interval == "day":
+            return [{"date": datetime(2026, 10, 12), "open": 10, "high": 11, "low": 9, "close": 10, "volume": 1}]
+        start = datetime(2026, 10, 13, 4, 50, tzinfo=UTC)
+        return [{"date": start, "open": 10, "high": 11, "low": 9, "close": 10, "volume": 1}]
+
+    def instruments(self, exchange: str) -> list[dict[str, object]]:
+        return []
+
+    def quote(self, key: str) -> dict[str, object]:
+        return {}
 
 
 def test_stale_candle_does_not_open_a_new_paper_order(repository: CoreRepository) -> None:

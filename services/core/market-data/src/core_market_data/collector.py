@@ -265,6 +265,15 @@ def _one_symbol(
         if candles:
             repository.upsert_candles(candles)
             row.written += len(candles)
+            stored = repository.latest_candle(symbol, timeframe)
+            stored_end = None if stored is None else stored.end
+            stored_fresh = candle_is_fresh(stored_end, timeframe, now)
+            if label == "daily":
+                row.daily_end = None if stored_end is None else stored_end.isoformat()
+                row.daily_fresh = stored_fresh
+            else:
+                row.intraday_end = None if stored_end is None else stored_end.isoformat()
+                row.intraday_fresh = stored_fresh
         expected = expected_starts(start, stop, Timeframe.D1 if timeframe == Timeframe.D1 else Timeframe.M5)
         have = {bar.start.astimezone(timezone.utc) for bar in repository.stored_candles(symbol, timeframe)}
         row.missing_bars += len({item for item in expected if item not in have})
