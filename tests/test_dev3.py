@@ -130,7 +130,7 @@ def test_kill_switch_queues_a_flatten_after_a_cnc_fill(repository: CoreRepositor
     )
     _store_signal(repository, decision)
     publisher = MemoryEventPublisher()
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"), now=decision)
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"), now=decision, enforce_entry_window=False)
     start = datetime(2026, 10, 13, 3, 50, tzinfo=timezone.utc)
     repository.upsert_candles([_five(start, Decimal("100"))])
     run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"), now=start + timedelta(minutes=5))

@@ -7,7 +7,7 @@ when this schedule was read on 2026-10-12. Dates outside the covered range
 fail closed.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -21,6 +21,9 @@ ORDINARY_OPEN = time(9, 15)
 ORDINARY_CLOSE = time(15, 30)
 ENTRY_START = time(9, 20)
 ENTRY_END = time(10, 30)
+TEST_EXTENSION_DATE = date(2026, 10, 13)
+TEST_EXTENSION_END = time(11, 0)
+TEST_EXTENSION_SOURCE = "ordinary-cash-session+paper-test-20261013-1100"
 
 # NSE capital-market special live session, primary site.
 # Normal market 09:15–10:00 IST. The later DR segment is a different session
@@ -59,6 +62,32 @@ class EntryWindow:
     @property
     def entry_start_at(self) -> datetime:
         return datetime.combine(self.session_date, self.entry_start, tzinfo=IST)
+
+
+def paper_test_entry_window(now: datetime) -> EntryWindow | None:
+    """11:00 IST end on 13 October 2026 only, and only while that date is an ordinary session.
+
+    Returns None before 09:20, at 11:00, and on every other date. The caller must
+    also require PAPER mode. The ordinary 10:30 end is left unchanged.
+    """
+    local = now.astimezone(IST)
+    if local.date() != TEST_EXTENSION_DATE or not (ENTRY_START <= local.time() < TEST_EXTENSION_END):
+        return None
+    base = session_for(local.date())
+    if base is None or (base.entry_start, base.entry_end) != (ENTRY_START, ENTRY_END):
+        return None
+    return replace(base, entry_end=TEST_EXTENSION_END, source=TEST_EXTENSION_SOURCE)
+
+
+def cash_session_open(now: datetime) -> bool:
+    """True from the cash open inclusive to the cash close exclusive."""
+    local = now.astimezone(IST)
+    window = session_for(local.date())
+    if window is None:
+        return False
+    opened = datetime.combine(window.session_date, window.market_open, tzinfo=IST)
+    closed = datetime.combine(window.session_date, window.market_close, tzinfo=IST)
+    return opened <= local < closed
 
 
 def session_block_reason(day: date) -> str | None:

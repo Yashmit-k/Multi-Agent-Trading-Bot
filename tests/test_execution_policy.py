@@ -14,7 +14,7 @@ from core_api.app import create_app
 from core_api.settings import Settings
 from core_db.models import AuditLogRow, ChargeLedgerRow, DpChargeRow
 from core_db.repository import CoreRepository
-from core_paper.charges import ChargeConfigError, EquityChargeSchedule, ZERODHA_EQUITY_RI, delivery_buy, require_schedule
+from core_paper.charges import ChargeConfigError, EquityChargeSchedule, ZERODHA_EQUITY_RI, delivery_buy, require_schedule, reservation_buy
 from core_paper.cycle import run_paper_cycle
 from core_paper.execute import affordable_quantity, queue_entry, settle_entries
 from core_paper.limits import buy_limit, limit_fill_price
@@ -114,7 +114,7 @@ def test_exact_charges_require_provenance_and_delivery_brokerage_is_zero() -> No
 
 def test_gap_does_not_fill_and_a_later_trade_through_does(repository: CoreRepository) -> None:
     _arm(repository, Decimal("442"))
-    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION)
+    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION, enforce_entry_window=False)
     order = repository.list_orders()[0]
     assert Decimal(order.metadata["reference_price"]) == Decimal("442.00")
     assert order.limit_price == Decimal("443.10")
@@ -135,7 +135,7 @@ def test_gap_does_not_fill_and_a_later_trade_through_does(repository: CoreReposi
 
 def test_open_below_limit_fills_at_the_open(repository: CoreRepository) -> None:
     _arm(repository, Decimal("442"))
-    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION)
+    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION, enforce_entry_window=False)
     start = datetime(2026, 10, 13, 3, 50, tzinfo=UTC)
     repository.upsert_candles([_bar(start, open_=Decimal("440"), low=Decimal("439"))])
     run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=start + timedelta(minutes=5))
@@ -144,7 +144,7 @@ def test_open_below_limit_fills_at_the_open(repository: CoreRepository) -> None:
 
 def test_missing_bar_expires_without_data_and_a_complete_miss_expires(repository: CoreRepository) -> None:
     _arm(repository, Decimal("442"))
-    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION)
+    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION, enforce_entry_window=False)
     expiry = datetime(2026, 10, 13, 5, 0, tzinfo=UTC)
     settle_entries(repository, starting_cash=CASH, now=expiry)
     assert repository.list_orders()[0].status == OrderStatus.EXPIRED_NO_DATA
@@ -153,7 +153,7 @@ def test_missing_bar_expires_without_data_and_a_complete_miss_expires(repository
 
 def test_complete_window_without_a_trade_expires(repository: CoreRepository) -> None:
     _arm(repository, Decimal("442"))
-    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION)
+    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION, enforce_entry_window=False)
     order = repository.list_orders()[0]
     window = assign_entry_window(DECISION)
     bars = []
@@ -168,16 +168,19 @@ def test_complete_window_without_a_trade_expires(repository: CoreRepository) -> 
 
 
 def test_two_buys_cannot_reserve_the_same_cash(repository: CoreRepository) -> None:
-    repository.open_paper_session(Decimal("100000"))
+    limit = buy_limit(Decimal("442"), Decimal("0.05"))
+    one = affordable_quantity(Decimal("1000000"), limit, ZERODHA_EQUITY_RI)
+    cash = reservation_buy(limit * one, ZERODHA_EQUITY_RI) + Decimal("1")
+    repository.open_paper_session(cash)
     _daily(repository, "RELIANCE", Decimal("442"))
     _daily(repository, "TCS", Decimal("442"))
     _store(repository, _signal(signal_id="sig-rel", timestamp=DECISION, valid_until=DECISION + timedelta(days=2)))
     _store(repository, _signal(signal_id="sig-tcs", symbol="TCS", timestamp=DECISION, valid_until=DECISION + timedelta(days=2)))
-    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=Decimal("100000"), now=DECISION)
+    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=cash, now=DECISION, enforce_entry_window=False)
     orders = [item for item in repository.list_orders() if item.status == OrderStatus.OPEN]
     assert len(orders) == 1
-    assert repository.available_cash(Decimal("100000")) < Decimal("100000")
-    assert repository.cash_balance(Decimal("100000")) == Decimal("100000")
+    assert repository.available_cash(cash) < cash
+    assert repository.cash_balance(cash) == cash
 
 
 def test_quantity_respects_cap_after_fees() -> None:
@@ -185,13 +188,16 @@ def test_quantity_respects_cap_after_fees() -> None:
     quantity = affordable_quantity(Decimal("1000000"), limit, ZERODHA_EQUITY_RI)
     notional = limit * quantity
     fees = delivery_buy(notional, ZERODHA_EQUITY_RI, ceiling=True).total
-    assert notional + fees <= Decimal("100000")
+    assert notional <= Decimal("20000")
+    assert notional + limit > Decimal("20000")
+    assert fees > 0
+    assert reservation_buy(notional, ZERODHA_EQUITY_RI) == notional + fees
     assert affordable_quantity(Decimal("10"), Decimal("100"), ZERODHA_EQUITY_RI) == 0
 
 
 def test_restart_does_not_double_fill(repository: CoreRepository) -> None:
     _arm(repository, Decimal("442"))
-    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION)
+    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION, enforce_entry_window=False)
     first = datetime(2026, 10, 13, 3, 50, tzinfo=UTC)
     repository.upsert_candles([_bar(first, open_=Decimal("450"), low=Decimal("446"))])
     settle_entries(repository, starting_cash=CASH, now=first + timedelta(minutes=5))
@@ -205,7 +211,7 @@ def test_restart_does_not_double_fill(repository: CoreRepository) -> None:
 
 def test_same_day_reclass_and_single_dp_charge(repository: CoreRepository) -> None:
     _arm(repository, Decimal("100"))
-    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION)
+    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION, enforce_entry_window=False)
     start = datetime(2026, 10, 13, 3, 50, tzinfo=UTC)
     repository.upsert_candles([_bar(start, open_=Decimal("100"), low=Decimal("99"))])
     run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=start + timedelta(minutes=5))
@@ -237,7 +243,7 @@ def test_same_day_reclass_and_single_dp_charge(repository: CoreRepository) -> No
 
 def test_second_sell_does_not_charge_dp_again(repository: CoreRepository) -> None:
     _arm(repository, Decimal("100"))
-    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION)
+    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION, enforce_entry_window=False)
     start = datetime(2026, 10, 13, 3, 50, tzinfo=UTC)
     repository.upsert_candles([_bar(start, open_=Decimal("100"), low=Decimal("99"))])
     run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=start + timedelta(minutes=5))
@@ -316,7 +322,7 @@ def test_partial_same_day_sell_uses_the_whole_buy_order_for_brokerage() -> None:
 
 def test_rejected_fill_commit_does_not_move_peak(repository: CoreRepository, monkeypatch: pytest.MonkeyPatch) -> None:
     _arm(repository, Decimal("442"))
-    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION)
+    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION, enforce_entry_window=False)
     order = repository.list_orders()[0]
     start = datetime(2026, 10, 13, 3, 50, tzinfo=UTC)
     repository.upsert_candles([_bar(start, open_=Decimal("440"), low=Decimal("439"))])
@@ -324,14 +330,14 @@ def test_rejected_fill_commit_does_not_move_peak(repository: CoreRepository, mon
     from core_paper.execute import _fill_buy
 
     assert _fill_buy(repository, order, _bar(start, open_=Decimal("440"), low=Decimal("439")), Decimal("440"), CASH, ZERODHA_EQUITY_RI, "bar", []) is False
-    assert repository.active_paper_session().peak_equity is None
+    assert repository.active_paper_session().peak_equity == CASH
     assert repository.execution_count() == 0
     assert repository.list_orders()[0].status == OrderStatus.OPEN
 
 
 def test_cancel_releases_once_and_conflict_does_not_change_the_order(repository: CoreRepository) -> None:
     book = _arm(repository, Decimal("442"))
-    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION)
+    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION, enforce_entry_window=False)
     order = repository.list_orders()[0]
     reserved = repository.available_cash(CASH)
     assert reserved < CASH
@@ -373,7 +379,7 @@ def test_cancel_releases_once_and_conflict_does_not_change_the_order(repository:
 
 def test_cancel_route_is_paper_only(repository: CoreRepository) -> None:
     book = _arm(repository, Decimal("442"))
-    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION)
+    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION, enforce_entry_window=False)
     order = repository.list_orders()[0]
     client = TestClient(
         create_app(

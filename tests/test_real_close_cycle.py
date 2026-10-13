@@ -66,7 +66,7 @@ def test_real_closes_produce_one_filled_paper_order(repository: CoreRepository |
     )
     assert stored.accepted
     repository.open_paper_session(Decimal("1000000"))
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"), now=moment)
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"), now=moment, enforce_entry_window=False)
     orders = repository.list_orders()
     assert len(orders) == 1
     assert orders[0].status == OrderStatus.OPEN
@@ -88,7 +88,7 @@ def test_real_closes_produce_one_filled_paper_order(repository: CoreRepository |
             )
         ]
     )
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"), now=moment)
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1000000"), now=moment, enforce_entry_window=False)
     orders = repository.list_orders()
     assert orders[0].status == OrderStatus.OPEN
     assert repository.list_executions() == []

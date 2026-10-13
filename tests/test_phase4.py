@@ -70,7 +70,7 @@ def test_paper_cycle_fills_once_and_ignores_late_signals(repository: CoreReposit
     publisher = MemoryEventPublisher()
     opened = repository.open_paper_session(CASH)
     moment = FIXTURE_AS_OF
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH, now=moment)
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH, now=moment, enforce_entry_window=False)
     proposals = repository.list_proposals()
     assert len(proposals) == 1
     proposal = proposals[0]
@@ -80,7 +80,7 @@ def test_paper_cycle_fills_once_and_ignores_late_signals(repository: CoreReposit
     assert proposal.supporting_signal_ids == ["sig-valid"]
     assert proposal.aggregated_signal == 0.4
     assert proposal.aggregated_confidence == 0.8
-    assert proposal.quantity == 34
+    assert proposal.quantity == 6
     assert proposal.entry_price == Decimal("2927.00")
     assert proposal.stop_loss == Decimal("2868.46")
     assert proposal.take_profit == Decimal("3044.08")
@@ -117,7 +117,7 @@ def test_paper_cycle_fills_once_and_ignores_late_signals(repository: CoreReposit
             )
         ]
     )
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH, now=moment)
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH, now=moment, enforce_entry_window=False)
     orders = repository.list_orders()
     assert orders[0].status == OrderStatus.OPEN
     assert repository.list_executions() == []
@@ -136,7 +136,7 @@ def test_paper_cycle_fills_once_and_ignores_late_signals(repository: CoreReposit
             valid_until=as_of + timedelta(hours=6),
         ),
     )
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH, now=moment)
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH, now=moment, enforce_entry_window=False)
     assert repository.get_proposal(proposal.proposal_id).supporting_signal_ids == ["sig-valid"]  # type: ignore[union-attr]
     assert repository.execution_count() == 0
     assert len(publisher.events) == before
@@ -147,7 +147,7 @@ def test_non_paper_modes_are_rejected(repository: CoreRepository, mode: TradingM
     repository.open_paper_session(CASH)
     _prepare_buy(repository)
     publisher = MemoryEventPublisher()
-    run_paper_cycle(repository, publisher, mode=mode, starting_cash=CASH)
+    run_paper_cycle(repository, publisher, mode=mode, starting_cash=CASH, enforce_entry_window=False)
     decision = repository.list_risk_decisions()[0]
     assert decision.status.value == "REJECTED"
     assert any(check.name == "mode_is_paper" and not check.passed for check in decision.checks)
@@ -161,7 +161,7 @@ def test_risk_rejects_insufficient_cash(repository: CoreRepository) -> None:
     repository.open_paper_session(Decimal("1"))
     _prepare_buy(repository)
     publisher = MemoryEventPublisher()
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1"))
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=Decimal("1"), enforce_entry_window=False)
     decision = repository.list_risk_decisions()[0]
     assert decision.status.value == "REJECTED"
     assert any(check.name == "sufficient_cash" and not check.passed for check in decision.checks)
@@ -190,7 +190,7 @@ def test_risk_rejects_notional_cap(repository: CoreRepository) -> None:
     _store(repository, _signal(signal_id="sig-expensive", timestamp=end, valid_until=end + timedelta(hours=1)))
     repository.open_paper_session(CASH)
     publisher = MemoryEventPublisher()
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH)
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH, enforce_entry_window=False)
     decision = repository.list_risk_decisions()[0]
     assert decision.status.value == "REJECTED"
     assert any(check.name == "notional_cap" and not check.passed for check in decision.checks)
@@ -203,7 +203,7 @@ def test_risk_rejects_sell_without_a_long(repository: CoreRepository) -> None:
     repository.upsert_candles(list(candles_for("RELIANCE")))
     _store(repository, _signal(signal_id="sig-sell", signal=-0.8, confidence=0.9, timestamp=FIXTURE_AS_OF))
     publisher = MemoryEventPublisher()
-    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH)
+    run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH, enforce_entry_window=False)
     decision = repository.list_risk_decisions()[0]
     assert decision.status.value == "REJECTED"
     assert any(check.name == "no_short" and not check.passed for check in decision.checks)
@@ -232,10 +232,10 @@ def test_paper_routes_and_stop(repository: CoreRepository) -> None:
     assert stopped.json()["running"] is False
     assert stopped.json()["starting_cash"] == "1000000"
     _prepare_buy(repository)
-    run_paper_cycle(repository, MemoryEventPublisher(), mode=TradingMode.PAPER, starting_cash=CASH, now=FIXTURE_AS_OF)
+    run_paper_cycle(repository, MemoryEventPublisher(), mode=TradingMode.PAPER, starting_cash=CASH, now=FIXTURE_AS_OF, enforce_entry_window=False)
     assert repository.list_proposals() == []
     client.post("/api/v1/paper/start", headers=headers)
-    run_paper_cycle(repository, MemoryEventPublisher(), mode=TradingMode.PAPER, starting_cash=CASH, now=FIXTURE_AS_OF)
+    run_paper_cycle(repository, MemoryEventPublisher(), mode=TradingMode.PAPER, starting_cash=CASH, now=FIXTURE_AS_OF, enforce_entry_window=False)
     assert repository.execution_count() == 0
     body = client.get("/api/v1/orders", headers=headers).json()[0]
     assert body["status"] == "OPEN"

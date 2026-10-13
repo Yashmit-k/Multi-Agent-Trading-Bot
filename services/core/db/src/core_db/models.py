@@ -297,6 +297,14 @@ class DpChargeRow(Base):
     execution_id: Mapped[str] = mapped_column(String(128), nullable=False)
 
 
+class EntryDayGateRow(Base):
+    """Mutex row for one IST date. The entry count itself is derived from orders."""
+
+    __tablename__ = "entry_day_gates"
+
+    trading_day: Mapped[str] = mapped_column(String(10), primary_key=True)
+
+
 class OrderBarCheckRow(Base):
     __tablename__ = "order_bar_checks"
     __table_args__ = (UniqueConstraint("order_id", "bar_key", name="uq_order_bar_check"),)
