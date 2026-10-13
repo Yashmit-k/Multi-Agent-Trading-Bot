@@ -4,6 +4,8 @@ from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
+
 from quant_agents.research.daily_rules.costs import trade_pnl
 from quant_agents.research.daily_rules.evaluate import score_rules
 from quant_agents.research.daily_rules.rules import low_volatility_names, momentum_12_1, momentum_20, realized_volatility
@@ -60,17 +62,23 @@ def test_selective_momentum_can_pass_and_always_long_cannot():
     assert crowded.average_selected_fraction >= Decimal("0.90")
 
 
-def test_runner_uses_the_daily_snapshot_only():
-    path = daily_candle_file()
+def test_runner_uses_the_daily_snapshot_only(tmp_path: Path):
+    nifty = tmp_path / "snapshots 2" / "nifty50"
+    (nifty / "1D").mkdir(parents=True)
+    (nifty / "1D" / "candles.jsonl").write_text("{}\n", encoding="utf-8")
+    path = daily_candle_file(nifty)
     assert path.parent.name == "1D"
+    assert path.parent.parent.parent.name == "snapshots 2"
     assert "holdout" not in str(path)
     root = Path(__file__).resolve().parents[2]
     research_init = (root / "src" / "quant_agents" / "research" / "__init__.py").read_text(encoding="utf-8")
     worker = (root.parents[0] / "core" / "worker" / "src" / "core_worker" / "__main__.py").read_text(encoding="utf-8")
     assert "daily_rules" not in research_init
     assert "daily_rules" not in worker
-    try:
+    with pytest.raises(SnapshotRefused):
         daily_candle_file(Path("/tmp/holdout_after_20261005"))
-    except SnapshotRefused:
-        return
-    raise AssertionError("holdout path was accepted")
+    other = tmp_path / "short-tape" / "nifty50"
+    (other / "1D").mkdir(parents=True)
+    (other / "1D" / "candles.jsonl").write_text("{}\n", encoding="utf-8")
+    with pytest.raises(SnapshotRefused):
+        daily_candle_file(other)
