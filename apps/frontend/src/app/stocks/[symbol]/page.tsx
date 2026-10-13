@@ -2,7 +2,7 @@ import { fetchApi } from "@/lib/api";
 import type { ProvisionalAgentScore, ProvisionalRiskStatus, ProvisionalStock } from "@/api/generated/provisional";
 import { CandleChart } from "@/components/CandleChart";
 import { HorizonSplit } from "@/components/HorizonSplit";
-import { ErrorState } from "@/components/States";
+import { ErrorState, EmptyState } from "@/components/States";
 
 export default async function StockPage({ params }: { params: Promise<{ symbol: string }> }) {
   const { symbol } = await params;
@@ -41,13 +41,18 @@ export default async function StockPage({ params }: { params: Promise<{ symbol: 
           ))}
         </ul>
         <h2 className="font-semibold">News</h2>
-        <ul>
-          {news.map((item) => (
-            <li key={item.title}>
-              {item.title} ({item.published_at})
-            </li>
-          ))}
-        </ul>
+        <p>Stored per-symbol articles. This is not a live news feed.</p>
+        {news.length === 0 ? (
+          <EmptyState label="per-symbol news" />
+        ) : (
+          <ul>
+            {news.map((item) => (
+              <li key={item.title}>
+                {item.title} ({item.published_at})
+              </li>
+            ))}
+          </ul>
+        )}
         <h2 className="font-semibold">Fundamentals</h2>
         <ul>
           {fundamentals.map((item) => (

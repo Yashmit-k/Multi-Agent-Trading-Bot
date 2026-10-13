@@ -2,6 +2,7 @@ import { fetchApi } from "@/lib/api";
 import type { ProvisionalMarketOverview, ProvisionalRiskStatus, ProvisionalStock, ProvisionalSystemStatus } from "@/api/generated/provisional";
 import { ErrorState } from "@/components/States";
 import { HorizonSplit } from "@/components/HorizonSplit";
+import { PaperMetrics, type PaperPortfolio } from "@/components/PaperMetrics";
 
 export default async function DashboardPage() {
   try {
@@ -10,7 +11,7 @@ export default async function DashboardPage() {
       fetchApi<ProvisionalMarketOverview>("/api/v1/market/overview"),
       fetchApi<ProvisionalStock[]>("/api/v1/stocks"),
       fetchApi<Array<{ agent_name: string; horizon: string; signal: number; confidence: number; symbol: string }>>("/api/v1/signals"),
-      fetchApi<{ total_pnl: string; equity: string; gross_exposure: string }>("/api/v1/portfolio"),
+      fetchApi<PaperPortfolio>("/api/v1/portfolio"),
       fetchApi<Array<{ symbol: string; quantity: number }>>("/api/v1/positions"),
       fetchApi<ProvisionalRiskStatus>("/api/v1/risk/status"),
     ]);
@@ -24,20 +25,22 @@ export default async function DashboardPage() {
         <p>
           Mode {status.trading_mode} · live_enabled {String(status.live_enabled)} · health {status.status}
         </p>
-        <p>
-          Portfolio PnL {portfolio.total_pnl} · equity {portfolio.equity} · exposure {portfolio.gross_exposure}
-        </p>
+        <PaperMetrics portfolio={portfolio} />
         <p>
           Risk {risk.status} · {risk.message}
         </p>
         <h2 className="font-semibold">Positions</h2>
-        <ul>
-          {positions.map((item) => (
-            <li key={item.symbol}>
-              {item.symbol} qty {item.quantity}
-            </li>
-          ))}
-        </ul>
+        {positions.length === 0 ? (
+          <p data-testid="missing-positions">No positions in the active session.</p>
+        ) : (
+          <ul>
+            {positions.map((item) => (
+              <li key={item.symbol}>
+                {item.symbol} qty {item.quantity}
+              </li>
+            ))}
+          </ul>
+        )}
         <h2 className="font-semibold">Top signals</h2>
         <HorizonSplit signals={signals} />
         <h2 className="font-semibold">Universe</h2>

@@ -21,7 +21,8 @@ export default async function PerformancePage() {
     const performance = await fetchApi<Performance>("/api/v1/performance");
     return (
       <div>
-        <h1 className="text-2xl font-bold">Performance</h1>
+        <h1 className="text-2xl font-bold">Backtest results</h1>
+        <p>These figures are the latest stored backtest from GET /api/v1/performance. They are not paper-account P&amp;L.</p>
         <p>Return {performance.total_return}</p>
         <p>
           Sharpe {performance.sharpe ?? "n/a"} over {performance.periods_per_year} periods/year
@@ -42,7 +43,8 @@ export default async function PerformancePage() {
     if (message === "api_404") {
       return (
         <div>
-          <h1 className="text-2xl font-bold">Performance</h1>
+          <h1 className="text-2xl font-bold">Backtest results</h1>
+          <p>These figures are the latest stored backtest from GET /api/v1/performance. They are not paper-account P&amp;L.</p>
           <EmptyState label="backtests" />
         </div>
       );

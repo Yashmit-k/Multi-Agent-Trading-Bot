@@ -831,9 +831,9 @@ def _portfolio_body(snapshot: object, starting_cash: Decimal) -> dict[str, objec
     if snapshot is None:
         return {
             "snapshot": None,
-            "total_pnl": "0",
+            "total_pnl": None,
             "equity": str(starting_cash),
-            "gross_exposure": "0",
+            "gross_exposure": None,
         }
     return {
         "snapshot": snapshot.model_dump(mode="json"),  # type: ignore[attr-defined]
