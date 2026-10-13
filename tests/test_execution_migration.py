@@ -1,4 +1,4 @@
-"""Upgrade and downgrade 0006 on a disposable SQLite file. Production is not contacted."""
+"""Upgrade to head and downgrade past the execution tables. Production is not contacted."""
 
 import os
 import subprocess
@@ -19,7 +19,7 @@ def test_execution_migration_round_trip(tmp_path: Path) -> None:
     _alembic(env, "upgrade", "head")
     engine = create_engine(env["DATABASE_URL"])
     names = set(inspect(engine).get_table_names())
-    assert {"cash_reservations", "charge_ledger", "dp_charges", "order_bar_checks"} <= names
+    assert {"cash_reservations", "charge_ledger", "dp_charges", "order_bar_checks", "entry_day_gates"} <= names
     with engine.begin() as connection:
         connection.execute(
             text(
@@ -27,10 +27,11 @@ def test_execution_migration_round_trip(tmp_path: Path) -> None:
                 "VALUES ('legacy', 'sess', 'prop', 'NSE:KOTAKBANK', '{\"status\":\"OPEN\",\"fill_at\":\"next_open\"}')"
             )
         )
-    _alembic(env, "downgrade", "-1")
+    _alembic(env, "downgrade", "0005_paper_sessions")
     gone = set(inspect(engine).get_table_names())
     assert "cash_reservations" not in gone
     assert "charge_ledger" not in gone
+    assert "entry_day_gates" not in gone
     _alembic(env, "upgrade", "head")
     with engine.connect() as connection:
         payload = connection.execute(text("SELECT payload FROM orders WHERE order_id = 'legacy'")).scalar_one()

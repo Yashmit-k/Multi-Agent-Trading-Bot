@@ -24,13 +24,15 @@ def assess(
     cash: Decimal,
     held_quantity: int,
     timestamp: datetime,
+    max_notional: Decimal | None = None,
 ) -> RiskDecision:
+    bound = MAX_NOTIONAL if max_notional is None else max_notional
     notional = proposal.entry_price * proposal.quantity
     checks = [
         _check("mode_is_paper", mode == TradingMode.PAPER, f"mode {mode.value} is not PAPER"),
         _check("universe_member", in_universe, f"{proposal.symbol} is outside the universe at as_of"),
         _check("sufficient_cash", proposal.side != Side.BUY or notional <= cash, "buy notional exceeds cash"),
-        _check("notional_cap", notional <= MAX_NOTIONAL, "order notional exceeds 20000"),
+        _check("notional_cap", notional <= bound, f"order notional exceeds {bound}"),
         _check(
             "no_short",
             proposal.side != Side.SELL or proposal.quantity <= held_quantity,
