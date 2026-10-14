@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { fetchApi } from "@/lib/api";
 import { ErrorState } from "@/components/States";
+import { provenance } from "@/lib/signal-provenance";
 
 export type TraceEvent = {
   event_id: string;
@@ -75,7 +76,7 @@ function time(value: string | null): string {
 
 const loadTrace = (key: string) => fetchApi<TraceResponse>(key);
 
-export function AgentTrace() {
+export function AgentTrace({ excluded = [] }: { excluded?: string[] }) {
   const [filter, setFilter] = useState<string>("all");
   const [chain, setChain] = useState<string | null>(null);
   const { data, error, isLoading } = useSWR("/api/v1/trace?limit=300", loadTrace, { refreshInterval: 10000 });
@@ -117,6 +118,7 @@ export function AgentTrace() {
               <div className="text-[#94A3B8]">{lane.kind}</div>
               <div className="mt-1 text-[#E6EDF3]">{stat ? `${stat.count} msgs` : "no messages"}</div>
               <div className="text-[#64748B]">{stat ? time(stat.last) : "—"}</div>
+              {excluded.includes(lane.key) ? <div className="text-[#F59E0B]">excluded from fusion</div> : null}
             </button>
           );
         })}
@@ -171,9 +173,7 @@ export function AgentTrace() {
                   <td className="pr-3">{event.symbol ?? "—"}</td>
                   <td className="pr-3">
                     {describe(event)}
-                    {event.event_type === "agent.signal" && typeof event.payload.reasoning === "string" ? (
-                      <div className="text-[#64748B]">{String(event.payload.reasoning).slice(0, 160)}</div>
-                    ) : null}
+                    {event.event_type === "agent.signal" ? <SignalDetail event={event} excluded={excluded} /> : null}
                   </td>
                   <td>
                     <button type="button" className="text-[#60A5FA] underline" onClick={() => setChain(event.correlation_id)}>
@@ -189,6 +189,22 @@ export function AgentTrace() {
       <p className="text-xs text-[#64748B]">
         {data.count} most recent messages · refreshes every 10 s · PAPER only, live trading disabled.
       </p>
+    </div>
+  );
+}
+
+function SignalDetail({ event, excluded }: { event: TraceEvent; excluded: string[] }) {
+  const p = provenance(event.payload);
+  return (
+    <div className="text-[#64748B]">
+      {p.reasons.length ? <div>reasons: {p.reasons.join(", ")}</div> : null}
+      {p.llm ? <div>source: {p.llm}</div> : <div>source: deterministic rules on live candles</div>}
+      {p.headlines.slice(0, 2).map((item) => (
+        <div key={item.title}>
+          “{item.title}” <span className="text-[#475569]">({item.source})</span>
+        </div>
+      ))}
+      {event.agent && excluded.includes(event.agent) ? <div className="text-[#F59E0B]">excluded from fusion (no live data source)</div> : null}
     </div>
   );
 }

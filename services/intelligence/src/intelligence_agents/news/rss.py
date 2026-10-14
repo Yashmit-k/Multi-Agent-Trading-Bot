@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import re
 import time
 from datetime import datetime
 from email.utils import parsedate_to_datetime
@@ -17,11 +16,12 @@ from contracts.schemas.news_article import NewsArticle
 from defusedxml import ElementTree
 
 from intelligence_agents.clock import Clock
+from intelligence_agents.news.aliases import build_matcher, map_symbols
 from intelligence_agents.news.store import NewsStore
 
 logger = logging.getLogger(__name__)
 
-_TICKER = re.compile(r"\b([A-Z]{2,12})\b")
+USER_AGENT = "Mozilla/5.0 (compatible; nifty-paper-intelligence/1.0)"
 
 
 class RssPuller:
@@ -45,7 +45,8 @@ class RssPuller:
         self._max_items = max_items
         self._interval_seconds = interval_seconds
         self._retries = retries
-        self._client = client or httpx.Client(timeout=15.0, follow_redirects=True)
+        self._client = client or httpx.Client(timeout=15.0, follow_redirects=True, headers={"User-Agent": USER_AGENT})
+        self._matcher = build_matcher(self._universe)
         self._sleep = sleeper
         self._last_fetch: dict[str, datetime] = {}
 
@@ -104,8 +105,7 @@ class RssPuller:
         return inserted
 
     def _map_symbols(self, text: str) -> list[str]:
-        found = {match.group(1) for match in _TICKER.finditer(text.upper())}
-        return sorted(found & self._universe)
+        return map_symbols(text, self._universe, self._matcher)
 
     def _fetch(self, url: str) -> bytes | None:
         delay = 0.2

@@ -46,18 +46,21 @@ def fuse(
     selected = select_signals(signals, horizon=horizon, as_of=as_of)
     if not selected:
         return None
-    weighted = [(signal, _weight(horizon, signal.agent_name, weights)) for signal in selected]
+    # A zero weight removes the agent from the vote and from the supporting ids.
+    weighted = [(signal, weight) for signal in selected if (weight := _weight(horizon, signal.agent_name, weights)) > 0]
+    if not weighted:
+        return None
     total_weight = sum((weight for _, weight in weighted), Decimal("0"))
     if total_weight <= 0:
         return None
     signal_total = sum((weight * Decimal(str(signal.signal)) * Decimal(str(signal.confidence)) for signal, weight in weighted), Decimal("0"))
     confidence_total = sum((weight * Decimal(str(signal.confidence)) for signal, weight in weighted), Decimal("0"))
     return Aggregate(
-        symbol=selected[0].symbol,
+        symbol=weighted[0][0].symbol,
         horizon=horizon,
         aggregated_signal=_clipped_ratio(signal_total, total_weight),
         aggregated_confidence=_ratio(confidence_total, total_weight),
-        supporting_signal_ids=tuple(signal.signal_id for signal in selected),
+        supporting_signal_ids=tuple(signal.signal_id for signal, _ in weighted),
     )
 
 

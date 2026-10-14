@@ -44,6 +44,7 @@ class NewsAgent(BaseIntelligenceAgent):
         metadata = {
             "llm": [as_jsonable(item) for item in assessments],
             "content_hash": content_hash("".join(article.content_hash for article in articles)),
+            "headlines": [{"title": article.title, "source": article.source, "url": str(article.url)} for article in articles[:5]],
         }
         payload["llm"] = metadata["llm"]
         return self._build(
