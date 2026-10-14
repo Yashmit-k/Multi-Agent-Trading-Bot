@@ -1,6 +1,7 @@
 import result from "@/lib/research/ml-rank-result.json";
 import { PageFrame } from "@/components/shell/PageFrame";
 import { Badge, Card, Stat, Table, Td } from "@/components/ui";
+import { EnsembleStudy } from "@/components/research/EnsembleStudy";
 
 export const metadata = { title: "Research · StockX" };
 
@@ -56,9 +57,12 @@ export default function ResearchPage() {
   const chosen = result.chosen_model as string;
   return (
     <PageFrame
-      title="Research: ML stock ranker"
-      description="A pre-registered study: rules fixed before testing, model chosen on 2024–2025, scored once on 2026 data no study had used. Gates decide; the result is shown even though it failed."
+      title="ML research"
+      description="Two pre-registered studies. Rules were fixed and committed before any result existed, and every result is shown, including failures."
     >
+      <h2 className="pt-2 text-lg font-semibold">Study 2 · Multi-algorithm ensemble across market conditions</h2>
+      <EnsembleStudy />
+      <h2 className="pt-6 text-lg font-semibold">Study 1 · Single-model stock ranker, scored once on 2026</h2>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Verdict" value={result.accepted ? "Accepted" : "Not accepted"} tone={result.accepted ? "up" : "down"} hint="MlAgent stays unloaded; no paper orders use it" />
         <Stat label="Out-of-sample edge vs basket" value={pct(oos.excess_mean, 2)} tone="up" hint="per 5-session window, after costs" />
