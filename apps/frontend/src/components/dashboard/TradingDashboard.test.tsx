@@ -79,6 +79,7 @@ describe("dashboard isolation", () => {
     expect(source).not.toContain('"/api/v1/performance"');
     const loader = readFileSync("src/lib/load-real-dashboard.ts", "utf8");
     expect(loader).not.toContain("demoDashboard");
+    expect(loader).not.toContain("current-paper");
     expect(loader).toContain('"/api/v1/paper/daily-performance"');
   });
 

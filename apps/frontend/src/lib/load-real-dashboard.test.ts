@@ -1,6 +1,45 @@
-import { describe, expect, it } from "vitest";
-import { applyDailyPerformance, type DailyPerformanceResponse } from "@/lib/load-real-dashboard";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { applyDailyPerformance, loadRealDashboard, type DailyPerformanceResponse } from "@/lib/load-real-dashboard";
 import type { DashboardSnapshot } from "@/lib/daily-pnl";
+import { demoDashboard } from "@/lib/demo/dashboard-fixtures";
+import { fetchApi } from "@/lib/api";
+
+vi.mock("@/lib/api", () => ({
+  fetchApi: vi.fn(),
+}));
+
+const ACTIVE_SESSION_ID = "c6c7f91fe84f4d48862c4a1b85646f3b";
+
+function paperStatus(sessionId: string | null) {
+  return {
+    running: true,
+    trading_mode: "PAPER",
+    starting_cash: "1000000",
+    kill_switch: "disarmed",
+    session_id: sessionId,
+    session_status: "active",
+    live_enabled: false,
+  };
+}
+
+function mockReads(paper: Record<string, unknown> | Error) {
+  vi.mocked(fetchApi).mockImplementation(async (path: string) => {
+    if (path === "/api/v1/paper/status") {
+      if (paper instanceof Error) throw paper;
+      return paper;
+    }
+    if (path === "/api/v1/paper/daily-performance") {
+      return { status: "unavailable", reason: "no_daily_equity_history" };
+    }
+    if (path === "/api/v1/positions" || path === "/api/v1/orders" || path === "/api/v1/trades") {
+      return [];
+    }
+    if (path === "/api/v1/system/status") {
+      return { status: "ok", trading_mode: "PAPER", live_enabled: false };
+    }
+    throw new Error("api_503");
+  });
+}
 
 function stub(): DashboardSnapshot {
   return {
@@ -32,6 +71,43 @@ function stub(): DashboardSnapshot {
     contract_note: "test",
   };
 }
+
+describe("loadRealDashboard session id", () => {
+  beforeEach(() => {
+    vi.mocked(fetchApi).mockReset();
+  });
+
+  it("uses the active paper session id from GET /api/v1/paper/status", async () => {
+    mockReads(paperStatus(ACTIVE_SESSION_ID));
+    const snapshot = await loadRealDashboard();
+    expect(snapshot.mode).toBe("real");
+    expect(snapshot.sessions[0]?.session_id).toBe(ACTIVE_SESSION_ID);
+    expect(snapshot.selected_session_id).toBe(ACTIVE_SESSION_ID);
+    expect(snapshot.selected_session_id).not.toBe("current-paper");
+    expect(snapshot.daily_endpoint).toBe("unavailable");
+    expect(snapshot.days).toEqual([]);
+    const demoIds = demoDashboard().sessions.map((session) => session.session_id);
+    expect(demoIds).not.toContain(snapshot.selected_session_id);
+    expect(demoDashboard().mode).toBe("demo");
+  });
+
+  it("leaves the session empty when paper status has no session id", async () => {
+    mockReads(paperStatus(null));
+    const snapshot = await loadRealDashboard();
+    expect(snapshot.sessions).toEqual([]);
+    expect(snapshot.selected_session_id).toBe("");
+    expect(snapshot.mode).toBe("real");
+  });
+
+  it("leaves the session empty when paper status fails", async () => {
+    mockReads(new Error("api_503"));
+    const snapshot = await loadRealDashboard();
+    expect(snapshot.sessions).toEqual([]);
+    expect(snapshot.selected_session_id).toBe("");
+    expect(snapshot.status.core).toBe("ok");
+    expect(snapshot.daily_endpoint).toBe("unavailable");
+  });
+});
 
 describe("applyDailyPerformance", () => {
   it("maps Core unavailable to empty days, not fabricated P&L", () => {
