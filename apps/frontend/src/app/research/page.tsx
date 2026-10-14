@@ -2,6 +2,7 @@ import result from "@/lib/research/ml-rank-result.json";
 import { PageFrame } from "@/components/shell/PageFrame";
 import { Badge, Card, Stat, Table, Td } from "@/components/ui";
 import { EnsembleStudy } from "@/components/research/EnsembleStudy";
+import { CombinedStudy } from "@/components/research/CombinedStudy";
 
 export const metadata = { title: "Research · StockX" };
 
@@ -58,9 +59,11 @@ export default function ResearchPage() {
   return (
     <PageFrame
       title="ML research"
-      description="Two pre-registered studies. Rules were fixed and committed before any result existed, and every result is shown, including failures."
+      description="Three pre-registered studies. Rules were fixed and committed before any result existed, and every result is shown, including failures. Across 48 tracked trials there is no robust return edge; there is a robust risk (volatility) edge."
     >
-      <h2 className="pt-2 text-lg font-semibold">Study 2 · Multi-algorithm ensemble across market conditions</h2>
+      <h2 className="pt-2 text-lg font-semibold">Study 3 · One combined model: every hypothesis family, return and risk targets</h2>
+      <CombinedStudy />
+      <h2 className="pt-6 text-lg font-semibold">Study 2 · Multi-algorithm ensemble across market conditions</h2>
       <EnsembleStudy />
       <h2 className="pt-6 text-lg font-semibold">Study 1 · Single-model stock ranker, scored once on 2026</h2>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
