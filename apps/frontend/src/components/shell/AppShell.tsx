@@ -5,23 +5,16 @@ import { usePathname } from "next/navigation";
 import type { TradingMode } from "@/contracts/generated/vocab";
 import { ModeBanner } from "@/components/ModeBanner";
 
-const LINKS = [
-  ["/dashboard", "Overview"],
-  ["/positions", "Positions"],
-  ["/orders", "Orders"],
-  ["/news", "News"],
-  ["/signals", "Signals"],
-  ["/agents", "Agents"],
-  ["/trace", "Agent trace"],
-  ["/market", "Market"],
-  ["/stocks", "Stocks"],
-  ["/portfolio", "Portfolio"],
-  ["/backtests", "Backtests"],
-  ["/performance", "Performance"],
-  ["/risk", "Risk"],
-  ["/system", "System"],
-  ["/settings", "Settings"],
-] as const;
+type NavLink = readonly [string, string];
+const GROUPS: ReadonlyArray<readonly [string, ReadonlyArray<NavLink>]> = [
+  ["Trading", [["/dashboard", "Overview"], ["/portfolio", "Portfolio"], ["/positions", "Positions"], ["/orders", "Orders"], ["/risk", "Risk"]]],
+  ["Agents", [["/agents", "Agents"], ["/trace", "Agent trace"], ["/signals", "Signals"], ["/news", "News"]]],
+  ["Market", [["/market", "Market"], ["/stocks", "Stocks"]]],
+  ["Research", [["/research", "ML research"], ["/backtests", "Backtests"], ["/performance", "Performance"]]],
+  ["System", [["/system", "Health"], ["/settings", "Settings"]]],
+];
+
+const LINKS: NavLink[] = GROUPS.flatMap(([, links]) => [...links]);
 
 export function AppShell({
   mode,
@@ -38,23 +31,31 @@ export function AppShell({
       <ModeBanner mode={mode} killSwitch={killSwitch} />
       <div className="flex min-h-[calc(100vh-40px)]">
         <aside className="hidden w-[214px] shrink-0 border-r border-[#26303C] bg-[#0F141B] md:block">
-          <nav className="flex flex-col gap-0.5 px-2 py-4 text-sm">
-            {LINKS.map(([href, label]) => {
-              const active = pathname === href || pathname.startsWith(`${href}/`);
-              return (
-                <Link prefetch={false}
-                  key={href}
-                  href={href}
-                  className={
-                    active
-                      ? "rounded-md bg-[#171F2A] px-3 py-1.5 text-[#E6EDF3]"
-                      : "rounded-md px-3 py-1.5 text-[#94A3B8] hover:bg-[#171F2A]"
-                  }
-                >
-                  {label}
-                </Link>
-              );
-            })}
+          <nav className="flex flex-col gap-4 px-2 py-4 text-sm">
+            {GROUPS.map(([group, links]) => (
+              <div key={group}>
+                <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">{group}</div>
+                <div className="flex flex-col gap-0.5">
+                  {links.map(([href, label]) => {
+                    const active = pathname === href || pathname.startsWith(`${href}/`);
+                    return (
+                      <Link
+                        prefetch={false}
+                        key={href}
+                        href={href}
+                        className={
+                          active
+                            ? "rounded-md bg-[#171F2A] px-3 py-1.5 text-[#E6EDF3]"
+                            : "rounded-md px-3 py-1.5 text-[#94A3B8] hover:bg-[#171F2A]"
+                        }
+                      >
+                        {label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </nav>
         </aside>
         <div className="min-w-0 flex-1">

@@ -140,7 +140,14 @@ This split is deliberate. LLMs are good at reading news and filings and bad at b
 | **defusedxml + httpx** for RSS | Safe XML parsing, size/item caps, retries |
 | **Next.js 15 + React 19 + SWR + Tailwind** | Server components read Core directly. A server-side proxy keeps the API token off the browser. SWR polls the live trace. |
 | **Docker Compose + Caddy** | Same seven-service stack locally and on one cloud VM. Caddy provides automatic HTTPS. Only ports 80/443 are public. |
-| **pytest + vitest + GitHub Actions** | About 300 backend tests (paper lifecycle, risk, caps, migrations on Postgres, trace recorder, fusion exclusion) and 53 frontend tests on every push |
+| **pytest + vitest + GitHub Actions** | 302 core tests, 85 intelligence tests, 151 quant tests (including no-look-ahead tests for the ML ranker) and 57 frontend tests, run on every push |
+| **scikit-learn** | Gradient boosting and ridge for the pre-registered ML ranker. Small, fixed hyperparameters, walk-forward refits with an embargo. |
+
+## Observability
+
+- `GET /api/v1/system/health` checks every component: Kite, collector, Postgres, Redis, quant agents, LLM agents, intelligence service, trace recorder, orchestrator, and paper session. The dashboard's pipeline strip and the **System** page show it.
+- `GET /api/v1/decisions/chain` joins each proposal to its risk decision and order. The **Risk** page lists recent decisions with every failed check named.
+- `GET /api/v1/trace` serves the recorded bus messages. The **Agent trace** page and `scripts/export_agent_trace.py` use it.
 
 ## Safety properties
 

@@ -1,24 +1,13 @@
-export const metadata = { title: "Backtests · StockX" };
 import { fetchApi } from "@/lib/api";
-import { EmptyState, ErrorState } from "@/components/States";
+import { ErrorState } from "@/components/States";
 import { PageFrame } from "@/components/shell/PageFrame";
+import { BacktestSummary, type BacktestPerformance } from "@/components/BacktestSummary";
+import { EquityLine } from "@/components/EquityLine";
+import { Badge, Card, Empty } from "@/components/ui";
+import { inr, istTime, shortId } from "@/lib/format";
 
-type EquityPoint = { timestamp: string; equity: string };
-
-type Performance = {
-  total_return: number;
-  sharpe: number | null;
-  sortino: number | null;
-  max_drawdown: string;
-  win_rate: number;
-  profit_factor: string | null;
-  trades: number;
-  gross_pnl: string;
-  transaction_costs: string;
-  slippage: string;
-  net_pnl: string;
-  periods_per_year: number;
-};
+export const metadata = { title: "Backtests · StockX" };
+export const dynamic = "force-dynamic";
 
 type BacktestRun = {
   backtest_id: string;
@@ -32,71 +21,78 @@ type BacktestRun = {
   transaction_cost_bps: string | null;
   slippage_bps: string;
   portfolio_value: string;
-  performance: Performance;
-  equity_curve: EquityPoint[];
+  candles_processed?: number;
+  signals_generated?: number;
+  performance: BacktestPerformance;
+  equity_curve: Array<{ timestamp: string; equity: string }>;
 };
 
-export default async function BacktestsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ id?: string }>;
-}) {
+export default async function BacktestsPage({ searchParams }: { searchParams: Promise<{ id?: string }> }) {
   const params = await searchParams;
   try {
     const runs = await fetchApi<BacktestRun[]>("/api/v1/backtests");
     if (runs.length === 0) {
       return (
         <PageFrame title="Backtests">
-          <EmptyState label="backtests" />
+          <Empty>No backtests stored yet.</Empty>
         </PageFrame>
       );
     }
     const selected = runs.find((run) => run.backtest_id === params.id) ?? runs[0];
-    const performance = selected.performance;
     return (
-      <PageFrame title="Backtests">
-        <ul className="space-y-1 text-sm">
-          {runs.map((run) => (
-            <li key={run.backtest_id}>
-              <a className="text-cyan-400 hover:underline" href={`/backtests?id=${run.backtest_id}`}>
-                {run.backtest_id}
+      <PageFrame
+        title="Backtests"
+        description="Historical replays of the same fusion → decision → risk → execution path, on frozen Zerodha candles. These are not paper-account results."
+      >
+        {runs.length > 1 ? (
+          <div className="flex flex-wrap gap-2 text-sm">
+            {runs.map((run) => (
+              <a key={run.backtest_id} href={`/backtests?id=${run.backtest_id}`} className={run.backtest_id === selected.backtest_id ? "text-[#60A5FA]" : "text-[#94A3B8] hover:text-[#E6EDF3]"}>
+                {shortId(run.backtest_id)} · {run.strategy}
               </a>
-            </li>
-          ))}
-        </ul>
-        <h2 className="text-xl font-semibold">Run {selected.backtest_id}</h2>
-        <p>Snapshot {selected.snapshot_id}</p>
-        <p>Strategy {selected.strategy}</p>
-        <p>
-          {selected.timeframe} {selected.start} to {selected.end}
-        </p>
-        <p>Symbols {selected.symbols.join(", ")}</p>
-        <p>Initial cash {selected.initial_cash}</p>
-        <p>
-          Cost {selected.transaction_cost_bps ?? "itemized"} bp, slippage {selected.slippage_bps} bp
-        </p>
-        <p>Portfolio {selected.portfolio_value}</p>
-        <p>Return {performance.total_return}</p>
-        <p>
-          Sharpe {performance.sharpe ?? "n/a"} over {performance.periods_per_year} periods/year
-        </p>
-        <p>Sortino {performance.sortino ?? "n/a"}</p>
-        <p>Max drawdown {performance.max_drawdown}</p>
-        <p>Win rate {performance.win_rate}</p>
-        <p>Profit factor {performance.profit_factor ?? "n/a"}</p>
-        <p>Trades {performance.trades}</p>
-        <p>Gross P&L {performance.gross_pnl}</p>
-        <p>Costs {performance.transaction_costs}</p>
-        <p>Slippage {performance.slippage}</p>
-        <p>Net P&L {performance.net_pnl}</p>
-        <h2 className="text-xl font-semibold">Equity curve</h2>
-        <ol className="space-y-1 text-sm">
-          {selected.equity_curve.slice(-20).map((point) => (
-            <li key={point.timestamp}>
-              {point.timestamp} {point.equity}
-            </li>
-          ))}
-        </ol>
+            ))}
+          </div>
+        ) : null}
+        <Card title={`Run ${shortId(selected.backtest_id)}`} right={<Badge tone="info">{selected.strategy}</Badge>}>
+          <dl className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <dt className="text-xs text-[#94A3B8]">Period</dt>
+              <dd>
+                {istTime(selected.start)} → {istTime(selected.end)} IST · {selected.timeframe} bars
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-[#94A3B8]">Symbols</dt>
+              <dd>{selected.symbols.join(", ")}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-[#94A3B8]">Snapshot</dt>
+              <dd className="font-mono text-xs">{selected.snapshot_id}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-[#94A3B8]">Starting → ending</dt>
+              <dd>
+                {inr(selected.initial_cash)} → {inr(selected.portfolio_value)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-[#94A3B8]">Costs</dt>
+              <dd>
+                {selected.transaction_cost_bps ?? "itemized"} bp per fill + {selected.slippage_bps} bp slippage
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-[#94A3B8]">Pipeline activity</dt>
+              <dd>
+                {selected.candles_processed ?? "—"} bars · {selected.signals_generated ?? "—"} agent signals
+              </dd>
+            </div>
+          </dl>
+        </Card>
+        <BacktestSummary performance={selected.performance} />
+        <Card title="Equity curve">
+          <EquityLine points={selected.equity_curve} />
+        </Card>
       </PageFrame>
     );
   } catch (error) {
