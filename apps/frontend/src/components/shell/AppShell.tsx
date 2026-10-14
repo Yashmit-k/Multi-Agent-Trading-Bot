@@ -29,8 +29,8 @@ export function AppShell({
   return (
     <div className="min-h-screen bg-[#0B0F14] text-[#E6EDF3]">
       <ModeBanner mode={mode} killSwitch={killSwitch} />
-      <div className="flex min-h-[calc(100vh-40px)]">
-        <aside className="hidden w-[214px] shrink-0 border-r border-[#26303C] bg-[#0F141B] md:block">
+      <div className="flex min-h-[calc(100vh-48px)]">
+        <aside className="sticky top-12 hidden h-[calc(100vh-48px)] w-[214px] shrink-0 overflow-y-auto border-r border-[#26303C] bg-[#0F141B] md:block">
           <nav className="flex flex-col gap-4 px-2 py-4 text-sm">
             {GROUPS.map(([group, links]) => (
               <div key={group}>
