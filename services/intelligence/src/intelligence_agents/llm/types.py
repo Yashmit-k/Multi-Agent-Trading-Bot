@@ -22,7 +22,7 @@ SYSTEM_PROMPT = (
     "\"horizon\":\"SWING\",\"high_impact\":false}."
 )
 
-PROMPT_VERSION = "1.2.0"
+PROMPT_VERSION = "1.3.0"
 
 
 @dataclass(frozen=True, slots=True)
