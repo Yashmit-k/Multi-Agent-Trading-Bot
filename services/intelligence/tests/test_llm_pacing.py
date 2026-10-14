@@ -86,11 +86,12 @@ def test_json_mode_and_token_cap_reach_the_request() -> None:
     provider = OpenAICompatibleProvider(
         "https://api.groq.com/openai/v1", "k", "m", retries=0,
         client=httpx.Client(transport=httpx.MockTransport(handler)),
-        max_output_tokens=600, json_mode=True,
+        max_output_tokens=600, json_mode=True, reasoning_effort="low",
     )
     provider.complete(_request(), tier="tier1")
     assert seen[0]["max_tokens"] == 600
     assert seen[0]["response_format"] == {"type": "json_object"}
+    assert seen[0]["reasoning_effort"] == "low"
 
 
 def test_defaults_leave_the_request_unchanged() -> None:
@@ -106,3 +107,4 @@ def test_defaults_leave_the_request_unchanged() -> None:
     provider.complete(_request(), tier="tier1")
     assert seen[0]["max_tokens"] == 160
     assert "response_format" not in seen[0]
+    assert "reasoning_effort" not in seen[0]

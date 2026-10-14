@@ -40,6 +40,7 @@ class IntelligenceSettings:
     llm_min_interval_seconds: float = 0.0
     llm_max_output_tokens: int = 160
     llm_json_mode: bool = False
+    llm_reasoning_effort: str = ""
 
     @classmethod
     def from_env(cls) -> IntelligenceSettings:
@@ -74,6 +75,7 @@ class IntelligenceSettings:
             llm_min_interval_seconds=float(os.environ.get("LLM_MIN_INTERVAL_SECONDS", "0")),
             llm_max_output_tokens=int(os.environ.get("LLM_MAX_OUTPUT_TOKENS", "160")),
             llm_json_mode=os.environ.get("LLM_JSON_MODE", "false").strip().lower() == "true",
+            llm_reasoning_effort=os.environ.get("LLM_REASONING_EFFORT", "").strip().lower(),
         )
         settings.validate()
         return settings

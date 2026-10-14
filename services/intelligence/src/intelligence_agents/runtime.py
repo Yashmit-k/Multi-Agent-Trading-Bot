@@ -79,6 +79,7 @@ def make_router(settings: IntelligenceSettings) -> LLMRouter:
         min_interval_seconds=settings.llm_min_interval_seconds,
         max_output_tokens=settings.llm_max_output_tokens,
         json_mode=settings.llm_json_mode,
+        reasoning_effort=settings.llm_reasoning_effort,
     )
 
 

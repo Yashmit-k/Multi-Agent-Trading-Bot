@@ -146,6 +146,7 @@ def build_router(
     min_interval_seconds: float = 0.0,
     max_output_tokens: int = 160,
     json_mode: bool = False,
+    reasoning_effort: str = "",
 ) -> LLMRouter:
     fixture = FixtureLLMProvider()
     tracker = CostTracker(daily_budget_usd=daily_budget_usd)
@@ -167,6 +168,7 @@ def build_router(
         "min_interval_seconds": min_interval_seconds,
         "max_output_tokens": max_output_tokens,
         "json_mode": json_mode,
+        "reasoning_effort": reasoning_effort,
     }
     if openai_client is not None:
         kwargs["client"] = openai_client

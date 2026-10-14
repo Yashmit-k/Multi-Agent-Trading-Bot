@@ -41,6 +41,7 @@ class OpenAICompatibleProvider:
         clock: Callable[[], float] = time.monotonic,
         max_output_tokens: int = MAX_OUTPUT_TOKENS,
         json_mode: bool = False,
+        reasoning_effort: str = "",
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
@@ -60,6 +61,8 @@ class OpenAICompatibleProvider:
         # Reasoning models spend output tokens before the JSON answer, so they need a larger cap.
         self._max_output_tokens = max_output_tokens
         self._json_mode = json_mode
+        # Only sent when set; "none" or empty omits it for non-reasoning models.
+        self._reasoning_effort = "" if reasoning_effort in {"", "none"} else reasoning_effort
 
     def _pace(self) -> None:
         """Space requests at least min_interval apart to stay under a provider's per-minute limit."""
@@ -214,6 +217,8 @@ class OpenAICompatibleProvider:
         }
         if self._json_mode:
             body["response_format"] = {"type": "json_object"}
+        if self._reasoning_effort:
+            body["reasoning_effort"] = self._reasoning_effort
         headers = {"Authorization": f"Bearer {self._api_key}"}
         response = self._client.post(
             f"{self._base_url}/chat/completions",
