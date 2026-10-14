@@ -39,6 +39,22 @@ export function applyDailyPerformance(
   return { ...snapshot, daily_endpoint: "unavailable", days: [] };
 }
 
+function activePaperSession(paper: Record<string, unknown>): PaperSession[] {
+  const sessionId = paper.session_id;
+  if (typeof sessionId !== "string" || sessionId.length === 0) {
+    return [];
+  }
+  return [
+    {
+      session_id: sessionId,
+      label: paper.running ? "Current paper account (running)" : "Current paper account",
+      status: paper.running ? "active" : "unknown",
+      starting_cash_inr: parseDecimal(paper.starting_cash as string | undefined),
+      source: "GET /api/v1/paper/status (no session-history API)",
+    },
+  ];
+}
+
 function emptyRealSnapshot(note: string): DashboardSnapshot {
   return {
     mode: "real",
@@ -107,18 +123,7 @@ export async function loadRealDashboard(): Promise<DashboardSnapshot> {
   const marketAsOf = overview.ok ? String(overview.value.as_of ?? "") : "";
   const tradingDate = marketAsOf ? istDateKeyFromInstant(marketAsOf) : null;
 
-  const starting = parseDecimal(pap.starting_cash as string | undefined);
-  const sessions: PaperSession[] = paper.ok
-    ? [
-        {
-          session_id: "current-paper",
-          label: pap.running ? "Current paper account (running)" : "Current paper account",
-          status: pap.running ? "active" : "unknown",
-          starting_cash_inr: starting,
-          source: "GET /api/v1/paper/status (no session-history API)",
-        },
-      ]
-    : [];
+  const sessions: PaperSession[] = paper.ok ? activePaperSession(pap) : [];
 
   const pnlBasis: PnlBasis = "unavailable";
   const now = new Date().toISOString();
