@@ -95,9 +95,9 @@ services:
       # rss: live headlines from public Indian market feeds. A separate sqlite file
       # keeps the old fixture articles out of the live news store.
       INTELLIGENCE_DATA_SOURCE: ${INTELLIGENCE_DATA_SOURCE:-rss}
-      NEWS_RSS_URLS: ${NEWS_RSS_URLS:-https://economictimes.indiatimes.com/markets/stocks/rssfeeds/2146842.cms,https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms,https://www.moneycontrol.com/rss/business.xml,https://www.moneycontrol.com/rss/latestnews.xml,https://www.business-standard.com/rss/markets-106.rss,https://www.livemint.com/rss/markets,https://www.livemint.com/rss/companies}
+      NEWS_RSS_URLS: ${NEWS_RSS_URLS:-https://economictimes.indiatimes.com/markets/stocks/rssfeeds/2146842.cms,https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms,https://www.business-standard.com/rss/markets-106.rss,https://www.livemint.com/rss/markets,https://www.livemint.com/rss/companies}
       INTELLIGENCE_STORE: sqlite
-      INTELLIGENCE_SQLITE_PATH: /var/lib/intelligence/intel-live.db
+      INTELLIGENCE_SQLITE_PATH: /var/lib/intelligence/intel-rss.db
       INTELLIGENCE_EVAL_INTERVAL_SECONDS: "600"
       INTELLIGENCE_SYMBOLS: *nifty50
       CORE_API_URL: http://core-api:8000
