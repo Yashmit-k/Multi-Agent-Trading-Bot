@@ -16,6 +16,21 @@ def test_unknown_route_is_501() -> None:
     assert response.status_code == 501
 
 
+def test_kill_switch_stub() -> None:
+    client = TestClient(app)
+    body = client.get("/api/v1/risk/status").json()
+    assert body["kill_switch"] == "disarmed"
+    armed = client.post("/api/v1/risk/kill-switch", json={"armed": True}).json()
+    assert armed["kill_switch"] == "armed"
+    client.post("/api/v1/risk/kill-switch", json={"armed": False})
+
+
+def test_daily_performance_unavailable() -> None:
+    client = TestClient(app)
+    body = client.get("/api/v1/paper/daily-performance").json()
+    assert body == {"status": "unavailable", "reason": "no_daily_equity_history"}
+
+
 def test_signals_are_contract_shaped() -> None:
     client = TestClient(app)
     rows = client.get("/api/v1/signals").json()

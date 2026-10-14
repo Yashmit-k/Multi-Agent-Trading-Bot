@@ -5,7 +5,9 @@ export default function NewsPage() {
     <div>
       <h1 className="text-2xl font-bold">News</h1>
       <NotAvailableState feature="Global news list" />
-      <p className="mt-2 text-sm">Per-symbol news lives on each stock page via GET /api/v1/stocks/{"{symbol}"}/news.</p>
+      <p className="mt-2 text-sm text-[#94A3B8]">
+        Per-symbol news lives on each stock page via GET /api/v1/stocks/{"{symbol}"}/news.
+      </p>
     </div>
   );
 }
