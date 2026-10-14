@@ -107,3 +107,39 @@ Checkpoint 3 added the unavailable daily-performance route, the snapshot-writer 
 Checkpoint 4 checked fixture Intelligence news and the page contracts. The closure is **PARTIAL**: fixture routes pass, and live news plus daily equity history stay blocked.
 
 Checkpoint 5 audited the existing daily-rule result in `docs/dev3-daily-rules-audit.md` and wrote `docs/dev3-demo-runbook.md`. H001 stays blocked. No new backtest was run and the holdout was not opened.
+
+## Post-deployment verification, 2026-10-14
+
+This section supersedes the stale sentences below. It does not delete them. It does not claim that every symbol and timeframe is complete, or that the collector has run continuously.
+
+Verified while writing this note, without restarting services:
+
+- `GET /health` returned `{"status":"ok"}`.
+- `multi-agent-trading-bot-core-worker-1` was exited, code 137, finished `2026-10-14T06:27:40.772517625Z`, restart policy `no`, image `sha256:5ea8292147331f73d32c1626526ffd4a24a8f6784299e0669ab192501eb863bc`. It was not started.
+
+Previously observed on 2026-10-14 after the Core API recreate from `24bed9f44de1c991d182daf39e1ac25aac6a579e`, and not re-read for authentication or candle ends while writing this note:
+
+- The running API image was `sha256:b0e1e4ea8937ca6a2d1223b1680ea0295cc2f1c0aeed48f02b86e37040a1b201`. System status was `PAPER` and `live_enabled` false.
+- After the browser login, `GET /api/v1/zerodha/status` was `configured` true, `authenticated` true, `live_enabled` false. Ingestion `last_error` was null. `authentication_required` had cleared.
+- The login callback queued the existing historical seed. Logs reported `seed_finished status=completed symbols=50 failed=0`.
+- `last_success_at` moved through `2026-10-14T07:51:14Z`, `2026-10-14T07:54:34Z`, and `2026-10-14T07:55:54Z`. The latest reported five-minute end moved from `2026-10-14T07:45:00Z` (13:15 IST) to `2026-10-14T07:50:00Z` (13:20 IST). The poll at 13:25:54 IST was before the 13:25 bar was 90 seconds old, so 13:20 IST was the completed bar at that read. `poll_skip_reason` still said `seed_active` after `seed_status` was `completed`. A later `last_success_at` still advanced.
+- Orders were one cancelled `KOTAKBANK` buy created `2026-10-12T10:00:00Z`. Trades were zero. That order count was not re-read for this note.
+- `GET /api/v1/paper/daily-performance` was `{"status":"unavailable","reason":"no_daily_equity_history"}`. `alembic current`, using `main`'s scripts, was `0007_entry_day_gates (head)`.
+
+The worker had been found running on that old image at `2026-10-14T06:05:43Z`. `docker compose stop core-worker` stopped only that service. Stdout for the 30 minutes before the stop was empty, which is not proof that no cycle ran.
+
+Superseded claims:
+
+- "The collector re-read is not deployed" and "Core API was not rebuilt" in the collector and heartbeat rows. The API image above is the `24bed9f` image. The running worker image is still the older one, and it is stopped, so a live heartbeat from that worker was not observed.
+- "Live re-authentication after an API restart" as `NOT VERIFIED`. The recreate cleared the in-memory token. A later browser login left `authenticated` true. That observation is the one timestamped above, not a new login during this documentation edit.
+- "Older policy text still says ₹1,00,000 for the paper order." `docs/paper-execution-policy.md` now states the paper cap as ₹20,000 and the research backtest cap as ₹1,00,000. `execute.py` and `assess.py` remain `Decimal("20000")`. `backtest.py` remains `Decimal("100000")`. No cap was changed.
+
+Still blocked, and not started here: the end-of-day snapshot writer, live news, H001 execution, and the holdout. `DATA_PREP_READY` and `READY_TO_RUN` stay NO.
+
+### Dev2 handoff
+
+Recommendation only. No file under `apps/frontend` was edited.
+
+On `developer-2` at `cffb6ef`, `apps/frontend/src/lib/load-real-dashboard.ts` reads `GET /api/v1/paper/status` and then sets `session_id` to the literal `current-paper`. The Core response field is `session_id` from `_paper_body` in `services/core/api/src/core_api/app.py`. Unscoped `GET /api/v1/positions` is already the active session. The synthetic id does not select that session.
+
+Please derive the dashboard session id from `session_id` on `GET /api/v1/paper/status`. Keep the active-session reads, the loading and error states, and the demo path behind `?demo=1`. Add a regression test that the real-mode session id equals the API value and is not `current-paper`. Run the frontend tests and the TypeScript check, then check the dashboard in the browser and report the files changed. Do not mix demo fixtures into the real account response.
