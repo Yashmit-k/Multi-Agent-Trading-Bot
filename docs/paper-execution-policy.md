@@ -59,7 +59,11 @@ Zerodha states that a same-day CNC buy and sell is charged as intraday, and that
 
 DP is ₹15.34 per scrip per trading day, as published (₹3.5 CDSL + ₹9.5 Zerodha + ₹2.34 GST). The published line says this is charged when stocks are sold, irrespective of quantity. It does not say whether a same-day CNC square-off, which never leaves the trading account for demat, is exempt. This engine therefore records one charge on the first sell of a scrip on that trading day and does not treat that choice as exact depository accounting. The female-holder discount is not applied. The accumulator key is the paper-session id plus the trading date, exchange, and symbol. The trading date is not the paper-session id. The instrument model has no ISIN.
 
-The per-order notional cap remains ₹1,00,000. Quantity is floored at the limit, then reduced until limit notional plus the ceiling fee estimate fits both the cap and unreserved cash.
+The paper per-order notional cap is ₹20,000. `MAX_NOTIONAL` in `services/core/paper-execution/src/core_paper/execute.py` and the default bound in `services/core/risk-engine/src/core_risk/assess.py` are `Decimal("20000")`. Fees sit on top of that notional. Quantity is floored at the limit, then reduced until limit notional plus the ceiling fee estimate fits both the cap and unreserved cash.
+
+Research backtests are a separate bound. `services/core/paper-execution/src/core_paper/backtest.py` sets `MAX_NOTIONAL = Decimal("100000")` and passes that value into `assess` as `max_notional`. That figure is not the paper-order cap.
+
+`7604ea9` introduced the paper cap of ₹20,000. `fd9a0de` kept the research backtest on ₹1,00,000. `144bc08` still had `Decimal("100000")` in `execute.py` and `assess.py`. This paragraph replaces that older paper-cap sentence. The caps themselves were not changed here.
 
 ## Calendar
 
