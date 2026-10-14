@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -320,15 +320,22 @@ class CoreRepository:
         as_of: datetime,
         start: datetime | None = None,
         end: datetime | None = None,
+        last: int | None = None,
     ) -> list[Candle]:
+        """Completed bars with end <= as_of, oldest first. ``last`` keeps only the newest N."""
         parsed = timeframe if isinstance(timeframe, Timeframe) else Timeframe(timeframe)
         moment = as_utc(as_of)
         with self._session_factory() as session:
-            rows = session.scalars(
+            query = (
                 select(CandleRow)
                 .where(CandleRow.symbol == symbol.strip().upper(), CandleRow.timeframe == parsed.value)
-                .order_by(CandleRow.start)
+                .where(CandleRow.end <= moment)
             )
+            if last is not None:
+                newest = list(session.scalars(query.order_by(CandleRow.end.desc()).limit(last)))
+                rows = sorted(newest, key=lambda row: as_utc(row.start))
+            else:
+                rows = session.scalars(query.order_by(CandleRow.start))
             candles = []
             for row in rows:
                 bar_end = as_utc(row.end)
@@ -415,17 +422,37 @@ class CoreRepository:
             row = session.get(AgentSignalRow, signal_id)
             return dict(row.payload) if row else None
 
-    def latest_signal_per_agent(self, scan: int = 5000) -> list[dict]:
-        """Newest stored signal for each agent, from the most recent ``scan`` rows."""
+    def latest_signal_per_agent(self) -> list[dict]:
+        """Newest stored signal for each agent that has published at least once."""
+        agent = AgentSignalRow.payload["agent_name"].as_string()
         with self._session_factory() as session:
-            rows = session.scalars(select(AgentSignalRow).order_by(AgentSignalRow.recorded_at.desc()).limit(scan))
+            newest = (
+                select(agent.label("agent"), func.max(AgentSignalRow.recorded_at).label("recorded_at"))
+                .group_by(agent)
+                .subquery()
+            )
+            rows = session.scalars(
+                select(AgentSignalRow).join(
+                    newest,
+                    (AgentSignalRow.payload["agent_name"].as_string() == newest.c.agent)
+                    & (AgentSignalRow.recorded_at == newest.c.recorded_at),
+                )
+            )
             latest: dict[str, dict] = {}
             for row in rows:
                 payload = dict(row.payload)
-                name = str(payload.get("agent_name"))
-                if name not in latest:
-                    latest[name] = payload
+                latest.setdefault(str(payload.get("agent_name")), payload)
             return [latest[name] for name in sorted(latest)]
+
+    def recent_signal_payloads(self, limit: int = 500, symbol: str | None = None, agent_name: str | None = None) -> list[dict]:
+        """Newest signals first, bounded, so the dashboard never pulls the whole table."""
+        with self._session_factory() as session:
+            query = select(AgentSignalRow).order_by(AgentSignalRow.recorded_at.desc())
+            if symbol:
+                query = query.where(AgentSignalRow.symbol == symbol.strip().upper())
+            if agent_name:
+                query = query.where(AgentSignalRow.payload["agent_name"].as_string() == agent_name)
+            return [dict(row.payload) for row in session.scalars(query.limit(limit))]
 
     def list_signal_payloads(self) -> list[dict]:
         with self._session_factory() as session:
@@ -514,6 +541,10 @@ class CoreRepository:
             query = select(SystemEventRow).order_by(SystemEventRow.recorded_at.desc(), SystemEventRow.event_id)
             if event_type is not None:
                 query = query.where(SystemEventRow.event_type == event_type)
+            if correlation_id is not None:
+                query = query.where(SystemEventRow.payload["correlation_id"].as_string() == correlation_id)
+            if source is None:
+                query = query.limit(limit)
             rows = session.scalars(query)
             found: list[dict] = []
             for row in rows:
@@ -546,17 +577,13 @@ class CoreRepository:
         """Latest stored bar for this symbol and timeframe. Stored bars are already complete."""
         parsed = timeframe if isinstance(timeframe, Timeframe) else Timeframe(timeframe)
         with self._session_factory() as session:
-            rows = list(
-                session.scalars(
-                    select(CandleRow).where(
-                        CandleRow.symbol == symbol.strip().upper(),
-                        CandleRow.timeframe == parsed.value,
-                    )
-                )
-            )
-        if not rows:
-            return None
-        return _candle(max(rows, key=lambda item: as_utc(item.end)))
+            row = session.scalars(
+                select(CandleRow)
+                .where(CandleRow.symbol == symbol.strip().upper(), CandleRow.timeframe == parsed.value)
+                .order_by(CandleRow.end.desc())
+                .limit(1)
+            ).first()
+        return None if row is None else _candle(row)
 
     def insert_proposal(self, proposal: TradeProposal) -> bool:
         instrument = self._require_instrument(proposal.symbol)

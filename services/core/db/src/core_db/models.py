@@ -3,7 +3,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, DateTime, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Index, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -55,7 +55,10 @@ class MarketTickRow(Base):
 
 class CandleRow(Base):
     __tablename__ = "candles"
-    __table_args__ = (UniqueConstraint("instrument_id", "timeframe", "start", name="uq_candles"),)
+    __table_args__ = (
+        UniqueConstraint("instrument_id", "timeframe", "start", name="uq_candles"),
+        Index("ix_candles_symbol_timeframe_end", "symbol", "timeframe", "end"),
+    )
 
     candle_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     instrument_id: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -86,6 +89,10 @@ class FeatureRow(Base):
 
 class AgentSignalRow(Base):
     __tablename__ = "agent_signals"
+    __table_args__ = (
+        Index("ix_agent_signals_recorded_at", "recorded_at"),
+        Index("ix_agent_signals_symbol", "symbol"),
+    )
 
     signal_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     symbol: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -117,6 +124,7 @@ class AuditLogRow(Base):
 
 class SystemEventRow(Base):
     __tablename__ = "system_events"
+    __table_args__ = (Index("ix_system_events_recorded_at", "recorded_at"),)
 
     event_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     event_type: Mapped[str] = mapped_column(String(64), nullable=False)
