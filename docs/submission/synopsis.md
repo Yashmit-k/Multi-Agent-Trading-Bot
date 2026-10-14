@@ -22,7 +22,7 @@ The architecture, the 10 named agents, the "agents give opinions, code decides" 
 
 | CA2 item | Status now | Why |
 |---|---|---|
-| ML agent | Implemented, **not loaded** | No model has passed our validation and acceptance gate. Loading an unvalidated model would add noise, not evidence. |
+| ML agent | Implemented, **not loaded** | A pre-registered ML stock ranker (gradient boosting on daily features) was built and scored once on unseen 2026 data. It beat an equal-weight basket by +0.21% per 5-day window, in 65% of windows, but its 90% interval includes zero and it lost money after delivery costs. It failed the acceptance gate, so it is not traded ([result](../../services/quant/docs/ml-rank-result.md), *Research* page). |
 | News agent | **Live**: real RSS headlines from ET Markets, Business Standard, and Mint, mapped to NIFTY symbols and scored through the LLM router | Live with an OpenAI-compatible LLM key. Without a key, the router falls back to a deterministic heuristic, and each signal is labelled `fixture` in its metadata and in the UI. |
 | Fundamental, Valuation, Earnings agents | Run on fixture data and are **excluded from fusion** (weight 0) | No verified live fundamentals/earnings feed is configured. They still run and appear in the trace, but they cannot influence a trade. |
 | SHADOW / LIVE modes | Disabled | Paper validation is not complete. No strategy has yet passed the acceptance gate (`docs/strategy-acceptance.md`). |
