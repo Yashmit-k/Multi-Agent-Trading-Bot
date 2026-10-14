@@ -11,6 +11,10 @@ Usage::
     CORE_API_TOKEN=... python scripts/export_agent_trace.py \
         --api http://localhost:8000 --limit 1000 --run live-signals-20261014
 
+Or read the recorded rows directly (read-only), e.g. before the API is rebuilt::
+
+    python scripts/export_agent_trace.py --database-url postgresql+psycopg://core:core@localhost:5432/core --run …
+
 Nothing here writes to the API or the database.
 """
 
@@ -45,6 +49,15 @@ def fetch(api: str, token: str, limit: int, event_type: str | None) -> list[dict
         return json.loads(response.read())["events"]
 
 
+def fetch_db(database_url: str, limit: int, event_type: str | None) -> list[dict]:
+    from core_api.app import _trace_item
+    from core_db.repository import CoreRepository
+    from core_db.session import make_session_factory
+
+    repository = CoreRepository(make_session_factory(database_url))
+    return [_trace_item(item) for item in repository.list_system_events(event_type=event_type, limit=limit)]
+
+
 def producer(event: dict) -> str:
     if event.get("agent"):
         return f"{event['agent']} agent → {event['source']}"
@@ -55,9 +68,15 @@ def summary(event: dict) -> str:
     payload = event.get("payload") or {}
     kind = event["event_type"]
     if kind == "agent.signal":
+        metadata = payload.get("metadata") or {}
+        headlines = metadata.get("headlines") or []
+        raw_llm = metadata.get("llm") or {}
+        llm = raw_llm[0] if isinstance(raw_llm, list) and raw_llm else raw_llm if isinstance(raw_llm, dict) else {}
+        source = f" model={llm.get('model')}" if llm else ""
+        headline = f' headline="{headlines[0].get("title", "")[:110]}"' if headlines else ""
         return (
-            f"{payload.get('symbol')} {payload.get('horizon')} signal={payload.get('signal')} "
-            f"confidence={payload.get('confidence')} — {str(payload.get('reasoning', ''))[:140]}"
+            f"{payload.get('symbol')} {payload.get('horizon')} signal={_num(payload.get('signal'))} "
+            f"confidence={_num(payload.get('confidence'))} reasons={','.join(payload.get('reason_codes') or [])}{source}{headline}"
         )
     if kind == "decision.created":
         return (
@@ -103,6 +122,10 @@ def write(events: list[dict], out: Path, run: str) -> tuple[Path, Path]:
         f"- First event: {ordered[0]['timestamp'] if ordered else '—'}",
         f"- Last event: {ordered[-1]['timestamp'] if ordered else '—'}",
         "",
+        "Signal ids are deterministic per (agent, symbol, horizon, bar). An agent whose input bar has not changed "
+        "re-sends the same id, which ingestion stores once and does not re-publish. Quant agents therefore appear "
+        "on the bus only when a new candle closes during market hours.",
+        "",
     ]
     if proposals:
         lines += ["## Decision chains", ""]
@@ -128,6 +151,10 @@ def write(events: list[dict], out: Path, run: str) -> tuple[Path, Path]:
     return jsonl, markdown
 
 
+def _num(value: object) -> str:
+    return f"{value:.3f}" if isinstance(value, float) else str(value)
+
+
 def _row(event: dict) -> str:
     consumer = CONSUMER.get(event["event_type"], "—")
     return f"- `{event.get('timestamp')}` **{event['event_type']}** — {producer(event)} → `{event.get('channel')}` → {consumer}: {summary(event)}"
@@ -140,11 +167,15 @@ def main() -> None:
     parser.add_argument("--event-type", default=None)
     parser.add_argument("--run", required=True)
     parser.add_argument("--out", default="docs/submission/agent-trace")
+    parser.add_argument("--database-url", default=None, help="read system_events directly instead of the API")
     args = parser.parse_args()
-    token = os.environ.get("CORE_API_TOKEN", "")
-    if not token:
-        raise SystemExit("CORE_API_TOKEN is required")
-    events = fetch(args.api, token, args.limit, args.event_type)
+    if args.database_url:
+        events = fetch_db(args.database_url, args.limit, args.event_type)
+    else:
+        token = os.environ.get("CORE_API_TOKEN", "")
+        if not token:
+            raise SystemExit("CORE_API_TOKEN is required")
+        events = fetch(args.api, token, args.limit, args.event_type)
     jsonl, markdown = write(events, Path(args.out), args.run)
     print(f"wrote {len(events)} events to {jsonl} and {markdown}")
 

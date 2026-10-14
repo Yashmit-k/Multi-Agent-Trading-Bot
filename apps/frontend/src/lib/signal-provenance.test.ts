@@ -14,6 +14,10 @@ describe("signal provenance", () => {
     expect(provenance({ metadata: { llm: [{ model: "fixture" }] } }).llm).toContain("fixture");
   });
 
+  it("accepts a single llm object", () => {
+    expect(provenance({ metadata: { llm: { model: "fixture" } } }).llm).toContain("fixture");
+  });
+
   it("deterministic agents have no LLM", () => {
     expect(provenance({ reason_codes: ["momentum.up"], metadata: {} }).llm).toBeNull();
   });

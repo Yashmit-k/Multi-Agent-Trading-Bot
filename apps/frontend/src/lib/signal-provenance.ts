@@ -11,7 +11,8 @@ export type Provenance = {
 
 export function provenance(payload: Record<string, unknown>): Provenance {
   const metadata = (payload.metadata as Record<string, unknown> | undefined) ?? {};
-  const llmItems = Array.isArray(metadata.llm) ? (metadata.llm as Llm[]) : [];
+  const raw = metadata.llm;
+  const llmItems = Array.isArray(raw) ? (raw as Llm[]) : raw && typeof raw === "object" ? [raw as Llm] : [];
   const first = llmItems[0];
   let llm: string | null = null;
   if (first) {
