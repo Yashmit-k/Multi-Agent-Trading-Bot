@@ -1,0 +1,60 @@
+{
+  "mark": "EXPERIMENTAL_NOT_APPROVED",
+  "approved_minority_bar": 50,
+  "official_readiness_decision": "AUDIT_COMPLETE_INCONCLUSIVE",
+  "protocol_id": "H001-2026-10-12",
+  "protocol_status": "PROTOCOL APPROVED \u2014 EXECUTION NOT AUTHORIZED",
+  "integrity_verification_status": "ALTERNATIVE_BASIS_USED_HISTORICAL_UNVERIFIED",
+  "readiness_decision": "DATA_READY",
+  "readiness_reason": "EXPERIMENTAL_NOT_APPROVED. Official readiness remains AUDIT_COMPLETE_INCONCLUSIVE; execution is unauthorized. Both splits meet the experimental 34-observation minority-class bar. The approved bar remains 50. This is not execution authorization.",
+  "execution_authorized": false,
+  "snapshot_ids": [
+    "nifty50_5m_20261005",
+    "nifty50_1d_20261005",
+    "h001-nse-raw-20261010T140237Z"
+  ],
+  "five_file_sha256": "0f2df34d35e5a02ab6cd725882afd3fca7354eff65e4c1d219cf7fa9bdf1cb9b",
+  "daily_file_sha256": "0411a89535ab50ae6488c7d93c5ce7572feba4f55fd9ecb0f73478bf33bd2a7d",
+  "stage_counts": {
+    "input_records": 18235,
+    "unique_event_identifiers": 18235,
+    "classified_in_class": 251,
+    "with_entry_p0": 251,
+    "with_h1_label": 251,
+    "with_features": 224,
+    "eligible_labelled_train": 75,
+    "eligible_labelled_validation": 149,
+    "eligible_labelled_total": 224,
+    "decision_after_validation_end": 0
+  },
+  "exclusion_counts": {
+    "desc_not_in_class": 17984,
+    "short_history": 27
+  },
+  "train": {
+    "n": 75,
+    "positive": 34,
+    "negative": 41,
+    "minority": 34,
+    "status": "SATISFIED"
+  },
+  "validation": {
+    "n": 149,
+    "positive": 70,
+    "negative": 79,
+    "minority": 70,
+    "status": "SATISFIED"
+  },
+  "minority_threshold": 34,
+  "executed_at": "2026-10-13T20:57:43+00:00",
+  "reproducibility": {
+    "train_end": "2024-06-30",
+    "validation_end": "2025-02-14",
+    "minority_bar": "34",
+    "feature_columns": "intercept,minute_of_day,return_1,return_5,return_20",
+    "label": "1 if (P1-P0)/P0 > 0 else 0"
+  },
+  "configured_snapshots_root": "C:\\Users\\User\\Desktop\\SEM 7\\flexiproj\\Multi-Agent-Trading-Bot\\snapshots 2\\nifty50",
+  "holdout_accessed": false,
+  "model_fitted": false
+}

@@ -236,14 +236,20 @@ def main() -> int:
     print("threshold", report.minority_threshold)
     print("executed_at", report.executed_at)
     print("protocol", report.protocol_id, report.protocol_status)
-    out = root / "services" / "quant" / "docs" / "h001-eligibility-audit-result.json"
+    official = root / "services" / "quant" / "docs" / "h001-eligibility-audit-result.json"
+    if official.exists():
+        print("leaving official", official, "unmodified")
+    out = root / "services" / "quant" / "docs" / "h001-threshold-34-experiment.json"
     payload = {
+        "mark": "EXPERIMENTAL_NOT_APPROVED",
+        "approved_minority_bar": 50,
+        "official_readiness_decision": "AUDIT_COMPLETE_INCONCLUSIVE",
         "protocol_id": report.protocol_id,
         "protocol_status": report.protocol_status,
         "integrity_verification_status": report.integrity_verification_status,
         "readiness_decision": report.readiness_decision,
         "readiness_reason": report.readiness_reason,
-        "execution_authorized": report.execution_authorized,
+        "execution_authorized": False,
         "snapshot_ids": list(report.snapshot_ids),
         "five_file_sha256": five_hash,
         "daily_file_sha256": day_hash,
