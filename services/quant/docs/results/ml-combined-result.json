@@ -1,0 +1,170 @@
+{
+  "protocol": "services/quant/docs/ml-combined-protocol.md",
+  "period": {
+    "first_decision": "2024-11-22",
+    "last_decision": "2026-09-17"
+  },
+  "symbols": 49,
+  "features": [
+    "ret_1_rank",
+    "ret_5_rank",
+    "ret_10_rank",
+    "ret_20_rank",
+    "ret_60_rank",
+    "vol_20_rank",
+    "atr_14_rank",
+    "rsi_14_rank",
+    "dist_ma20_rank",
+    "dist_ma50_rank",
+    "vol_ratio_rank",
+    "vol_z_rank",
+    "gap_rank",
+    "dist_high_250_rank",
+    "beta_60_rank",
+    "rel_nifty_20_rank",
+    "rel_sector_20_rank",
+    "sector_ret_20_rank",
+    "clv_rank",
+    "open_to_close_rank",
+    "first_hour_ret_rank",
+    "last_hour_ret_rank",
+    "intraday_rv_rank",
+    "vwap_dist_rank",
+    "last_hour_vol_share_rank",
+    "rel_sector_5_rank",
+    "nifty_ret_5",
+    "nifty_ret_20",
+    "nifty_ret_60",
+    "nifty_vs_ma50",
+    "vix",
+    "vix_chg_5",
+    "vix_pct_120",
+    "breadth_ma50",
+    "dispersion_5",
+    "weekday",
+    "sessions_to_month_end"
+  ],
+  "trials_counted": 48,
+  "target_a_direction": {
+    "accuracy": 0.5019414845584251,
+    "accuracy_90": [
+      0.49178255372945634,
+      0.511829510565288
+    ],
+    "auc": 0.4968601446863497,
+    "top6_accuracy": 0.4926253687315635,
+    "base_rate": 0.5,
+    "trading": {
+      "always": {
+        "variant": "H10-combined-logistic-always",
+        "horizon": 10,
+        "selector": "combined-logistic",
+        "exposure": "always",
+        "windows": 46,
+        "mean_net": -0.0029934176430218796,
+        "annualized_net": -0.07483544107554699,
+        "sharpe": -0.5304500922068246,
+        "hit_rate": 0.45652173913043476,
+        "max_drawdown": 0.18641308345187746,
+        "exposure_share": 1.0,
+        "excess_vs_equal_weight": 0.00010761707348098876,
+        "total_compounded": -0.14439962704572396,
+        "regimes": {
+          "down-trend/high-vol": {
+            "windows": 13,
+            "mean_net": -0.0007622489913979061
+          },
+          "down-trend/low-vol": {
+            "windows": 8,
+            "mean_net": -0.009071497265715506
+          },
+          "up-trend/high-vol": {
+            "windows": 10,
+            "mean_net": -0.005906354811286239
+          },
+          "up-trend/low-vol": {
+            "windows": 15,
+            "mean_net": 0.000256503436516846
+          }
+        },
+        "deflated": {
+          "sharpe_per_window": -0.10609001844136491,
+          "benchmark_sharpe": 0.1907011728209701,
+          "deflated_sharpe": 0.023366255375841607,
+          "probabilistic_sharpe": 0.23857925711229605,
+          "windows": 46
+        }
+      },
+      "trend": {
+        "variant": "H10-combined-logistic-trend",
+        "horizon": 10,
+        "selector": "combined-logistic",
+        "exposure": "trend",
+        "windows": 46,
+        "mean_net": -0.0012003477514154284,
+        "annualized_net": -0.03000869378538571,
+        "sharpe": -0.3750981875988618,
+        "hit_rate": 0.2391304347826087,
+        "max_drawdown": 0.09937600535327085,
+        "exposure_share": 0.5434782608695652,
+        "excess_vs_equal_weight": 0.0019006869650874407,
+        "total_compounded": -0.05921576109313886,
+        "regimes": {
+          "down-trend/high-vol": {
+            "windows": 13,
+            "mean_net": 0.0
+          },
+          "down-trend/low-vol": {
+            "windows": 8,
+            "mean_net": 0.0
+          },
+          "up-trend/high-vol": {
+            "windows": 10,
+            "mean_net": -0.005906354811286239
+          },
+          "up-trend/low-vol": {
+            "windows": 15,
+            "mean_net": 0.000256503436516846
+          }
+        },
+        "deflated": {
+          "sharpe_per_window": -0.07501963751977236,
+          "benchmark_sharpe": 0.1907011728209701,
+          "deflated_sharpe": 0.036335003529495834,
+          "probabilistic_sharpe": 0.3061670347161871,
+          "windows": 46
+        }
+      }
+    },
+    "verdict": "no return edge"
+  },
+  "target_b_volatility": {
+    "accuracy": 0.6267383059418458,
+    "accuracy_90": [
+      0.6124232436337367,
+      0.640917915838902
+    ],
+    "persistence_accuracy": 0.5932815604117754,
+    "improvement_90": [
+      0.021670128228282463,
+      0.04605381975799169
+    ],
+    "auc": 0.6686144829926646,
+    "persistence_auc": 0.631707227138643,
+    "low_vol_half": {
+      "mean_net": -0.004330365010804003,
+      "annualized_net": -0.10825912527010007,
+      "annualized_vol": 0.11613600254850073,
+      "max_drawdown": 0.19394383985099162,
+      "windows": 46
+    },
+    "all_stocks": {
+      "mean_net": -0.0031010347165028687,
+      "annualized_net": -0.07752586791257172,
+      "annualized_vol": 0.11647199998574845,
+      "max_drawdown": 0.15350424800709317,
+      "windows": 46
+    },
+    "verdict": "robust risk edge"
+  }
+}
