@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from typing import Callable
 from urllib.parse import urlparse
@@ -140,8 +140,9 @@ def _parse_date(value: str | None, fallback: datetime) -> datetime:
     except (TypeError, ValueError, IndexError):
         return fallback
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=fallback.tzinfo)
-    return parsed
+        parsed = parsed.replace(tzinfo=fallback.tzinfo)
+    # The store compares ISO strings, so every stamp must share one offset.
+    return parsed.astimezone(timezone.utc)
 
 
 def _safe_host(url: str) -> str:

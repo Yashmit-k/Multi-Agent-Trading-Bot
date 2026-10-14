@@ -29,3 +29,14 @@ def test_ambiguous_names_are_ignored() -> None:
 
 def test_symbols_outside_the_universe_are_dropped() -> None:
     assert map_symbols("Wipro and Infosys report", {"INFY"}) == ["INFY"]
+
+
+def test_rss_dates_are_stored_in_utc() -> None:
+    from datetime import datetime, timezone
+
+    from intelligence_agents.news.rss import _parse_date
+
+    fallback = datetime(2026, 10, 14, 18, 0, tzinfo=timezone.utc)
+    parsed = _parse_date("Wed, 14 Oct 2026 23:00:00 +0530", fallback)
+    assert parsed == datetime(2026, 10, 14, 17, 30, tzinfo=timezone.utc)
+    assert parsed.isoformat().endswith("+00:00")
