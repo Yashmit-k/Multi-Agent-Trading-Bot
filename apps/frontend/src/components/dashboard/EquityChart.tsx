@@ -21,6 +21,17 @@ export function EquityChart({
     );
   }
 
+  if (days.length === 0) {
+    return (
+      <section className="rounded-[12px] border border-[#26303C] bg-[#121922] p-4" data-testid="equity-chart">
+        <h2 className="mb-2 text-lg font-semibold text-[#E6EDF3]">Equity history</h2>
+        <p data-testid="equity-demo-empty" className="text-sm text-[#94A3B8]">
+          No demo equity series for this session.
+        </p>
+      </section>
+    );
+  }
+
   const start = startingCash && startingCash > 0 ? startingCash : 1_000_000;
   const points: Array<{ key: string; equity: number }> = [];
   let equity = start;

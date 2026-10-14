@@ -177,6 +177,13 @@ export function demoDashboard(): DashboardSnapshot {
         timestamp: `${addDaysKey(DEMO_END_IST, -3)}T04:01:00Z`,
       },
     ],
+    market: {
+      as_of: `${DEMO_END_IST}T10:00:00+05:30`,
+      nifty_last: "24812.55",
+      breadth_advancers: 32,
+      breadth_decliners: 18,
+      mode: "PAPER",
+    },
     status: {
       core: "demo",
       trading_mode: "PAPER",
