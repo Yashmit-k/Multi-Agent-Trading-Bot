@@ -7,7 +7,18 @@ from intelligence_agents.llm.fixture import FixtureLLMProvider
 from intelligence_agents.llm.openai_compat import OpenAICompatibleProvider
 from intelligence_agents.llm.router import FallbackProvider, LLMRouter
 from intelligence_agents.llm.types import LLMRequest
-from tests.test_llm import _valid_llm_json
+
+
+def _valid_llm_json() -> dict:
+    return {
+        "sentiment": 0.2,
+        "impact": 0.3,
+        "confidence": 0.4,
+        "event_type": "earnings.beat",
+        "reason_codes": ["operating_updates"],
+        "horizon": "SWING",
+        "high_impact": False,
+    }
 
 
 def _ok(request: httpx.Request) -> httpx.Response:
