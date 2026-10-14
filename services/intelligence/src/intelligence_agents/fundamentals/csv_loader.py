@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import logging
 from datetime import datetime
 from decimal import Decimal
 from io import StringIO
@@ -11,6 +12,8 @@ from pathlib import Path
 from contracts.schemas.fundamental import FundamentalDataPoint
 
 from intelligence_agents.fundamentals.store import FundamentalStore
+
+logger = logging.getLogger(__name__)
 
 
 def load_csv(store: FundamentalStore, path: str | Path) -> int:
@@ -22,18 +25,22 @@ def load_csv_text(store: FundamentalStore, text: str) -> int:
     reader = csv.DictReader(StringIO(text))
     inserted = 0
     for row in reader:
-        point = FundamentalDataPoint(
-            symbol=row["symbol"].strip().upper(),
-            metric=row["metric"].strip(),
-            value=Decimal(row["value"]),
-            unit=row.get("unit") or "INR",
-            period=row["period"].strip(),
-            announced_at=datetime.fromisoformat(row["announced_at"]),
-            available_at=datetime.fromisoformat(row["available_at"]),
-            source=row.get("source") or "csv",
-            source_id=row["source_id"].strip(),
-            metadata={"csv": True},
-        )
+        try:
+            point = FundamentalDataPoint(
+                symbol=row["symbol"].strip().upper(),
+                metric=row["metric"].strip(),
+                value=Decimal(row["value"]),
+                unit=row.get("unit") or "INR",
+                period=row["period"].strip(),
+                announced_at=datetime.fromisoformat(row["announced_at"]),
+                available_at=datetime.fromisoformat(row["available_at"]),
+                source=row.get("source") or "csv",
+                source_id=row["source_id"].strip(),
+                metadata={"csv": True},
+            )
+        except Exception:
+            logger.warning("csv_row_skipped", extra={"source_id": str((row or {}).get("source_id", ""))[:80]})
+            continue
         if store.insert(point):
             inserted += 1
     return inserted

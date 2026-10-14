@@ -27,6 +27,16 @@ class TickRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class PaperSessionRecord:
+    session_id: str
+    status: str
+    created_at: datetime
+    closed_at: datetime | None
+    starting_cash: Decimal | None
+    peak_equity: Decimal | None
+
+
+@dataclass(frozen=True, slots=True)
 class MembershipRecord:
     instrument_id: str
     symbol: str

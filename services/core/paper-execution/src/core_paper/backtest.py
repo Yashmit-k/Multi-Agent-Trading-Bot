@@ -262,6 +262,7 @@ def _decide(book, symbol, visible, stamp, horizon, frame, schedule, max_notional
         cash=book.cash,
         held_quantity=book.positions[symbol].quantity if symbol in book.positions else 0,
         timestamp=stamp,
+        max_notional=max_notional,
     )
     if decision.status.value != "APPROVED":
         return

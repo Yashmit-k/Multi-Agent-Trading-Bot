@@ -1,5 +1,6 @@
 import { fetchApi } from "@/lib/api";
 import { ErrorState } from "@/components/States";
+import { PageFrame } from "@/components/shell/PageFrame";
 
 type AgentRow = {
   agent_name: string;
@@ -16,9 +17,8 @@ export default async function AgentsPage() {
   try {
     const agents = await fetchApi<AgentRow[]>("/api/v1/agents");
     return (
-      <div>
-        <h1 className="text-2xl font-bold">Agents</h1>
-        <ul className="mt-4 space-y-2">
+      <PageFrame title="Agents">
+        <ul className="space-y-2 text-sm">
           {agents.map((agent) => (
             <li key={agent.agent_name}>
               {agent.agent_name}: {agent.enabled ? "enabled" : "disabled"} · {agent.mode} · features {agent.feature_version}
@@ -27,14 +27,13 @@ export default async function AgentsPage() {
             </li>
           ))}
         </ul>
-      </div>
+      </PageFrame>
     );
   } catch (error) {
     return (
-      <div>
-        <h1 className="text-2xl font-bold">Agents</h1>
+      <PageFrame title="Agents">
         <ErrorState message={error instanceof Error ? error.message : "agents_unavailable"} />
-      </div>
+      </PageFrame>
     );
   }
 }

@@ -1,0 +1,34 @@
+# Standalone Intelligence fixture service. Do not combine this file with the production Compose file.
+# Fixture news only. No live RSS, no LLM key, and no paper worker.
+
+services:
+  intelligence:
+    build:
+      context: .
+      dockerfile: services/intelligence/Dockerfile
+    environment:
+      INTELLIGENCE_TRADING_MODE: PAPER
+      INTELLIGENCE_SERVICE_MODE: serve
+      INTELLIGENCE_DATA_SOURCE: fixtures
+      INTELLIGENCE_STORE: sqlite
+      INTELLIGENCE_SQLITE_PATH: /var/lib/intelligence/intel.db
+      INTELLIGENCE_SYMBOLS: RELIANCE
+      INTELLIGENCE_EVAL_INTERVAL_SECONDS: "300"
+      CORE_API_URL: http://127.0.0.1:9
+      INTERNAL_SIGNAL_TOKEN: checkpoint4-fixture
+      LLM_BASE_URL: ""
+      LLM_API_KEY: ""
+    ports:
+      - "127.0.0.1:18101:8080"
+    volumes:
+      - intel-data:/var/lib/intelligence
+    networks:
+      - probe
+
+networks:
+  probe:
+    name: dev3-cp4-intel-net
+
+volumes:
+  intel-data:
+    name: dev3-cp4-intel-data

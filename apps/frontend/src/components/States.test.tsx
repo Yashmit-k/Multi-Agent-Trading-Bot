@@ -8,10 +8,15 @@ describe("ModeBanner", () => {
   it("shows UNKNOWN", () => {
     render(<ModeBanner mode="UNKNOWN" />);
     expect(screen.getByTestId("mode-banner").textContent).toContain("UNKNOWN");
+    expect(screen.getByTestId("kill-chip").textContent).toContain("UNKNOWN");
   });
   it("warns on LIVE", () => {
     render(<ModeBanner mode="LIVE" />);
     expect(screen.getByTestId("mode-banner").textContent).toContain("LIVE TRADING");
+  });
+  it("shows kill switch chip when known", () => {
+    render(<ModeBanner mode="PAPER" killSwitch="disarmed" />);
+    expect(screen.getByTestId("kill-chip").textContent).toContain("disarmed");
   });
 });
 

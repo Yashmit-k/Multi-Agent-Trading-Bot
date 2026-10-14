@@ -1,12 +1,14 @@
-"""Paper cycle. as_of is the latest stored candle end for the horizon timeframe.
+"""Paper cycle. New equity buys are CNC limit orders.
 
-A market decision on candle t stays open until a later stored bar exists, then
-fills at that bar's open. Stops use the same same-bar rule as the backtester.
-When no cost schedule is passed, the research cost is 2 bp. It is never zero
-unless the caller sets that schedule explicitly.
+A buy records the latest completed daily close as its reference price and can
+fill only on a completed five-minute bar inside its entry window, at or below
+the limit. Orders that do not carry the CNC policy version are left unchanged.
+When no research schedule is passed, backtest helpers still use 2 bp. The CNC
+path uses the versioned Zerodha schedule and does not fall back to 2 bp.
 """
 
 import hashlib
+import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Protocol
@@ -18,10 +20,14 @@ from contracts.schemas.execution import Execution
 from contracts.schemas.order import Order
 from contracts.schemas.portfolio import PortfolioSnapshot
 from contracts.schemas.position import Position
-from core_db.repository import CoreRepository
+from core_db.repository import DAILY_ENTRY_LIMIT, CoreRepository
 from core_decision import build_proposal, proposal_id_for
 from core_fusion import fuse
 from core_paper.costs import CostSchedule, fee_on, slipped_price
+from core_paper.execute import MAX_NOTIONAL, queue_entry, settle_entries, settle_sell
+from core_paper.limits import PRODUCT_CNC, SELL_POLICY_VERSION
+from core_paper.charges import ZERODHA_EQUITY_RI
+from core_paper.trading_calendar import paper_test_entry_window
 from core_risk import assess
 
 HORIZON_TIMEFRAME: dict[Horizon, Timeframe] = {
@@ -31,12 +37,18 @@ HORIZON_TIMEFRAME: dict[Horizon, Timeframe] = {
 }
 _DRAWDOWN_QUANTUM = Decimal("0.00000001")
 _CENT = Decimal("0.01")
-MAX_NOTIONAL = Decimal("100000")
+logger = logging.getLogger(__name__)
 
 
 class EventPublisher(Protocol):
     def publish(self, channel: str, payload: str) -> None:
         """Send one Redis message."""
+
+
+def _candle_is_fresh(stored_end: datetime, timeframe: Timeframe, now: datetime) -> bool:
+    from core_market_data.schedule import candle_is_fresh
+
+    return candle_is_fresh(stored_end, timeframe, now)
 
 
 def kill_switch(repository: CoreRepository | None = None, *, armed: bool = True) -> bool:
@@ -61,34 +73,70 @@ def run_paper_cycle(
     starting_cash: Decimal,
     weights: dict | None = None,
     schedule: CostSchedule | None = None,
+    require_fresh: bool = False,
+    now: datetime | None = None,
+    max_new_orders: int | None = None,
+    enforce_entry_window: bool = True,
+    require_universe_fresh: bool = False,
+    broker_authenticated: bool = True,
+    allow_test_extension: bool = False,
 ) -> int:
+    if max_new_orders is not None and max_new_orders < 0:
+        raise ValueError("max_new_orders must be zero or positive")
     if not repository.paper_running():
         return 0
+    book = repository.active_paper_session()
+    if book is None or book.starting_cash is None:
+        return 0
+    starting_cash = book.starting_cash
+    moment = now or datetime.now(timezone.utc)
     costs = paper_schedule(schedule)
-    _settle_open_orders(repository, publisher, costs, starting_cash)
+    _settle_open_orders(repository, publisher, costs, starting_cash, now=moment)
     _monitor_brackets(repository, publisher, costs, starting_cash, mode)
-    _settle_open_orders(repository, publisher, costs, starting_cash)
+    _settle_open_orders(repository, publisher, costs, starting_cash, now=moment)
     if repository.kill_switch_armed():
         _queue_flattens(repository, publisher, costs, starting_cash, mode)
-        _settle_open_orders(repository, publisher, costs, starting_cash)
+        _settle_open_orders(repository, publisher, costs, starting_cash, now=moment)
         return 0
     written = 0
+    blocked = _new_entry_block(
+        repository,
+        moment,
+        mode=mode,
+        enforce_entry_window=enforce_entry_window,
+        require_universe_fresh=require_universe_fresh,
+        broker_authenticated=broker_authenticated,
+        allow_test_extension=allow_test_extension,
+    )
+    if blocked is not None:
+        logger.info("new_entries_blocked reason=%s", blocked)
+        return written
+    created_orders = 0
+    capped = False
+    extension = paper_test_entry_window(moment) if allow_test_extension and mode == TradingMode.PAPER else None
     for instrument in repository.list_instruments():
+        if capped:
+            break
         for horizon, timeframe in HORIZON_TIMEFRAME.items():
+            if max_new_orders is not None and created_orders >= max_new_orders:
+                capped = True
+                break
             candle = repository.latest_candle(instrument.symbol, timeframe)
             if candle is None or repository.held_quantity(instrument.symbol) > 0:
                 continue
+            if require_fresh and not _candle_is_fresh(candle.end, timeframe, moment):
+                continue
             as_of = candle.end.astimezone(timezone.utc)
-            proposal_id = proposal_id_for(instrument.symbol, horizon, as_of)
+            proposal_id = proposal_id_for(instrument.symbol, horizon, as_of, session_id=book.session_id)
             proposal = repository.get_proposal(proposal_id)
             if proposal is None:
                 aggregate = fuse(repository.signals_for(instrument.symbol), horizon=horizon, as_of=as_of, weights=weights)
                 if aggregate is None:
                     continue
-                proposal = build_proposal(aggregate, candle, as_of)
+                proposal = build_proposal(aggregate, candle, as_of, session_id=book.session_id)
                 if proposal is None:
                     continue
-                proposal = _sized(proposal, repository.cash_balance(starting_cash), costs)
+                proposal = _sized(proposal, repository.available_cash(starting_cash), costs)
                 proposal = proposal.model_copy(update={"metadata": {**proposal.metadata, "stops_monitored": True, "same_bar_exit": "stop_first"}})
                 if repository.insert_proposal(proposal):
                     _publish(publisher, EventType.DECISION_CREATED, f"decision.created:{proposal.proposal_id}", as_of, proposal.proposal_id, proposal)
@@ -99,7 +147,7 @@ def run_paper_cycle(
                     proposal,
                     mode=mode,
                     in_universe=proposal.symbol in members,
-                    cash=repository.cash_balance(starting_cash),
+                    cash=repository.available_cash(starting_cash),
                     held_quantity=repository.held_quantity(proposal.symbol),
                     timestamp=as_of,
                 )
@@ -112,9 +160,90 @@ def run_paper_cycle(
                 continue
             if repository.order_for_proposal(proposal.proposal_id) is not None:
                 continue
-            _queue(repository, proposal, as_of, reason="entry", fill_at="next_open")
-    _settle_open_orders(repository, publisher, costs, starting_cash)
+            before = {item.order_id for item in repository.list_orders()}
+            queue_entry(repository, proposal, as_of, entry_window=extension)
+            created_orders += len({item.order_id for item in repository.list_orders()} - before)
+    if capped:
+        logger.info("new_order_cap cap=%s created=%s", max_new_orders, created_orders)
+    _settle_open_orders(repository, publisher, costs, starting_cash, now=moment)
     return written
+
+
+class CycleRefused(RuntimeError):
+    """The one-shot preflight refused to start a cycle."""
+
+
+REQUIRED_MEMBER_COUNT = 50
+
+
+def _new_entry_block(
+    repository: CoreRepository,
+    now: datetime,
+    *,
+    mode: TradingMode,
+    enforce_entry_window: bool,
+    require_universe_fresh: bool,
+    broker_authenticated: bool,
+    allow_test_extension: bool,
+) -> str | None:
+    """Why this cycle must not submit a new buy. Settlement has already run."""
+    if not broker_authenticated:
+        return "broker_unauthenticated"
+    if enforce_entry_window:
+        try:
+            require_entry_window(now, mode=mode, allow_extension=allow_test_extension)
+        except CycleRefused as exc:
+            return str(exc)
+    if require_universe_fresh:
+        try:
+            require_fresh_constituents(repository, now)
+        except CycleRefused as exc:
+            return str(exc)
+    if repository.daily_entry_count(now) >= DAILY_ENTRY_LIMIT:
+        return "daily_entry_cap"
+    return None
+
+
+def require_fresh_constituents(repository: CoreRepository, now: datetime) -> None:
+    """Fail closed unless every current member has a fresh five-minute bar in the database.
+
+    Freshness is `candle_is_fresh`, which uses `expected_completed_end` and the
+    90-second publication delay. The ingestion status snapshot is not read.
+    """
+    members = repository.members_at(now)
+    if len(members) != REQUIRED_MEMBER_COUNT:
+        raise CycleRefused(f"NIFTY50 membership is {len(members)}, required {REQUIRED_MEMBER_COUNT}")
+    for item in members:
+        bar = repository.latest_candle(item.symbol, Timeframe.M5)
+        if bar is None or not _candle_is_fresh(bar.end, Timeframe.M5, now):
+            raise CycleRefused(f"stale or missing 5m bar for {item.symbol}")
+
+
+def require_ordinary_entry_window(now: datetime) -> None:
+    """Ordinary cash session, 09:20 inclusive to 10:30 exclusive IST."""
+    require_entry_window(now, mode=TradingMode.PAPER, allow_extension=False)
+
+
+def require_entry_window(now: datetime, *, mode: TradingMode, allow_extension: bool) -> None:
+    """New-entry gate. The 11:00 end applies only to the opted-in 13 October 2026 paper test."""
+    from datetime import time
+
+    from core_paper.trading_calendar import ENTRY_END, IST, paper_test_entry_window, session_for
+
+    local = now.astimezone(IST)
+    window = session_for(local.date())
+    if window is None or (window.entry_start, window.entry_end) != (time(9, 20), time(10, 30)):
+        raise CycleRefused("session is not an ordinary 09:20-10:30 entry window")
+    end = ENTRY_END
+    if allow_extension and mode == TradingMode.PAPER:
+        extended = paper_test_entry_window(now)
+        if extended is not None:
+            end = extended.entry_end
+    end_at = datetime.combine(window.session_date, end, tzinfo=IST)
+    if not (window.entry_start_at <= local < end_at):
+        if end == time(11, 0):
+            raise CycleRefused("outside the 13 October 2026 paper entry window ending 11:00 IST")
+        raise CycleRefused("outside 09:20 inclusive to 10:30 exclusive IST")
 
 
 def _sized(proposal, cash: Decimal, schedule: CostSchedule):
@@ -156,27 +285,22 @@ def _queue(repository: CoreRepository, proposal, as_of: datetime, *, reason: str
             "decision_end": as_of.isoformat(),
             "same_bar_exit": "stop_first",
             "level_price": None if raw_price is None else str(raw_price),
+            "product_type": PRODUCT_CNC,
+            "policy_version": SELL_POLICY_VERSION,
+            "charge_version": ZERODHA_EQUITY_RI.version,
         },
     )
     repository.insert_order(order)
 
 
-def _settle_open_orders(repository: CoreRepository, publisher: EventPublisher, schedule: CostSchedule, starting_cash: Decimal) -> None:
+def _settle_open_orders(repository: CoreRepository, publisher: EventPublisher, schedule: CostSchedule, starting_cash: Decimal, *, now: datetime | None = None) -> None:
+    moment = now or datetime.now(timezone.utc)
+    for order_id in settle_entries(repository, starting_cash=starting_cash, now=moment):
+        logger.info("legacy_order_review_required order_id=%s", order_id)
     for order in repository.list_orders():
-        if order.status != OrderStatus.OPEN:
-            continue
-        proposal = repository.get_proposal(order.proposal_id)
-        if proposal is None:
-            continue
-        decision_end = datetime.fromisoformat(str(order.metadata["decision_end"]))
-        if order.metadata.get("fill_at") == "level" and order.metadata.get("level_price"):
-            _execute(repository, publisher, order, proposal, Decimal(str(order.metadata["level_price"])), decision_end, schedule, starting_cash)
-            continue
-        nxt = _next_bar(repository, order.symbol, _timeframe_for(proposal), decision_end)
-        if nxt is None:
-            continue
-        raw = nxt.open
-        _execute(repository, publisher, order, proposal, raw, nxt.end, schedule, starting_cash)
+        if order.metadata.get("policy_version") == SELL_POLICY_VERSION:
+            settle_sell(repository, order, starting_cash=starting_cash, now=moment)
+    del publisher, schedule
 
 
 def _monitor_brackets(repository, publisher, schedule, starting_cash, mode: TradingMode) -> None:
@@ -187,6 +311,8 @@ def _monitor_brackets(repository, publisher, schedule, starting_cash, mode: Trad
             continue
         entry = _entry_execution(repository, position.symbol)
         if entry is None:
+            continue
+        if "stop_loss" not in entry.metadata or "take_profit" not in entry.metadata:
             continue
         stop = Decimal(str(entry.metadata["stop_loss"]))
         target = Decimal(str(entry.metadata["take_profit"]))
@@ -226,7 +352,10 @@ def _exit_proposal(repository, publisher, position, price, as_of, reason, schedu
     from contracts.schemas.trade_proposal import TradeProposal
 
     moment = as_of.astimezone(timezone.utc)
-    proposal_id = _digest("exit", f"{position.symbol}|{reason}|{moment.isoformat()}")
+    book = repository.active_paper_session()
+    if book is None:
+        return
+    proposal_id = _digest("exit", f"{book.session_id}|{position.symbol}|{reason}|{moment.isoformat()}")
     if repository.order_for_proposal(proposal_id) is not None:
         return
     proposal = TradeProposal(
@@ -251,7 +380,7 @@ def _exit_proposal(repository, publisher, position, price, as_of, reason, schedu
         proposal,
         mode=mode,
         in_universe=True,
-        cash=repository.cash_balance(starting_cash),
+        cash=repository.available_cash(starting_cash),
         held_quantity=position.quantity,
         timestamp=moment,
     )

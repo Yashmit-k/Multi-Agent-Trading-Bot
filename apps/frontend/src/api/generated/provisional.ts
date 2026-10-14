@@ -26,6 +26,7 @@ export interface ProvisionalRiskStatus {
   status: string;
   as_of: string;
   message: string;
+  kill_switch?: string;
 }
 
 export interface ProvisionalPerformance {

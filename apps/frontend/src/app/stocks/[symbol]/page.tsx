@@ -2,7 +2,8 @@ import { fetchApi } from "@/lib/api";
 import type { ProvisionalAgentScore, ProvisionalRiskStatus, ProvisionalStock } from "@/api/generated/provisional";
 import { CandleChart } from "@/components/CandleChart";
 import { HorizonSplit } from "@/components/HorizonSplit";
-import { ErrorState } from "@/components/States";
+import { ErrorState, EmptyState } from "@/components/States";
+import { PageFrame } from "@/components/shell/PageFrame";
 
 export default async function StockPage({ params }: { params: Promise<{ symbol: string }> }) {
   const { symbol } = await params;
@@ -23,17 +24,15 @@ export default async function StockPage({ params }: { params: Promise<{ symbol: 
     ]);
     const features = signals[0] as { features?: Record<string, string | number> } | undefined;
     return (
-      <div className="space-y-4">
-        <h1 className="text-2xl font-bold">{stock.symbol}</h1>
-        <p>
-          Price {stock.last_price} · timeframe {candles[0]?.timeframe ?? "1d"}
-        </p>
+      <PageFrame title={stock.symbol} description={`Price ${stock.last_price} · timeframe ${candles[0]?.timeframe ?? "1d"}`}>
         <CandleChart rows={candles} />
         <h2 className="font-semibold">Technical features (from last signal)</h2>
-        <pre className="text-xs bg-white p-2 overflow-auto">{JSON.stringify(features?.features ?? {}, null, 2)}</pre>
+        <pre className="overflow-auto rounded-[12px] border border-[#26303C] bg-[#121922] p-2 text-xs">
+          {JSON.stringify(features?.features ?? {}, null, 2)}
+        </pre>
         <HorizonSplit signals={signals} />
         <h2 className="font-semibold">Agent scores</h2>
-        <ul>
+        <ul className="space-y-1 text-sm">
           {agents.map((item) => (
             <li key={item.agent_name}>
               {item.agent_name} score {item.signal} confidence {item.confidence} ({item.horizon})
@@ -41,15 +40,20 @@ export default async function StockPage({ params }: { params: Promise<{ symbol: 
           ))}
         </ul>
         <h2 className="font-semibold">News</h2>
-        <ul>
-          {news.map((item) => (
-            <li key={item.title}>
-              {item.title} ({item.published_at})
-            </li>
-          ))}
-        </ul>
+        <p className="text-sm text-[#94A3B8]">Stored per-symbol articles. This is not a live news feed.</p>
+        {news.length === 0 ? (
+          <EmptyState label="per-symbol news" />
+        ) : (
+          <ul className="space-y-1 text-sm">
+            {news.map((item) => (
+              <li key={item.title}>
+                {item.title} ({item.published_at})
+              </li>
+            ))}
+          </ul>
+        )}
         <h2 className="font-semibold">Fundamentals</h2>
-        <ul>
+        <ul className="space-y-1 text-sm">
           {fundamentals.map((item) => (
             <li key={item.period}>
               {item.metric} {item.value} {item.period}
@@ -59,7 +63,7 @@ export default async function StockPage({ params }: { params: Promise<{ symbol: 
         <p>Current decision is owned by Core fusion — not computed here.</p>
         <p>Risk {risk.status}</p>
         <h2 className="font-semibold">Trade history (orders)</h2>
-        <ul>
+        <ul className="space-y-1 text-sm">
           {orders
             .filter((item) => item.symbol === stock.symbol)
             .map((item) => (
@@ -68,9 +72,13 @@ export default async function StockPage({ params }: { params: Promise<{ symbol: 
               </li>
             ))}
         </ul>
-      </div>
+      </PageFrame>
     );
   } catch (error) {
-    return <ErrorState message={error instanceof Error ? error.message : "unknown"} />;
+    return (
+      <PageFrame title={symbol}>
+        <ErrorState message={error instanceof Error ? error.message : "unknown"} />
+      </PageFrame>
+    );
   }
 }

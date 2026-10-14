@@ -19,6 +19,10 @@ jobs:
           python -m pip install -e services/core/feature-engine
           python -m pip install -e services/core/db
           python -m pip install -e services/core/market-data
+          python -m pip install -e services/core/signal-fusion
+          python -m pip install -e services/core/decision-engine
+          python -m pip install -e services/core/risk-engine
+          python -m pip install -e services/core/paper-execution
           python -m pip install -e "services/quant[dev]"
       - name: Unit tests
         run: python -m pytest services/quant/tests/unit -q

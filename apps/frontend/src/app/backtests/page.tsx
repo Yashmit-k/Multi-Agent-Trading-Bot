@@ -1,5 +1,6 @@
 import { fetchApi } from "@/lib/api";
 import { EmptyState, ErrorState } from "@/components/States";
+import { PageFrame } from "@/components/shell/PageFrame";
 
 type EquityPoint = { timestamp: string; equity: string };
 
@@ -44,21 +45,21 @@ export default async function BacktestsPage({
     const runs = await fetchApi<BacktestRun[]>("/api/v1/backtests");
     if (runs.length === 0) {
       return (
-        <div>
-          <h1 className="text-2xl font-bold">Backtests</h1>
+        <PageFrame title="Backtests">
           <EmptyState label="backtests" />
-        </div>
+        </PageFrame>
       );
     }
     const selected = runs.find((run) => run.backtest_id === params.id) ?? runs[0];
     const performance = selected.performance;
     return (
-      <div>
-        <h1 className="text-2xl font-bold">Backtests</h1>
-        <ul>
+      <PageFrame title="Backtests">
+        <ul className="space-y-1 text-sm">
           {runs.map((run) => (
             <li key={run.backtest_id}>
-              <a href={`/backtests?id=${run.backtest_id}`}>{run.backtest_id}</a>
+              <a className="text-cyan-400 hover:underline" href={`/backtests?id=${run.backtest_id}`}>
+                {run.backtest_id}
+              </a>
             </li>
           ))}
         </ul>
@@ -88,16 +89,20 @@ export default async function BacktestsPage({
         <p>Slippage {performance.slippage}</p>
         <p>Net P&L {performance.net_pnl}</p>
         <h2 className="text-xl font-semibold">Equity curve</h2>
-        <ol>
+        <ol className="space-y-1 text-sm">
           {selected.equity_curve.slice(-20).map((point) => (
             <li key={point.timestamp}>
               {point.timestamp} {point.equity}
             </li>
           ))}
         </ol>
-      </div>
+      </PageFrame>
     );
   } catch (error) {
-    return <ErrorState message={error instanceof Error ? error.message : "unknown"} />;
+    return (
+      <PageFrame title="Backtests">
+        <ErrorState message={error instanceof Error ? error.message : "unknown"} />
+      </PageFrame>
+    );
   }
 }

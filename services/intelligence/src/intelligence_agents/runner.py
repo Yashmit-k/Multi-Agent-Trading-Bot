@@ -13,7 +13,7 @@ from contracts.schemas.submission import SubmissionResult
 from contracts.time import require_aware
 
 from intelligence_agents.clock import Clock, ReplayClock
-from intelligence_agents.errors import LeakageError
+from intelligence_agents.errors import FixtureCoverageError, LeakageError
 from intelligence_agents.leakage import LeakageGuard
 
 logger = logging.getLogger(__name__)
@@ -39,6 +39,7 @@ class Runner:
         self.horizons = list(horizons or (Horizon.SWING,))
         self.results: list[SubmissionResult] = []
         self.produced: list[AgentSignal] = []
+        self.skipped: list[dict[str, str]] = []
 
     def run(self, symbols: Sequence[str], as_of: datetime) -> list[AgentSignal]:
         aware = require_aware(as_of, "as_of")
@@ -50,6 +51,13 @@ class Runner:
                     name = str(getattr(agent, "agent_name", type(agent).__name__))
                     try:
                         signal = agent.evaluate(symbol, aware, context)
+                    except FixtureCoverageError as exc:
+                        self.skipped.append({"agent": name, "symbol": exc.symbol, "reason": "fixture_coverage"})
+                        logger.warning(
+                            "fixture_symbol_skipped",
+                            extra={"agent": name, "symbol": exc.symbol, "reason": "fixture_coverage"},
+                        )
+                        continue
                     except LeakageError:
                         if self.mode is TradingMode.BACKTEST:
                             raise

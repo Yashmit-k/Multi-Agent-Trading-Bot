@@ -1,9 +1,12 @@
 """Repository used by every other core service."""
 
+import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from contracts.enums import Exchange, Timeframe
@@ -28,11 +31,17 @@ from core_db.models import (
     BacktestPositionRow,
     BacktestRunRow,
     CandleRow,
+    CashReservationRow,
+    ChargeLedgerRow,
+    DpChargeRow,
     ExecutionRow,
     FeatureRow,
     InstrumentRow,
     MarketTickRow,
+    EntryDayGateRow,
+    OrderBarCheckRow,
     OrderRow,
+    PaperSessionRow,
     PortfolioSnapshotRow,
     PositionRow,
     RiskDecisionRow,
@@ -41,9 +50,24 @@ from core_db.models import (
     TradeProposalRow,
     UniverseMembershipRow,
 )
-from core_db.records import InstrumentRecord, TickRecord
+from core_db.paper_sessions import (
+    LEGACY_ASSESSMENT_AUDIT_ID,
+    LEGACY_SESSION_ID,
+    ActivePaperSessionError,
+    AmbiguousPaperSessionError,
+    ClosedPaperSessionError,
+    LegacyAssessment,
+    MissingPaperSessionError,
+    assess_legacy_book,
+    payload_dict,
+)
+from core_db.records import InstrumentRecord, PaperSessionRecord, TickRecord
 
 NSE = Exchange.NSE.value
+_ACTIVE = object()
+_IST = ZoneInfo("Asia/Kolkata")
+DAILY_ENTRY_LIMIT = 6
+ENTRY_POLICY_VERSION = "cnc-limit-v1"
 
 
 class NonNseWriteError(ValueError):
@@ -129,6 +153,35 @@ class CoreRepository:
                     )
                 )
                 session.commit()
+
+    def sync_membership(
+        self,
+        instrument_id: str,
+        universe: str,
+        effective_from: datetime,
+        effective_to: datetime | None,
+    ) -> None:
+        """Insert a seed interval or update its close. Stored candles are not touched."""
+        opened = as_utc(effective_from)
+        closed = as_utc(effective_to) if effective_to else None
+        membership_id = f"{instrument_id}:{universe}:{opened.date().isoformat()}"
+        with self._session_factory() as session:
+            row = session.get(UniverseMembershipRow, membership_id)
+            if row is None:
+                session.add(
+                    UniverseMembershipRow(
+                        membership_id=membership_id,
+                        instrument_id=instrument_id,
+                        universe=universe,
+                        effective_from=opened,
+                        effective_to=closed,
+                    )
+                )
+            else:
+                current = as_utc(row.effective_to) if row.effective_to else None
+                if current != closed:
+                    row.effective_to = closed
+            session.commit()
 
     def remove_membership(self, instrument_id: str, universe: str, effective_from: datetime) -> None:
         membership_id = f"{instrument_id}:{universe}:{as_utc(effective_from).date().isoformat()}"
@@ -455,12 +508,14 @@ class CoreRepository:
 
     def insert_proposal(self, proposal: TradeProposal) -> bool:
         instrument = self._require_instrument(proposal.symbol)
+        session_id = self._trading_session_id()
         with self._session_factory() as session:
             if session.get(TradeProposalRow, proposal.proposal_id) is not None:
                 return False
             session.add(
                 TradeProposalRow(
                     proposal_id=proposal.proposal_id,
+                    session_id=session_id,
                     instrument_id=instrument.instrument_id,
                     symbol=proposal.symbol,
                     horizon=proposal.horizon.value,
@@ -481,9 +536,13 @@ class CoreRepository:
             row = session.get(TradeProposalRow, proposal_id)
             return row.instrument_id if row else None
 
-    def list_proposals(self) -> list[TradeProposal]:
+    def list_proposals(self, session_id: str | None | object = _ACTIVE) -> list[TradeProposal]:
         with self._session_factory() as session:
-            rows = session.scalars(select(TradeProposalRow).order_by(TradeProposalRow.as_of, TradeProposalRow.proposal_id))
+            rows = session.scalars(
+                self._scoped(select(TradeProposalRow), TradeProposalRow.session_id, session_id).order_by(
+                    TradeProposalRow.as_of, TradeProposalRow.proposal_id
+                )
+            )
             return [TradeProposal.model_validate(dict(row.payload)) for row in rows]
 
     def insert_risk_decision(self, decision: RiskDecision) -> bool:
@@ -491,12 +550,14 @@ class CoreRepository:
         if proposal is None:
             raise KeyError(decision.proposal_id)
         instrument = self._require_instrument(proposal.symbol)
+        session_id = self._session_id_for_proposal(decision.proposal_id)
         with self._session_factory() as session:
             if session.scalar(select(RiskDecisionRow).where(RiskDecisionRow.proposal_id == decision.proposal_id)) is not None:
                 return False
             session.add(
                 RiskDecisionRow(
                     risk_decision_id=decision.risk_decision_id,
+                    session_id=session_id,
                     proposal_id=decision.proposal_id,
                     instrument_id=instrument.instrument_id,
                     payload=decision.model_dump(mode="json"),
@@ -510,19 +571,25 @@ class CoreRepository:
             row = session.scalar(select(RiskDecisionRow).where(RiskDecisionRow.proposal_id == proposal_id))
             return RiskDecision.model_validate(dict(row.payload)) if row else None
 
-    def list_risk_decisions(self) -> list[RiskDecision]:
+    def list_risk_decisions(self, session_id: str | None | object = _ACTIVE) -> list[RiskDecision]:
         with self._session_factory() as session:
-            rows = session.scalars(select(RiskDecisionRow).order_by(RiskDecisionRow.risk_decision_id))
+            rows = session.scalars(
+                self._scoped(select(RiskDecisionRow), RiskDecisionRow.session_id, session_id).order_by(
+                    RiskDecisionRow.risk_decision_id
+                )
+            )
             return [RiskDecision.model_validate(dict(row.payload)) for row in rows]
 
     def insert_order(self, order: Order) -> bool:
         instrument = self._require_instrument(order.symbol)
+        session_id = self._session_id_for_proposal(order.proposal_id)
         with self._session_factory() as session:
             if session.scalar(select(OrderRow).where(OrderRow.proposal_id == order.proposal_id)) is not None:
                 return False
             session.add(
                 OrderRow(
                     order_id=order.order_id,
+                    session_id=session_id,
                     proposal_id=order.proposal_id,
                     instrument_id=instrument.instrument_id,
                     payload=order.model_dump(mode="json"),
@@ -539,12 +606,214 @@ class CoreRepository:
             row.payload = order.model_dump(mode="json")
             session.commit()
 
+    def commit_policy_order(self, order: Order, reserve: Decimal | None) -> bool:
+        """Insert one order and, for a BUY hold, its cash reservation in one transaction.
+
+        A new CNC entry is counted under its IST calendar date before the insert.
+        The gate row and the order commit together, so a concurrent insert cannot
+        pass the same daily count.
+        """
+        instrument = self._require_instrument(order.symbol)
+        session_id = self._session_id_for_proposal(order.proposal_id)
+        payload = order.model_dump(mode="json")
+        with self._session_factory() as session:
+            counted = _counted_entry(payload)
+            if counted:
+                _lock_entry_day(session, _ist_day(order.created_at))
+            if session.scalar(select(OrderRow).where(OrderRow.proposal_id == order.proposal_id)) is not None:
+                return False
+            if counted and _entry_count(session, _ist_day(order.created_at)) >= DAILY_ENTRY_LIMIT:
+                return False
+            session.add(
+                OrderRow(
+                    order_id=order.order_id,
+                    session_id=session_id,
+                    proposal_id=order.proposal_id,
+                    instrument_id=instrument.instrument_id,
+                    payload=payload,
+                )
+            )
+            if reserve is not None:
+                session.add(
+                    CashReservationRow(
+                        reservation_id=order.order_id,
+                        session_id=session_id,
+                        order_id=order.order_id,
+                        amount=reserve,
+                        status="HELD",
+                        applied_debit=None,
+                        created_at=as_utc(order.created_at),
+                        updated_at=as_utc(order.updated_at),
+                    )
+                )
+            session.commit()
+            return True
+
+    def daily_entry_count(self, moment: datetime) -> int:
+        """CNC entry orders whose creation instant falls on this IST date, across sessions."""
+        with self._session_factory() as session:
+            return _entry_count(session, _ist_day(moment))
+
+    def dp_claimed(self, trading_day: str, exchange: str, symbol: str, session_id: str | None | object = _ACTIVE) -> bool:
+        target = self._resolve_session_id(session_id)
+        if target is None:
+            return False
+        with self._session_factory() as session:
+            row = session.scalar(
+                select(DpChargeRow).where(
+                    DpChargeRow.session_id == target,
+                    DpChargeRow.trading_day == trading_day,
+                    DpChargeRow.exchange == exchange,
+                    DpChargeRow.symbol == symbol.strip().upper(),
+                )
+            )
+            return row is not None
+
+    def commit_policy_transition(
+        self,
+        order: Order,
+        *,
+        release: bool = False,
+        convert_amount: Decimal | None = None,
+        execution: Execution | None = None,
+        position: Position | None = None,
+        clear_symbol: str | None = None,
+        snapshot: PortfolioSnapshot | None = None,
+        snapshot_id: str | None = None,
+        bar_keys: list[str] | None = None,
+        ledger: list[dict] | None = None,
+        dp: dict | None = None,
+        fee_updates: list[tuple[str, dict]] | None = None,
+    ) -> bool:
+        """Persist an order transition once. A repeated bar key or fill does not apply again."""
+        session_id = self._session_id_for_order(order.order_id)
+        keys = list(bar_keys or [])
+        with self._session_factory() as session:
+            if execution is not None and session.scalar(
+                select(ExecutionRow).where(ExecutionRow.order_id == order.order_id)
+            ) is not None:
+                return False
+            if keys and session.scalar(
+                select(OrderBarCheckRow).where(
+                    OrderBarCheckRow.order_id == order.order_id,
+                    OrderBarCheckRow.bar_key.in_(keys),
+                )
+            ) is not None:
+                return False
+            row = session.get(OrderRow, order.order_id)
+            if row is None or row.session_id != session_id:
+                return False
+            row.payload = order.model_dump(mode="json")
+            for key in keys:
+                session.add(OrderBarCheckRow(check_id=f"{order.order_id}:{key}", order_id=order.order_id, bar_key=key))
+            reservation = session.scalar(select(CashReservationRow).where(CashReservationRow.order_id == order.order_id))
+            if release and reservation is not None and reservation.status == "HELD":
+                reservation.status = "RELEASED"
+                reservation.updated_at = as_utc(order.updated_at)
+            if convert_amount is not None and reservation is not None and reservation.status == "HELD":
+                reservation.status = "CONVERTED"
+                reservation.applied_debit = convert_amount
+                reservation.updated_at = as_utc(order.updated_at)
+            if execution is not None:
+                instrument_id = row.instrument_id
+                session.add(
+                    ExecutionRow(
+                        execution_id=execution.execution_id,
+                        session_id=session_id,
+                        order_id=order.order_id,
+                        instrument_id=instrument_id,
+                        payload=execution.model_dump(mode="json"),
+                    )
+                )
+            for execution_id, payload in fee_updates or []:
+                fill_row = session.get(ExecutionRow, execution_id)
+                if fill_row is not None and fill_row.session_id == session_id:
+                    fill_row.payload = payload
+            if position is not None:
+                instrument = session.scalar(
+                    select(InstrumentRow).where(InstrumentRow.symbol == position.symbol, InstrumentRow.exchange == "NSE")
+                )
+                if instrument is None:
+                    return False
+                current = self._position_row(session, session_id, instrument.instrument_id)
+                payload = position.model_dump(mode="json")
+                if current is None:
+                    session.add(
+                        PositionRow(
+                            position_id=f"{session_id}:{instrument.instrument_id}",
+                            session_id=session_id,
+                            instrument_id=instrument.instrument_id,
+                            symbol=position.symbol,
+                            payload=payload,
+                        )
+                    )
+                else:
+                    current.payload = payload
+                    current.symbol = position.symbol
+            if clear_symbol is not None:
+                instrument = session.scalar(
+                    select(InstrumentRow).where(InstrumentRow.symbol == clear_symbol, InstrumentRow.exchange == "NSE")
+                )
+                current = None if instrument is None else self._position_row(session, session_id, instrument.instrument_id)
+                if current is not None:
+                    session.delete(current)
+            if snapshot is not None and snapshot_id is not None and session.get(PortfolioSnapshotRow, snapshot_id) is None:
+                session.add(
+                    PortfolioSnapshotRow(
+                        snapshot_id=snapshot_id,
+                        session_id=session_id,
+                        timestamp=as_utc(snapshot.timestamp),
+                        payload=snapshot.model_dump(mode="json"),
+                    )
+                )
+            for item in ledger or []:
+                if session.scalar(
+                    select(ChargeLedgerRow).where(
+                        ChargeLedgerRow.session_id == session_id,
+                        ChargeLedgerRow.order_id == order.order_id,
+                        ChargeLedgerRow.kind == item["kind"],
+                    )
+                ) is None:
+                    session.add(
+                        ChargeLedgerRow(
+                            ledger_id=item["ledger_id"],
+                            session_id=session_id,
+                            order_id=order.order_id,
+                            execution_id=item.get("execution_id"),
+                            kind=item["kind"],
+                            amount=item["amount"],
+                            payload=item["payload"],
+                        )
+                    )
+            if dp is not None and session.scalar(
+                select(DpChargeRow).where(
+                    DpChargeRow.session_id == session_id,
+                    DpChargeRow.trading_day == dp["trading_day"],
+                    DpChargeRow.exchange == dp["exchange"],
+                    DpChargeRow.symbol == dp["symbol"],
+                )
+            ) is None:
+                session.add(
+                    DpChargeRow(
+                        dp_id=dp["dp_id"],
+                        session_id=session_id,
+                        trading_day=dp["trading_day"],
+                        exchange=dp["exchange"],
+                        symbol=dp["symbol"],
+                        amount=dp["amount"],
+                        execution_id=dp["execution_id"],
+                    )
+                )
+            session.commit()
+            return True
+
     def clear_position(self, symbol: str) -> None:
         instrument = self.get_by_symbol(symbol)
-        if instrument is None:
+        book = self.active_paper_session()
+        if instrument is None or book is None:
             return
         with self._session_factory() as session:
-            row = session.get(PositionRow, instrument.instrument_id)
+            row = self._position_row(session, book.session_id, instrument.instrument_id)
             if row is not None:
                 session.delete(row)
                 session.commit()
@@ -574,21 +843,25 @@ class CoreRepository:
             row = session.get(OrderRow, order_id)
             return row.instrument_id if row else None
 
-    def list_orders(self) -> list[Order]:
+    def list_orders(self, session_id: str | None | object = _ACTIVE) -> list[Order]:
         with self._session_factory() as session:
-            rows = session.scalars(select(OrderRow).order_by(OrderRow.order_id))
+            rows = session.scalars(
+                self._scoped(select(OrderRow), OrderRow.session_id, session_id).order_by(OrderRow.order_id)
+            )
             return [Order.model_validate(dict(row.payload)) for row in rows]
 
     def insert_execution(self, execution: Execution) -> bool:
         order = self._order_row_instrument(execution.order_id)
         if order is None:
             raise KeyError(execution.order_id)
+        session_id = self._session_id_for_order(execution.order_id)
         with self._session_factory() as session:
             if session.scalar(select(ExecutionRow).where(ExecutionRow.order_id == execution.order_id)) is not None:
                 return False
             session.add(
                 ExecutionRow(
                     execution_id=execution.execution_id,
+                    session_id=session_id,
                     order_id=execution.order_id,
                     instrument_id=order,
                     payload=execution.model_dump(mode="json"),
@@ -597,9 +870,11 @@ class CoreRepository:
             session.commit()
             return True
 
-    def list_executions(self) -> list[Execution]:
+    def list_executions(self, session_id: str | None | object = _ACTIVE) -> list[Execution]:
         with self._session_factory() as session:
-            rows = session.scalars(select(ExecutionRow).order_by(ExecutionRow.execution_id))
+            rows = session.scalars(
+                self._scoped(select(ExecutionRow), ExecutionRow.session_id, session_id).order_by(ExecutionRow.execution_id)
+            )
             return [Execution.model_validate(dict(row.payload)) for row in rows]
 
     def execution_count(self) -> int:
@@ -608,58 +883,147 @@ class CoreRepository:
 
     def save_position(self, position: Position) -> str:
         instrument = self._require_instrument(position.symbol)
+        session_id = self._trading_session_id()
         payload = position.model_dump(mode="json")
+        position_id = f"{session_id}:{instrument.instrument_id}"
         with self._session_factory() as session:
-            row = session.get(PositionRow, instrument.instrument_id)
+            row = self._position_row(session, session_id, instrument.instrument_id)
             if row is None:
-                session.add(PositionRow(instrument_id=instrument.instrument_id, symbol=position.symbol, payload=payload))
+                session.add(
+                    PositionRow(
+                        position_id=position_id,
+                        session_id=session_id,
+                        instrument_id=instrument.instrument_id,
+                        symbol=position.symbol,
+                        payload=payload,
+                    )
+                )
             else:
                 row.symbol = position.symbol
                 row.payload = payload
             session.commit()
         return instrument.instrument_id
 
-    def position_for(self, symbol: str) -> Position | None:
+    def position_for(self, symbol: str, session_id: str | None | object = _ACTIVE) -> Position | None:
         instrument = self.get_by_symbol(symbol)
-        if instrument is None:
+        target = self._resolve_session_id(session_id)
+        if instrument is None or target is None and session_id is _ACTIVE:
             return None
         with self._session_factory() as session:
-            row = session.get(PositionRow, instrument.instrument_id)
+            if target is None:
+                row = session.scalar(
+                    select(PositionRow).where(
+                        PositionRow.symbol == instrument.symbol,
+                        PositionRow.session_id.is_(None),
+                    )
+                )
+            else:
+                row = self._position_row(session, target, instrument.instrument_id)
             return Position.model_validate(dict(row.payload)) if row else None
 
-    def held_quantity(self, symbol: str) -> int:
-        position = self.position_for(symbol)
+    def held_quantity(self, symbol: str, session_id: str | None | object = _ACTIVE) -> int:
+        position = self.position_for(symbol, session_id)
         return 0 if position is None else position.quantity
 
-    def list_positions(self) -> list[Position]:
+    def list_positions(self, session_id: str | None | object = _ACTIVE) -> list[Position]:
         with self._session_factory() as session:
-            rows = session.scalars(select(PositionRow).order_by(PositionRow.symbol))
+            rows = session.scalars(
+                self._scoped(select(PositionRow), PositionRow.session_id, session_id).order_by(PositionRow.symbol)
+            )
             return [Position.model_validate(dict(row.payload)) for row in rows]
 
     def insert_snapshot(self, snapshot_id: str, snapshot: PortfolioSnapshot) -> None:
+        session_id = self._trading_session_id()
         with self._session_factory() as session:
             if session.get(PortfolioSnapshotRow, snapshot_id) is not None:
                 return
             session.add(
                 PortfolioSnapshotRow(
                     snapshot_id=snapshot_id,
+                    session_id=session_id,
                     timestamp=as_utc(snapshot.timestamp),
                     payload=snapshot.model_dump(mode="json"),
                 )
             )
             session.commit()
 
-    def latest_snapshot(self) -> PortfolioSnapshot | None:
+    def latest_snapshot(self, session_id: str | None | object = _ACTIVE) -> PortfolioSnapshot | None:
         with self._session_factory() as session:
-            rows = list(session.scalars(select(PortfolioSnapshotRow)))
+            rows = list(session.scalars(self._scoped(select(PortfolioSnapshotRow), PortfolioSnapshotRow.session_id, session_id)))
         if not rows:
             return None
         row = max(rows, key=lambda item: (as_utc(item.timestamp), item.snapshot_id))
         return PortfolioSnapshot.model_validate(dict(row.payload))
 
-    def cash_balance(self, starting_cash: Decimal) -> Decimal:
-        snapshot = self.latest_snapshot()
-        return starting_cash if snapshot is None else snapshot.cash
+    def open_reservation_total(self, session_id: str | None | object = _ACTIVE) -> Decimal:
+        target = self._resolve_session_id(session_id)
+        if session_id is _ACTIVE and target is None:
+            return Decimal("0")
+        with self._session_factory() as session:
+            rows = session.scalars(select(CashReservationRow).where(CashReservationRow.status == "HELD"))
+            return sum(
+                (row.amount for row in rows if target is None or row.session_id == target),
+                Decimal("0"),
+            )
+
+    def available_cash(self, starting_cash: Decimal, session_id: str | None | object = _ACTIVE) -> Decimal:
+        return self.cash_balance(starting_cash, session_id) - self.open_reservation_total(session_id)
+
+    def reserved_sell_quantity(self, symbol: str, session_id: str | None | object = _ACTIVE) -> int:
+        from contracts.enums import OrderStatus, Side
+
+        name = symbol.strip().upper()
+        return sum(
+            order.quantity
+            for order in self.list_orders(session_id)
+            if order.symbol == name and order.side == Side.SELL and order.status == OrderStatus.OPEN
+        )
+
+    def completed_daily(self, symbol: str, as_of: datetime) -> tuple[Candle, str] | None:
+        moment = as_utc(as_of)
+        with self._session_factory() as session:
+            rows = list(
+                session.scalars(
+                    select(CandleRow).where(
+                        CandleRow.symbol == symbol.strip().upper(),
+                        CandleRow.timeframe == Timeframe.D1.value,
+                    )
+                )
+            )
+        done = [row for row in rows if as_utc(row.end) <= moment]
+        if not done:
+            return None
+        row = max(done, key=lambda item: as_utc(item.end))
+        return _candle(row), row.candle_id
+
+    def bar_already_checked(self, order_id: str, bar_key: str) -> bool:
+        with self._session_factory() as session:
+            found = session.scalar(
+                select(OrderBarCheckRow).where(
+                    OrderBarCheckRow.order_id == order_id,
+                    OrderBarCheckRow.bar_key == bar_key,
+                )
+            )
+            return found is not None
+
+    def cash_balance(self, starting_cash: Decimal, session_id: str | None | object = _ACTIVE) -> Decimal:
+        if session_id is _ACTIVE:
+            book = self.active_paper_session()
+            if book is None:
+                return starting_cash
+            target: str | None = book.session_id
+            base = book.starting_cash if book.starting_cash is not None else starting_cash
+        elif session_id is None:
+            target = None
+            base = starting_cash
+        else:
+            book = self.paper_session(str(session_id))
+            if book is None:
+                raise KeyError(session_id)
+            target = book.session_id
+            base = book.starting_cash if book.starting_cash is not None else starting_cash
+        snapshot = self.latest_snapshot(target)
+        return base if snapshot is None else snapshot.cash
 
     def paper_running(self) -> bool:
         with self._session_factory() as session:
@@ -677,7 +1041,20 @@ class CoreRepository:
         return running
 
     def note_peak_equity(self, equity: Decimal) -> Decimal:
+        book = self.active_paper_session()
+        if book is not None:
+            with self._session_factory() as session:
+                row = session.get(PaperSessionRow, book.session_id)
+                if row is None:
+                    return equity
+                peak = equity if row.peak_equity is None else max(row.peak_equity, equity)
+                row.peak_equity = peak
+                session.commit()
+                return peak
         with self._session_factory() as session:
+            has_session = session.scalar(select(PaperSessionRow.session_id).limit(1))
+            if has_session is not None:
+                return equity
             row = session.get(RuntimeFlagRow, "paper")
             if row is None:
                 session.add(RuntimeFlagRow(flag_id="paper", paper_running=True, peak_equity=equity))
@@ -687,6 +1064,137 @@ class CoreRepository:
             row.peak_equity = peak
             session.commit()
             return peak
+
+    def open_paper_session(self, starting_cash: Decimal, *, created_at: datetime | None = None) -> PaperSessionRecord:
+        if starting_cash <= 0:
+            raise ValueError("starting cash must be positive")
+        if self.active_paper_session() is not None:
+            raise ActivePaperSessionError("an active paper session already exists")
+        moment = as_utc(created_at or datetime.now(timezone.utc))
+        session_id = uuid.uuid4().hex
+        with self._session_factory() as session:
+            session.add(
+                PaperSessionRow(
+                    session_id=session_id,
+                    status="active",
+                    created_at=moment,
+                    closed_at=None,
+                    starting_cash=starting_cash,
+                    peak_equity=starting_cash,
+                )
+            )
+            session.commit()
+        opened = self.paper_session(session_id)
+        if opened is None:
+            raise MissingPaperSessionError(session_id)
+        return opened
+
+    def close_paper_session(self, session_id: str, *, closed_at: datetime | None = None) -> PaperSessionRecord:
+        moment = as_utc(closed_at or datetime.now(timezone.utc))
+        with self._session_factory() as session:
+            row = session.get(PaperSessionRow, session_id)
+            if row is None:
+                raise KeyError(session_id)
+            if row.status != "active":
+                raise ClosedPaperSessionError(session_id)
+            row.status = "closed"
+            row.closed_at = moment
+            session.commit()
+        closed = self.paper_session(session_id)
+        if closed is None:
+            raise KeyError(session_id)
+        return closed
+
+    def paper_session(self, session_id: str) -> PaperSessionRecord | None:
+        with self._session_factory() as session:
+            row = session.get(PaperSessionRow, session_id)
+            return _paper_session(row) if row else None
+
+    def list_paper_sessions(self) -> list[PaperSessionRecord]:
+        with self._session_factory() as session:
+            rows = session.scalars(select(PaperSessionRow).order_by(PaperSessionRow.created_at, PaperSessionRow.session_id))
+            return [_paper_session(row) for row in rows]
+
+    def active_paper_session(self) -> PaperSessionRecord | None:
+        with self._session_factory() as session:
+            rows = list(session.scalars(select(PaperSessionRow).where(PaperSessionRow.status == "active")))
+        if len(rows) > 1:
+            raise AmbiguousPaperSessionError("more than one paper session is active")
+        return _paper_session(rows[0]) if rows else None
+
+    def assign_legacy_paper_session(self, *, now: datetime | None = None) -> str | None:
+        """Attach rows that have no session to the deterministic legacy session.
+
+        Existing rows are updated in place. They are not copied onto whatever
+        session is already active. Returns None when there is nothing to attach.
+        """
+        moment = as_utc(now or datetime.now(timezone.utc))
+        tables = (TradeProposalRow, RiskDecisionRow, OrderRow, ExecutionRow, PositionRow, PortfolioSnapshotRow)
+        with self._session_factory() as session:
+            has_unassigned = any(
+                session.scalars(select(table).where(table.session_id.is_(None)).limit(1)).first() is not None
+                for table in tables
+            )
+            existing = session.get(PaperSessionRow, LEGACY_SESSION_ID)
+            if not has_unassigned:
+                return LEGACY_SESSION_ID if existing is not None else None
+            if existing is None:
+                assessment = _legacy_assessment(session)
+                other_active = any(
+                    row.session_id != LEGACY_SESSION_ID
+                    for row in session.scalars(select(PaperSessionRow).where(PaperSessionRow.status == "active"))
+                )
+                status = "closed" if other_active or not assessment.consistent else "active"
+                diagnostics = list(assessment.diagnostics)
+                if other_active:
+                    diagnostics.append("legacy session stored closed because another session is already active")
+                session.add(
+                    PaperSessionRow(
+                        session_id=LEGACY_SESSION_ID,
+                        status=status,
+                        created_at=moment,
+                        closed_at=moment if status == "closed" else None,
+                        starting_cash=assessment.starting_cash if assessment.consistent else None,
+                        peak_equity=assessment.peak_equity if assessment.consistent else None,
+                    )
+                )
+                session.add(
+                    AuditLogRow(
+                        audit_id=LEGACY_ASSESSMENT_AUDIT_ID,
+                        action="legacy_paper_session",
+                        entity_type="paper_session",
+                        entity_id=LEGACY_SESSION_ID,
+                        recorded_at=moment,
+                        payload={
+                            "consistent": assessment.consistent,
+                            "starting_cash": _decimal_text(assessment.starting_cash),
+                            "peak_equity": _decimal_text(assessment.peak_equity),
+                            "peak_source": assessment.peak_source,
+                            "peak_complete": assessment.peak_complete,
+                            "diagnostics": diagnostics,
+                        },
+                    )
+                )
+            for table in (TradeProposalRow, RiskDecisionRow, OrderRow, ExecutionRow, PortfolioSnapshotRow):
+                for row in session.scalars(select(table).where(table.session_id.is_(None))):
+                    row.session_id = LEGACY_SESSION_ID
+            for row in list(session.scalars(select(PositionRow).where(PositionRow.session_id.is_(None)))):
+                payload = row.payload
+                symbol = row.symbol
+                instrument_id = row.instrument_id
+                session.delete(row)
+                session.flush()
+                session.add(
+                    PositionRow(
+                        position_id=f"{LEGACY_SESSION_ID}:{instrument_id}",
+                        session_id=LEGACY_SESSION_ID,
+                        instrument_id=instrument_id,
+                        symbol=symbol,
+                        payload=payload,
+                    )
+                )
+            session.commit()
+        return LEGACY_SESSION_ID
 
     def insert_backtest(self, backtest_id: str, snapshot_id: str, payload: dict) -> None:
         with self._session_factory() as session:
@@ -743,6 +1251,48 @@ class CoreRepository:
                 return None
             return row.payload | {"backtest_id": row.backtest_id}
 
+    def _trading_session_id(self) -> str:
+        book = self.active_paper_session()
+        if book is None or book.starting_cash is None:
+            raise MissingPaperSessionError("no active paper session")
+        return book.session_id
+
+    def _session_id_for_proposal(self, proposal_id: str) -> str:
+        with self._session_factory() as session:
+            row = session.get(TradeProposalRow, proposal_id)
+            if row is None or row.session_id is None:
+                raise MissingPaperSessionError(proposal_id)
+            return row.session_id
+
+    def _session_id_for_order(self, order_id: str) -> str:
+        with self._session_factory() as session:
+            row = session.get(OrderRow, order_id)
+            if row is None or row.session_id is None:
+                raise MissingPaperSessionError(order_id)
+            return row.session_id
+
+    def _resolve_session_id(self, session_id: str | None | object) -> str | None:
+        if session_id is _ACTIVE:
+            book = self.active_paper_session()
+            return None if book is None else book.session_id
+        return None if session_id is None else str(session_id)
+
+    def _scoped(self, statement, column, session_id: str | None | object):
+        target = self._resolve_session_id(session_id)
+        if session_id is _ACTIVE and target is None:
+            return statement.where(column == "__no_active_paper_session__")
+        if target is None:
+            return statement.where(column.is_(None))
+        return statement.where(column == target)
+
+    def _position_row(self, session, session_id: str, instrument_id: str) -> PositionRow | None:
+        return session.scalar(
+            select(PositionRow).where(
+                PositionRow.session_id == session_id,
+                PositionRow.instrument_id == instrument_id,
+            )
+        )
+
     def _require_instrument(self, symbol: str) -> InstrumentRecord:
         instrument = self.get_by_symbol(symbol)
         if instrument is None:
@@ -765,6 +1315,80 @@ def _instrument(row: InstrumentRow) -> InstrumentRecord:
         lot_size=row.lot_size,
         tick_size=row.tick_size,
     )
+
+
+def _paper_session(row: PaperSessionRow) -> PaperSessionRecord:
+    return PaperSessionRecord(
+        session_id=row.session_id,
+        status=row.status,
+        created_at=as_utc(row.created_at),
+        closed_at=as_utc(row.closed_at) if row.closed_at else None,
+        starting_cash=row.starting_cash,
+        peak_equity=row.peak_equity,
+    )
+
+
+def _legacy_assessment(session: Session) -> LegacyAssessment:
+    flag = session.get(RuntimeFlagRow, "paper")
+    return assess_legacy_book(
+        snapshots=[
+            {"snapshot_id": row.snapshot_id, "timestamp": as_utc(row.timestamp), "payload": payload_dict(row.payload)}
+            for row in session.scalars(select(PortfolioSnapshotRow).where(PortfolioSnapshotRow.session_id.is_(None)))
+        ],
+        orders=[
+            {"order_id": row.order_id, "payload": payload_dict(row.payload)}
+            for row in session.scalars(select(OrderRow).where(OrderRow.session_id.is_(None)))
+        ],
+        executions=[
+            {"execution_id": row.execution_id, "order_id": row.order_id, "payload": payload_dict(row.payload)}
+            for row in session.scalars(select(ExecutionRow).where(ExecutionRow.session_id.is_(None)))
+        ],
+        positions=[
+            {"instrument_id": row.instrument_id, "symbol": row.symbol, "payload": payload_dict(row.payload)}
+            for row in session.scalars(select(PositionRow).where(PositionRow.session_id.is_(None)))
+        ],
+        runtime_peak=None if flag is None else flag.peak_equity,
+    )
+
+
+def _decimal_text(value: Decimal | None) -> str | None:
+    if value is None:
+        return None
+    return format(value, "f")
+
+
+def _ist_day(moment: datetime) -> str:
+    return as_utc(moment).astimezone(_IST).date().isoformat()
+
+
+def _counted_entry(payload: dict) -> bool:
+    """A submitted CNC buy. Rejections, sells, and legacy orders are not entries."""
+    if payload.get("side") != "BUY" or payload.get("status") == "REJECTED":
+        return False
+    metadata = payload.get("metadata") or {}
+    return metadata.get("policy_version") == ENTRY_POLICY_VERSION and metadata.get("reason") == "entry"
+
+
+def _entry_count(session: Session, day: str) -> int:
+    total = 0
+    for row in session.scalars(select(OrderRow)):
+        payload = dict(row.payload)
+        if _counted_entry(payload) and _ist_day(datetime.fromisoformat(str(payload["created_at"]))) == day:
+            total += 1
+    return total
+
+
+def _lock_entry_day(session: Session, day: str) -> None:
+    """Take a write lock on this IST date before reading the entry count."""
+    locked = session.execute(update(EntryDayGateRow).where(EntryDayGateRow.trading_day == day).values(trading_day=day))
+    if locked.rowcount == 1:
+        return
+    try:
+        with session.begin_nested():
+            session.add(EntryDayGateRow(trading_day=day))
+            session.flush()
+    except IntegrityError:
+        session.execute(update(EntryDayGateRow).where(EntryDayGateRow.trading_day == day).values(trading_day=day))
 
 
 def _candle(row: CandleRow) -> Candle:
