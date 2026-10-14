@@ -43,3 +43,16 @@ def test_only_excluded_signals_produce_no_aggregate() -> None:
 def test_empty_list_keeps_default_weights() -> None:
     assert excluded_agent_weights("") is None
     assert excluded_agent_weights(" , ") is None
+
+
+def test_entry_end_env_is_bounded() -> None:
+    from datetime import time
+
+    from core_paper.trading_calendar import DEFAULT_ENTRY_END, _entry_end_from_env
+
+    assert _entry_end_from_env(None) == DEFAULT_ENTRY_END == time(10, 30)
+    assert _entry_end_from_env("15:15") == time(15, 15)
+    assert _entry_end_from_env("15:25") == DEFAULT_ENTRY_END
+    assert _entry_end_from_env("09:15") == DEFAULT_ENTRY_END
+    assert _entry_end_from_env("12:07") == DEFAULT_ENTRY_END
+    assert _entry_end_from_env("noon") == DEFAULT_ENTRY_END

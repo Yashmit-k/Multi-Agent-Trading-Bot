@@ -23,6 +23,7 @@ from core_db.clock import as_utc
 from core_db.models import (
     AgentSignalRow,
     AuditLogRow,
+    BrokerSessionRow,
     BacktestCostRow,
     BacktestFillRow,
     BacktestMetricRow,
@@ -514,6 +515,24 @@ class CoreRepository:
                 )
             )
             session.commit()
+
+    def save_broker_token(self, broker: str, token: str, issued_at: datetime) -> None:
+        with self._session_factory() as session:
+            row = session.get(BrokerSessionRow, broker)
+            if row is None:
+                session.add(BrokerSessionRow(broker=broker, access_token=token, issued_at=as_utc(issued_at)))
+            else:
+                row.access_token = token
+                row.issued_at = as_utc(issued_at)
+            session.commit()
+
+    def broker_token(self, broker: str, *, not_before: datetime) -> str | None:
+        """The stored token if it was issued at or after ``not_before``."""
+        with self._session_factory() as session:
+            row = session.get(BrokerSessionRow, broker)
+            if row is None or as_utc(row.issued_at) < as_utc(not_before):
+                return None
+            return row.access_token
 
     def insert_system_event(self, event_id: str, event_type: str, recorded_at: datetime, payload: dict) -> bool:
         """Store one bus message. A repeated event_id is ignored and returns False."""

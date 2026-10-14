@@ -328,3 +328,16 @@ class RuntimeFlagRow(Base):
     flag_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     paper_running: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     peak_equity: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+
+
+class BrokerSessionRow(Base):
+    """Latest market-data access token per broker, so a Core restart does not log out.
+
+    Paper only: the token is used for market data. No order endpoint is ever called.
+    """
+
+    __tablename__ = "broker_sessions"
+
+    broker: Mapped[str] = mapped_column(String(32), primary_key=True)
+    access_token: Mapped[str] = mapped_column(String(256), nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

@@ -17,15 +17,15 @@ type ChainRow = {
   order: { status: string } | null;
 };
 
-const LIMITS = [
+const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ["Trading mode", "PAPER only — LIVE, SHADOW and BACKTEST are rejected inside the risk engine"],
   ["Per-order cap", "₹20,000 notional per BUY, fees reserved on top"],
   ["Daily entries", "At most 6 new entry orders per IST calendar day"],
-  ["Entry window", "09:20–10:30 IST, with fresh 5-minute data for all 50 constituents"],
+  ["Entry window", `New entries 09:20–${process.env.PAPER_ENTRY_END ?? "10:30"} IST, with fresh 5-minute data for all 50 constituents; exits run all session`],
   ["Short selling", "Rejected — a SELL may not exceed shares held"],
   ["Brackets", "Stop −2 %, target +4 %; if both hit in one bar, the stop wins"],
   ["Universe", "NIFTY 50 members on the decision date"],
-] as const;
+];
 
 export default async function RiskPage() {
   try {

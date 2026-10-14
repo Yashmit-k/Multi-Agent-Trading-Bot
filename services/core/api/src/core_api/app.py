@@ -5,6 +5,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 from pathlib import Path
 from typing import Annotated, Any
@@ -79,10 +80,10 @@ def create_app(
     app.state.repository = repository
     app.state.publisher = publisher
     app.state.kite_client = kite_client
-    app.state.zerodha_access_token = None
     from core_market_data.collector import HistoricalGate, IngestionState
 
     app.state.ingestion = IngestionState()
+    app.state.zerodha_access_token = _restore_broker_token(repository, kite_client, app.state.ingestion, datetime.now(timezone.utc))
     app.state.historical_gate = HistoricalGate()
     app.state.kite_pace = app.state.historical_gate.pace
     app.state.worker_heartbeat_at = None
@@ -575,6 +576,7 @@ def create_app(
         if not token:
             raise HTTPException(status_code=502, detail="zerodha_session_failed")
         app.state.zerodha_access_token = str(token)
+        repository.save_broker_token("zerodha", str(token), datetime.now(timezone.utc))
         state = app.state.ingestion
         state.credentials_rejected = False
         state.authenticated = True
@@ -1166,6 +1168,35 @@ def _not_ready(path: str):
 
     endpoint.__name__ = "later_" + path.strip("/").replace("/", "_").replace("{", "").replace("}", "")
     return endpoint
+
+
+_IST = ZoneInfo("Asia/Kolkata")
+
+
+def kite_token_cutoff(now: datetime) -> datetime:
+    """Kite tokens expire at 06:00 IST: a token issued before the latest 06:00 is stale."""
+    local = now.astimezone(_IST)
+    cutoff = local.replace(hour=6, minute=0, second=0, microsecond=0)
+    if local < cutoff:
+        cutoff -= timedelta(days=1)
+    return cutoff.astimezone(timezone.utc)
+
+
+def _restore_broker_token(repository: CoreRepository, kite_client: Any | None, state: Any, now: datetime) -> str | None:
+    if kite_client is None:
+        return None
+    try:
+        token = repository.broker_token("zerodha", not_before=kite_token_cutoff(now))
+    except Exception:
+        logger.warning("broker_token_restore_failed")
+        return None
+    if token is None:
+        return None
+    kite_client.use_access_token(token)
+    state.authenticated = True
+    state.credentials_rejected = False
+    logger.info("broker_token_restored broker=zerodha")
+    return token
 
 
 def _cors_origins() -> list[str]:
