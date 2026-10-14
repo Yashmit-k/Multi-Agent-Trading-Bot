@@ -7,4 +7,10 @@ describe("research result copy", () => {
     const copy = readFileSync("src/lib/research/ml-rank-result.json", "utf8");
     expect(JSON.parse(copy)).toEqual(JSON.parse(source));
   });
+
+  it("matches the committed ensemble study output exactly", () => {
+    const source = readFileSync("../../services/quant/docs/results/ml-ensemble-result.json", "utf8");
+    const copy = readFileSync("src/lib/research/ml-ensemble-result.json", "utf8");
+    expect(JSON.parse(copy)).toEqual(JSON.parse(source));
+  });
 });
