@@ -1,7 +1,8 @@
+export const metadata = { title: "Agents · StockX" };
 import { fetchApi } from "@/lib/api";
 import { ErrorState } from "@/components/States";
 import { PageFrame } from "@/components/shell/PageFrame";
-import { excludedAgents, provenance } from "@/lib/signal-provenance";
+import { excludedAgents, provenance, sourceLabel } from "@/lib/signal-provenance";
 
 export const dynamic = "force-dynamic";
 
@@ -107,7 +108,7 @@ function Detail({ signal }: { signal: SignalRow }) {
   return (
     <div className="mt-1 space-y-0.5 text-[#CBD5E1]">
       {p.reasons.length ? <div>Reasons: {p.reasons.join(", ")}</div> : null}
-      <div className="text-[#94A3B8]">Source: {p.llm ?? "deterministic rules on live candles"}</div>
+      <div className="text-[#94A3B8]">Source: {sourceLabel(signal.agent_name, signal as unknown as Record<string, unknown>)}</div>
       {p.insufficient ? <div className="text-[#94A3B8]">Insufficient data for this symbol.</div> : null}
       {p.headlines.slice(0, 3).map((item) => (
         <div key={item.title}>

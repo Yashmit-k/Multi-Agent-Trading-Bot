@@ -1,37 +1,35 @@
-import Link from "next/link";
-import { fetchApi } from "@/lib/api";
-import type { ProvisionalStock } from "@/api/generated/provisional";
-import { EmptyState, ErrorState } from "@/components/States";
+import { ErrorState } from "@/components/States";
 import { PageFrame } from "@/components/shell/PageFrame";
+import { StockTable } from "@/components/StockTable";
+import { loadStocks } from "@/lib/stocks";
 
-export default async function StocksPage() {
+export const metadata = { title: "Stocks · StockX" };
+export const dynamic = "force-dynamic";
+
+export default async function StocksPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const { q = "" } = await searchParams;
   try {
-    const stocks = await fetchApi<ProvisionalStock[]>("/api/v1/stocks");
-    if (stocks.length === 0) {
-      return (
-        <PageFrame title="Stocks">
-          <EmptyState label="stocks" />
-        </PageFrame>
-      );
-    }
+    const rows = await loadStocks();
+    const query = q.trim().toUpperCase();
+    const shown = query ? rows.filter((row) => row.symbol.includes(query)) : rows;
     return (
-      <PageFrame title="Stocks">
-        <ul className="space-y-1 text-sm">
-          {stocks.map((item) => (
-            <li key={item.symbol}>
-              <Link className="text-cyan-400 hover:underline" href={`/stocks/${item.symbol}`}>
-                {item.symbol}
-              </Link>{" "}
-              {item.last_price}
-            </li>
-          ))}
-        </ul>
+      <PageFrame title="Stocks" description="Open a stock to see its chart, every agent's latest opinion, and the headlines the News agent read.">
+        <form className="flex gap-2" action="/stocks">
+          <input
+            name="q"
+            defaultValue={q}
+            placeholder="Filter symbol, e.g. INFY"
+            className="w-64 rounded border border-[#26303C] bg-[#0F141B] px-3 py-1.5 text-sm text-[#E6EDF3] placeholder:text-[#64748B]"
+          />
+          <button className="rounded border border-[#26303C] px-3 py-1.5 text-sm">Filter</button>
+        </form>
+        <StockTable rows={shown} />
       </PageFrame>
     );
   } catch (error) {
     return (
       <PageFrame title="Stocks">
-        <ErrorState message={error instanceof Error ? error.message : "unknown"} />
+        <ErrorState message={error instanceof Error ? error.message : "stocks_unavailable"} />
       </PageFrame>
     );
   }

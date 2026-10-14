@@ -6,7 +6,7 @@ import type { ProvisionalRiskStatus, ProvisionalSystemStatus } from "@/api/gener
 import { parseMode } from "@/lib/mode";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Trading Overview" };
+export const metadata = { title: "StockX · NIFTY 50 paper trading" };
 
 const inter = Inter({ subsets: ["latin"] });
 

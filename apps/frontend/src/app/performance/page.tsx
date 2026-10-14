@@ -1,3 +1,4 @@
+export const metadata = { title: "Performance · StockX" };
 import { fetchApi } from "@/lib/api";
 import { EmptyState, ErrorState } from "@/components/States";
 import { PageFrame } from "@/components/shell/PageFrame";

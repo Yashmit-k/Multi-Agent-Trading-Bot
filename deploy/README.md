@@ -73,6 +73,13 @@ ssh -L 8000:127.0.0.1:8000 user@vm
 
 Then open `http://127.0.0.1:8000/api/v1/zerodha/connect` with your Core token, follow `login_url`, and let Kite redirect to the callback. The redirect URL registered in the Kite developer console must match.
 
+## Gotchas learned on the live deploy
+
+- **Don't edit `.env` or run `up` without `--no-deps` once you've logged in to Zerodha.** Either one recreates core-api, and the Kite token lives only in core-api's memory. To update a single service, use `docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build --no-deps <service>`.
+- **Migrations are manual.** After pulling a new revision, run `docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml run --rm --no-deps -w /app/services/core/db core-api alembic upgrade head`.
+- **Attach an Elastic IP before relying on the URL.** Without one, a stop/start changes the public IP, and with it the sslip.io hostname and `DOMAIN`.
+- **A free Groq LLM needs pacing.** Keep the compose defaults `LLM_MIN_INTERVAL_SECONDS=2.5` and `LLM_REASONING_EFFORT=low` for `openai/gpt-oss-20b`.
+
 ## 7. Smoke test
 
 ```bash

@@ -1,16 +1,14 @@
 import { readFileSync } from "node:fs";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import NewsPage from "@/app/news/page";
 import { PaperMetrics } from "@/components/PaperMetrics";
 
 describe("checkpoint 4 page contracts", () => {
-  it("keeps the global news list unavailable", () => {
-    render(<NewsPage />);
-    expect(screen.getByTestId("not-available").textContent).toContain("Global news list");
+  it("builds the news list from scored live headlines, not fixtures", () => {
     const source = readFileSync("src/app/news/page.tsx", "utf8");
-    expect(source).toContain("/api/v1/stocks/");
-    expect(source).not.toContain("NEWS_RSS");
+    expect(source).toContain('agent: "news"');
+    expect(source).toContain("headlines");
+    expect(source).not.toContain("fixtures");
   });
 
   it("keeps performance on the backtest route", () => {
