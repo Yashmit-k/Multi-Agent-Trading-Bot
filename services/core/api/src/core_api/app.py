@@ -162,8 +162,14 @@ def create_app(
         return built.model_dump(mode="json")
 
     @app.get("/api/v1/signals")
-    def signals(_: Annotated[None, Depends(require_user)]) -> list[dict]:
-        return repository.list_signal_payloads()
+    def signals(
+        _: Annotated[None, Depends(require_user)],
+        limit: int = 500,
+        symbol: str | None = None,
+        agent: str | None = None,
+    ) -> list[dict]:
+        """Newest signals first, capped at 2000 per request."""
+        return repository.recent_signal_payloads(max(1, min(limit, 2000)), symbol=symbol, agent_name=agent)
 
     @app.get("/api/v1/signals/latest")
     def latest_signals(_: Annotated[None, Depends(require_user)]) -> list[dict]:
@@ -220,14 +226,16 @@ def create_app(
 
     @app.get("/api/v1/agents")
     def agents(_: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
-        return [_agent_row(repository, name, enabled) for name, enabled in _AGENT_ROWS]
+        latest = {item["agent_name"]: item for item in repository.latest_signal_per_agent()}
+        return [_agent_row(name, enabled, latest.get(name)) for name, enabled in _AGENT_ROWS]
 
     @app.get("/api/v1/agents/{agent_name}/health")
     def agent_health(agent_name: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
         known = {name: enabled for name, enabled in _AGENT_ROWS}
         if agent_name not in known:
             raise HTTPException(status_code=404, detail="unknown_agent")
-        row = _agent_row(repository, agent_name, known[agent_name])
+        latest = {item["agent_name"]: item for item in repository.latest_signal_per_agent()}
+        row = _agent_row(agent_name, known[agent_name], latest.get(agent_name))
         intel = _intelligence_health(app)
         if agent_name in {"news", "fundamental", "valuation", "earnings"}:
             row["enabled"] = intel.get("status") == "ok"
@@ -833,7 +841,7 @@ def _overview_body(repository: CoreRepository, moment: datetime, mode: TradingMo
     advancers = 0
     decliners = 0
     for item in repository.members_at(moment):
-        bars = repository.candles_until(item.symbol, Timeframe.D1, moment)
+        bars = repository.candles_until(item.symbol, Timeframe.D1, moment, last=2)
         if not bars:
             continue
         closes.append(bars[-1].close)
@@ -935,17 +943,16 @@ _AGENT_ROWS = (
 )
 
 
-def _agent_row(repository: CoreRepository, name: str, enabled: bool) -> dict[str, object]:
+def _agent_row(name: str, enabled: bool, last: dict | None) -> dict[str, object]:
     from core_features.engine import FEATURE_VERSION
 
-    rows = [item for item in repository.list_signals() if item.agent_name.value == name]
-    last = max(rows, key=lambda item: item.timestamp) if rows else None
+    stamp = None if last is None else AgentSignal.model_validate(last).timestamp.isoformat()
     return {
         "agent_name": name,
         "enabled": enabled,
         "mode": "PAPER",
         "feature_version": FEATURE_VERSION,
-        "last_signal_at": None if last is None else last.timestamp.isoformat(),
+        "last_signal_at": stamp,
         "sink": "core_ingestion",
     }
 
