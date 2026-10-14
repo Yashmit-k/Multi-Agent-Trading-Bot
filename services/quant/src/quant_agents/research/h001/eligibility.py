@@ -97,16 +97,22 @@ def _count_split(rows: list[EligibleRow]) -> SplitCounts:
 
 
 def _production_readiness(train: SplitCounts, validation: SplitCounts) -> tuple[str, str]:
+    official = (
+        "Official readiness remains AUDIT_COMPLETE_INCONCLUSIVE; execution is unauthorized."
+    )
     if train.status == SATISFIED and validation.status == SATISFIED:
         return (
             DATA_READY,
-            "Both splits meet the 50-observation minority-class bar. "
+            "EXPERIMENTAL_NOT_APPROVED. "
+            f"{official} Both splits meet the experimental {MINORITY_BAR}-observation "
+            "minority-class bar. The approved bar remains 50. "
             "This is not execution authorization.",
         )
     return (
         AUDIT_COMPLETE_INCONCLUSIVE,
-        "The approved minority-class bar of 50 was not met in both splits. "
-        "The threshold is not lowered. The event class is not widened.",
+        "EXPERIMENTAL_NOT_APPROVED. "
+        f"{official} The experimental minority-class bar of {MINORITY_BAR} was not met "
+        "in both splits. The approved threshold remains 50. The event class is not widened.",
     )
 
 
