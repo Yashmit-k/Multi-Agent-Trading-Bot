@@ -40,6 +40,7 @@ class OrderStatus(StrEnum):
     CANCELLED = "CANCELLED"
     REJECTED = "REJECTED"
     EXPIRED = "EXPIRED"
+    EXPIRED_NO_DATA = "EXPIRED_NO_DATA"
     FAILED = "FAILED"
 
 

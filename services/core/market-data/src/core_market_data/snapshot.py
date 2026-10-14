@@ -31,8 +31,25 @@ class CandleSnapshot:
 
 
 def seed_symbols(path: Path = SEED_PATH) -> tuple[str, ...]:
+    """Names in the frozen research universe.
+
+    A listing that opens after 2024-01-01 is a later member of the live
+    universe. It stays out of this tuple, so research snapshots keep the
+    original fifty names, including TATAMOTORS with zero bars.
+    """
+    anchor = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    names: list[str] = []
     with path.open(newline="", encoding="utf-8") as handle:
-        names = [row["symbol"].strip().upper() for row in csv.DictReader(handle) if row["symbol"].strip()]
+        for row in csv.DictReader(handle):
+            symbol = row["symbol"].strip().upper()
+            if not symbol:
+                continue
+            opened = datetime.fromisoformat(row["effective_from"].strip())
+            if opened.tzinfo is None:
+                opened = opened.replace(tzinfo=timezone.utc)
+            if opened > anchor:
+                continue
+            names.append(symbol)
     return tuple(names)
 
 

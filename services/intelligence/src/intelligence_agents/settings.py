@@ -41,6 +41,7 @@ class IntelligenceSettings:
     news_ingest: bool
     news_interpret: bool
     rss_symbol_batch: int
+    fundamentals_csv: str = ""
 
     @classmethod
     def from_env(cls) -> IntelligenceSettings:
@@ -87,6 +88,7 @@ class IntelligenceSettings:
             news_ingest=news_ingest,
             news_interpret=os.environ.get("INTELLIGENCE_NEWS_INTERPRET", "false").lower() == "true",
             rss_symbol_batch=int(os.environ.get("NEWS_RSS_SYMBOL_BATCH", "5")),
+            fundamentals_csv=os.environ.get("INTELLIGENCE_FUNDAMENTALS_CSV", "").strip(),
         )
         settings.validate()
         return settings
@@ -121,6 +123,8 @@ class IntelligenceSettings:
             raise ConfigError("BACKTEST cannot use RSS or csv-live; fixtures only")
         if self.data_source == "rss" and not self.news_rss_urls:
             raise ConfigError("NEWS_RSS_URLS required when INTELLIGENCE_DATA_SOURCE=rss")
+        if self.data_source == "csv-live" and not self.fundamentals_csv and self.trading_mode in LIVE_MODES:
+            raise ConfigError("INTELLIGENCE_FUNDAMENTALS_CSV required when INTELLIGENCE_DATA_SOURCE=csv-live")
         if not self.symbols:
             raise ConfigError("INTELLIGENCE_SYMBOLS must list at least one symbol")
         if self.rss_interval_seconds < 30:

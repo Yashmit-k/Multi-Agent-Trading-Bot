@@ -1,0 +1,45 @@
+# Standalone collector probe. Do not combine this file with the production Compose file.
+# Scripted bars only. There is no paper worker and no Zerodha client.
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: collector
+      POSTGRES_PASSWORD: collector
+      POSTGRES_DB: collector_probe
+    ports:
+      - "127.0.0.1:15432:5432"
+    volumes:
+      - collector-probe-data:/var/lib/postgresql/data
+    networks:
+      - probe
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U collector -d collector_probe"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  collector-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.core
+    command: ["python", "-m", "core_market_data.scripted_probe"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://collector:collector@postgres:5432/collector_probe
+      PROBE_PORT: "8000"
+    ports:
+      - "127.0.0.1:18000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - probe
+
+networks:
+  probe:
+    name: dev3-cp2-collector-net
+
+volumes:
+  collector-probe-data:
+    name: dev3-cp2-collector-data

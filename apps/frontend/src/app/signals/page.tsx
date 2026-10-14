@@ -1,20 +1,30 @@
 import { fetchApi } from "@/lib/api";
 import { HorizonSplit } from "@/components/HorizonSplit";
 import { EmptyState, ErrorState } from "@/components/States";
+import { PageFrame } from "@/components/shell/PageFrame";
 
 export default async function SignalsPage() {
   try {
     const signals = await fetchApi<Array<{ agent_name: string; horizon: string; signal: number; confidence: number; symbol: string }>>(
       "/api/v1/signals",
     );
-    if (signals.length === 0) return <EmptyState label="signals" />;
+    if (signals.length === 0) {
+      return (
+        <PageFrame title="Signals">
+          <EmptyState label="signals" />
+        </PageFrame>
+      );
+    }
     return (
-      <div>
-        <h1 className="text-2xl font-bold">Signals</h1>
+      <PageFrame title="Signals">
         <HorizonSplit signals={signals} />
-      </div>
+      </PageFrame>
     );
   } catch (error) {
-    return <ErrorState message={error instanceof Error ? error.message : "unknown"} />;
+    return (
+      <PageFrame title="Signals">
+        <ErrorState message={error instanceof Error ? error.message : "unknown"} />
+      </PageFrame>
+    );
   }
 }

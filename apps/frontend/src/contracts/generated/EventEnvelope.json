@@ -568,6 +568,14 @@
           "format": "date-time",
           "title": "Timestamp",
           "type": "string"
+        },
+        "unavailable": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Unavailable",
+          "type": "array"
         }
       },
       "required": [
@@ -1408,6 +1416,7 @@
         "CANCELLED",
         "REJECTED",
         "EXPIRED",
+        "EXPIRED_NO_DATA",
         "FAILED"
       ],
       "title": "OrderStatus",

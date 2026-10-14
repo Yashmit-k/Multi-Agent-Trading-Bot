@@ -24,10 +24,13 @@ def load_seed(repository: CoreRepository, path: Path = SEED_PATH) -> int:
     with path.open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
             instrument = repository.upsert_instrument(symbol=row["symbol"], exchange="NSE", trading_symbol=row["symbol"])
-            repository.add_membership(
+            opened = _parse_time(row["effective_from"])
+            if opened is None:
+                raise ValueError(f"{row['symbol']} is missing effective_from")
+            repository.sync_membership(
                 instrument.instrument_id,
                 row["universe"].strip(),
-                _parse_time(row["effective_from"]),
+                opened,
                 _parse_time(row["effective_to"]),
             )
             loaded += 1

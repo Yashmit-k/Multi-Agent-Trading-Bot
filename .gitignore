@@ -17,7 +17,10 @@ services/intelligence/.env
 # Frozen market dumps are too large for GitHub (5m candles.jsonl > 100MB).
 snapshots/
 snapshots 2/
+snapshots.zip
 snapshots 2.zip
+intelligence.db
+.vscode/
 datasets/
 experiments/
 artifacts/

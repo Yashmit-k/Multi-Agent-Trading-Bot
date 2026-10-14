@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime
 
 import httpx
@@ -13,10 +14,24 @@ from contracts.interfaces import AgentContext, SignalSink
 from contracts.schemas.feature_set import FeatureSet
 
 from quant_agents.agents import MeanReversionAgent, MomentumAgent, RegimeAgent, TechnicalAgent, VolumeAgent
+from quant_agents.ml.agent import MlAgent
 from quant_agents.calendar.static_nse import StaticNseCalendar
 from quant_agents.clock import ReplayClock
 
 logger = logging.getLogger(__name__)
+READY_ATTEMPTS = 20
+READY_DELAY_SECONDS = 1.0
+_ML_SKIP_REASONS = frozenset(
+    {
+        "ml.no_eligible_model",
+        "ml.artifact_corrupt",
+        "ml.feature_version_mismatch",
+        "ml.timeframe_mismatch",
+        "ml.feature_invalid",
+        "neutral.forced",
+        "calendar.not_covered",
+    }
+)
 
 _AGENTS = (TechnicalAgent, MomentumAgent, MeanReversionAgent, VolumeAgent, RegimeAgent)
 _SWING = {"horizon": Horizon.SWING, "timeframe": Timeframe.D1, "regime_index_symbols": ()}
@@ -45,6 +60,8 @@ def publish_symbol_signals(
     calendar=None,
     configuration: dict | None = None,
     index_sets: tuple[FeatureSet, ...] = (),
+    ml_registry=None,
+    ml_demo: bool = False,
 ) -> int:
     """Evaluate every quant agent once at the feature timestamp and submit each signal."""
     as_of = feature_set.timestamp
@@ -62,19 +79,113 @@ def publish_symbol_signals(
         signal = agent_cls(clock, calendar).evaluate(symbol, as_of, context)
         sink.submit(signal)
         written += 1
+    if ml_registry is not None:
+        written += _publish_ml(symbol, as_of, context, sink, clock, calendar, ml_registry, ml_demo)
     return written
 
 
-def fetch_feature(client: httpx.Client, base_url: str, token: str, symbol: str) -> FeatureSet | None:
-    response = client.get(
-        f"{base_url.rstrip('/')}/api/v1/features/{symbol}",
-        params={"timeframe": Timeframe.D1.value},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    if response.status_code == 404:
+def _ml_submittable(signal, *, demo: bool) -> bool:
+    if any(code in _ML_SKIP_REASONS for code in signal.reason_codes):
+        return False
+    if demo:
+        if signal.metadata.get("demo") is not True:
+            return False
+        if signal.metadata.get("training_data") != "synthetic_unvalidated_demo":
+            return False
+    return True
+
+
+def _publish_ml(symbol, as_of, context, sink, clock, calendar, registry, demo: bool) -> int:
+    try:
+        signal = MlAgent(clock, calendar, registry).evaluate(symbol, as_of, context)
+    except Exception:
+        logger.exception("quant_ml_skipped", extra={"symbol": symbol})
+        return 0
+    if not _ml_submittable(signal, demo=demo):
+        logger.warning(
+            "quant_ml_skipped",
+            extra={"symbol": symbol, "reason_codes": list(signal.reason_codes)},
+        )
+        return 0
+    sink.submit(signal)
+    return 1
+
+
+def _open_ml_registry(ml_demo: bool, ml_demo_dir: str | None, ml_artifact_dir: str | None):
+    if not ml_demo and not ml_artifact_dir:
         return None
-    response.raise_for_status()
-    return FeatureSet.model_validate(response.json())
+    try:
+        if ml_demo:
+            from pathlib import Path
+
+            from quant_agents.ml.demo import prepare_demo_artifact
+
+            return prepare_demo_artifact(Path(ml_demo_dir or ""))
+        from pathlib import Path
+
+        from quant_agents.ml.registry import ModelRegistry
+
+        return ModelRegistry(Path(ml_artifact_dir or ""))
+    except Exception:
+        logger.exception("quant_ml_skipped")
+        return None
+
+
+def core_is_ready(client: httpx.Client, base_url: str) -> bool:
+    try:
+        response = client.get(f"{base_url.rstrip('/')}/health")
+    except httpx.TransportError:
+        return False
+    return response.status_code == 200
+
+
+def wait_for_core_api(
+    client: httpx.Client,
+    base_url: str,
+    *,
+    attempts: int = READY_ATTEMPTS,
+    delay_seconds: float = READY_DELAY_SECONDS,
+    sleep=time.sleep,
+) -> bool:
+    """Bounded health wait. A refused connection is not a paper pass."""
+    for attempt in range(1, attempts + 1):
+        if core_is_ready(client, base_url):
+            return True
+        logger.warning("quant_core_api_not_ready", extra={"attempt": attempt, "attempts": attempts})
+        if attempt < attempts:
+            sleep(delay_seconds)
+    return False
+
+
+def fetch_feature(
+    client: httpx.Client,
+    base_url: str,
+    token: str,
+    symbol: str,
+    *,
+    attempts: int = 3,
+    delay_seconds: float = READY_DELAY_SECONDS,
+    sleep=time.sleep,
+) -> FeatureSet | None:
+    """Retry only when no response arrives. A received response is not retried."""
+    for attempt in range(1, attempts + 1):
+        try:
+            response = client.get(
+                f"{base_url.rstrip('/')}/api/v1/features/{symbol}",
+                params={"timeframe": Timeframe.D1.value},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        except httpx.TransportError:
+            logger.warning("quant_feature_unreachable", extra={"symbol": symbol, "attempt": attempt})
+            if attempt == attempts:
+                raise
+            sleep(delay_seconds)
+            continue
+        if response.status_code == 404:
+            return None
+        response.raise_for_status()
+        return FeatureSet.model_validate(response.json())
+    return None
 
 
 def run_paper_pass(
@@ -85,17 +196,33 @@ def run_paper_pass(
     *,
     client: httpx.Client | None = None,
     configuration: dict | None = None,
+    sleep=time.sleep,
+    ready_attempts: int = READY_ATTEMPTS,
+    ml_demo: bool = False,
+    ml_demo_dir: str | None = None,
+    ml_artifact_dir: str | None = None,
 ) -> int:
     owned = client or httpx.Client(timeout=30.0)
     close = client is None
     written = 0
     try:
+        if not wait_for_core_api(owned, base_url, attempts=ready_attempts, sleep=sleep):
+            logger.error("quant_core_api_unavailable")
+            return 0
+        ml_registry = _open_ml_registry(ml_demo, ml_demo_dir, ml_artifact_dir)
         for symbol in symbols:
-            feature_set = fetch_feature(owned, base_url, read_token, symbol)
+            feature_set = fetch_feature(owned, base_url, read_token, symbol, sleep=sleep)
             if feature_set is None:
                 logger.info("quant_skip_symbol", extra={"symbol": symbol, "reason": "no_features"})
                 continue
-            written += publish_symbol_signals(symbol, feature_set, sink, configuration=configuration)
+            written += publish_symbol_signals(
+                symbol,
+                feature_set,
+                sink,
+                configuration=configuration,
+                ml_registry=ml_registry,
+                ml_demo=ml_demo,
+            )
     finally:
         if close:
             owned.close()
