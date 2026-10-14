@@ -54,6 +54,9 @@ services:
       context: .
       dockerfile: docker/Dockerfile.core
     command: ["python", "-m", "core_worker"]
+    # Never starts with a plain `docker compose up`. Start it explicitly:
+    #   docker compose --profile worker up -d core-worker
+    profiles: ["worker"]
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://core:core@postgres:5432/core
@@ -63,6 +66,21 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+
+  trace-recorder:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.core
+    command: ["python", "-m", "core_ingestion.trace_recorder"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://core:core@postgres:5432/core
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
 
   intelligence:
     build:
@@ -78,8 +96,8 @@ services:
       INTELLIGENCE_EVAL_INTERVAL_SECONDS: "300"
       INTELLIGENCE_SYMBOLS: *nifty50
       CORE_API_URL: http://core-api:8000
-      LLM_BASE_URL: ""
-      LLM_API_KEY: ""
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
     depends_on:
       core-api:
         condition: service_healthy
@@ -110,8 +128,11 @@ services:
       context: .
       dockerfile: apps/frontend/Dockerfile
       args:
-        NEXT_PUBLIC_API_BASE_URL: http://core-api:8000
-        NEXT_PUBLIC_CORE_API_TOKEN: ${CORE_API_TOKEN}
+        NEXT_PUBLIC_API_BASE_URL: ""
+    environment:
+      API_INTERNAL_BASE_URL: http://core-api:8000
+      CORE_API_TOKEN: ${CORE_API_TOKEN}
+      FRONTEND_ALLOW_POST_PATHS: ${FRONTEND_ALLOW_POST_PATHS:-}
     depends_on:
       - core-api
     ports:

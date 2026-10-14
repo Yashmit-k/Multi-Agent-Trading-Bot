@@ -162,7 +162,11 @@ def run_paper_cycle(
                 continue
             before = {item.order_id for item in repository.list_orders()}
             queue_entry(repository, proposal, as_of, entry_window=extension)
-            created_orders += len({item.order_id for item in repository.list_orders()} - before)
+            queued = [item for item in repository.list_orders() if item.order_id not in before]
+            created_orders += len(queued)
+            for order in queued:
+                event_type = _order_event(order)
+                _publish(publisher, event_type, f"{event_type.value}:{order.order_id}", as_of, proposal.proposal_id, order)
     if capped:
         logger.info("new_order_cap cap=%s created=%s", max_new_orders, created_orders)
     _settle_open_orders(repository, publisher, costs, starting_cash, now=moment)
@@ -295,12 +299,24 @@ def _queue(repository: CoreRepository, proposal, as_of: datetime, *, reason: str
 
 def _settle_open_orders(repository: CoreRepository, publisher: EventPublisher, schedule: CostSchedule, starting_cash: Decimal, *, now: datetime | None = None) -> None:
     moment = now or datetime.now(timezone.utc)
+    before = {item.execution_id for item in repository.list_executions()}
     for order_id in settle_entries(repository, starting_cash=starting_cash, now=moment):
         logger.info("legacy_order_review_required order_id=%s", order_id)
     for order in repository.list_orders():
         if order.metadata.get("policy_version") == SELL_POLICY_VERSION:
             settle_sell(repository, order, starting_cash=starting_cash, now=moment)
-    del publisher, schedule
+    del schedule
+    fresh = [item for item in repository.list_executions() if item.execution_id not in before]
+    if not fresh:
+        return
+    orders = {item.order_id: item for item in repository.list_orders()}
+    for execution in fresh:
+        order = orders.get(execution.order_id)
+        correlation = order.proposal_id if order is not None else execution.order_id
+        _publish(publisher, EventType.ORDER_FILLED, f"order.filled:{execution.execution_id}", execution.executed_at, correlation, execution)
+        position = repository.position_for(execution.symbol)
+        if position is not None:
+            _publish(publisher, EventType.POSITION_UPDATED, f"position.updated:{execution.execution_id}", execution.executed_at, correlation, position)
 
 
 def _monitor_brackets(repository, publisher, schedule, starting_cash, mode: TradingMode) -> None:
@@ -559,6 +575,14 @@ def _publish(publisher: EventPublisher, event_type: EventType, event_id: str, ti
         payload=payload,  # type: ignore[arg-type]
     )
     publisher.publish(channel_for(event_type).value, envelope.model_dump_json())
+
+
+def _order_event(order: Order) -> EventType:
+    if order.status == OrderStatus.CREATED:
+        return EventType.ORDER_CREATED
+    if order.status == OrderStatus.REJECTED:
+        return EventType.ORDER_REJECTED
+    return EventType.ORDER_UPDATED
 
 
 def _digest(*parts: str) -> str:

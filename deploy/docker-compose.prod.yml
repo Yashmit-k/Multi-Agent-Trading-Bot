@@ -1,0 +1,65 @@
+# Production override for a single Linux VM.
+#
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build
+#
+# Only Caddy is exposed (80/443). Postgres, Redis, Core API, and the agents stay
+# on the internal network. The browser reaches Core through the Next.js proxy
+# route, which adds the token server-side and refuses writes by default.
+# core-worker sits behind the "worker" profile and never starts unless asked:
+#
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml --profile worker up -d core-worker
+
+services:
+  postgres:
+    ports: !reset []
+    restart: unless-stopped
+
+  redis:
+    ports: !reset []
+    restart: unless-stopped
+
+  core-api:
+    # Loopback only, so the operator can reach it through an SSH tunnel for the
+    # Zerodha login callback. Not reachable from the internet.
+    ports: !override
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+    environment:
+      CORE_API_CORS_ORIGINS: https://${DOMAIN}
+
+  core-worker:
+    profiles: ["worker"]
+
+  trace-recorder:
+    restart: unless-stopped
+
+  intelligence:
+    ports: !reset []
+    restart: unless-stopped
+
+  quant:
+    ports: !reset []
+    restart: unless-stopped
+
+  frontend:
+    ports: !reset []
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - frontend
+
+volumes:
+  caddy-data:
+  caddy-config:

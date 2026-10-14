@@ -47,6 +47,7 @@ from core_db.models import (
     RiskDecisionRow,
     RuntimeFlagRow,
     SignalRejectionRow,
+    SystemEventRow,
     TradeProposalRow,
     UniverseMembershipRow,
 )
@@ -414,6 +415,18 @@ class CoreRepository:
             row = session.get(AgentSignalRow, signal_id)
             return dict(row.payload) if row else None
 
+    def latest_signal_per_agent(self, scan: int = 5000) -> list[dict]:
+        """Newest stored signal for each agent, from the most recent ``scan`` rows."""
+        with self._session_factory() as session:
+            rows = session.scalars(select(AgentSignalRow).order_by(AgentSignalRow.recorded_at.desc()).limit(scan))
+            latest: dict[str, dict] = {}
+            for row in rows:
+                payload = dict(row.payload)
+                name = str(payload.get("agent_name"))
+                if name not in latest:
+                    latest[name] = payload
+            return [latest[name] for name in sorted(latest)]
+
     def list_signal_payloads(self) -> list[dict]:
         with self._session_factory() as session:
             rows = session.scalars(select(AgentSignalRow).order_by(AgentSignalRow.symbol, AgentSignalRow.signal_id))
@@ -474,6 +487,45 @@ class CoreRepository:
                 )
             )
             session.commit()
+
+    def insert_system_event(self, event_id: str, event_type: str, recorded_at: datetime, payload: dict) -> bool:
+        """Store one bus message. A repeated event_id is ignored and returns False."""
+        with self._session_factory() as session:
+            if session.get(SystemEventRow, event_id) is not None:
+                return False
+            session.add(SystemEventRow(event_id=event_id, event_type=event_type, recorded_at=as_utc(recorded_at), payload=payload))
+            try:
+                session.commit()
+            except IntegrityError:
+                session.rollback()
+                return False
+            return True
+
+    def list_system_events(
+        self,
+        *,
+        correlation_id: str | None = None,
+        event_type: str | None = None,
+        source: str | None = None,
+        limit: int = 200,
+    ) -> list[dict]:
+        """Newest bus messages first. Filters on the stored envelope."""
+        with self._session_factory() as session:
+            query = select(SystemEventRow).order_by(SystemEventRow.recorded_at.desc(), SystemEventRow.event_id)
+            if event_type is not None:
+                query = query.where(SystemEventRow.event_type == event_type)
+            rows = session.scalars(query)
+            found: list[dict] = []
+            for row in rows:
+                envelope = dict(row.payload)
+                if correlation_id is not None and envelope.get("correlation_id") != correlation_id:
+                    continue
+                if source is not None and envelope.get("source") != source and _agent_of(envelope) != source:
+                    continue
+                found.append({"event_id": row.event_id, "event_type": row.event_type, "recorded_at": as_utc(row.recorded_at), "envelope": envelope})
+                if len(found) >= limit:
+                    break
+            return found
 
     def signal_count(self) -> int:
         with self._session_factory() as session:
@@ -1404,3 +1456,11 @@ def _candle(row: CandleRow) -> Candle:
         start=as_utc(row.start),
         end=as_utc(row.end),
     )
+
+
+def _agent_of(envelope: dict) -> str | None:
+    payload = envelope.get("payload")
+    if isinstance(payload, dict):
+        name = payload.get("agent_name")
+        return str(name) if name is not None else None
+    return None
