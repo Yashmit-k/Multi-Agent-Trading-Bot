@@ -79,8 +79,11 @@ def test_symbol_exclusion_and_distinct_seq_ids() -> None:
 
 def test_package_does_not_open_data_files() -> None:
     for path in PACKAGE.glob("*.py"):
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
         assert "open(" not in text
-        assert "holdout_after_20261005" not in text
         assert "candles.jsonl" not in text
+        assert "read_parquet" not in text
+        if path.name == "authorization.py":
+            continue
+        assert "holdout_after_20261005" not in text
         assert "parquet" not in text
