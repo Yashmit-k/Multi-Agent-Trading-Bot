@@ -39,7 +39,9 @@ ALLOWED_PREFIXES = (
     "/api/v1/positions",
     "/api/v1/orders",
     "/api/v1/risk/status",
+    "/api/v1/risk/kill-switch",
     "/api/v1/performance",
+    "/api/v1/paper/daily-performance",
     "/docs",
     "/redoc",
     "/openapi.json",
@@ -73,6 +75,7 @@ class ProvisionalRiskStatus(BaseModel):
     status: RiskStatus
     as_of: str
     message: str
+    kill_switch: str | None = None
 
 
 class ProvisionalPerformance(BaseModel):
@@ -254,9 +257,33 @@ def orders() -> list[dict]:
     return [order.model_dump(mode="json")]
 
 
+_kill_switch = "disarmed"
+
+
+class KillBody(BaseModel):
+    armed: bool
+
+
 @app.get("/api/v1/risk/status", response_model=ProvisionalRiskStatus)
 def risk_status() -> ProvisionalRiskStatus:
-    return ProvisionalRiskStatus(status=RiskStatus.APPROVED, as_of=FIXTURE_AS_OF.isoformat(), message="paper risk idle")
+    return ProvisionalRiskStatus(
+        status=RiskStatus.APPROVED,
+        as_of=FIXTURE_AS_OF.isoformat(),
+        message="paper risk idle",
+        kill_switch=_kill_switch,
+    )
+
+
+@app.post("/api/v1/risk/kill-switch")
+def arm_kill_switch(body: KillBody) -> dict[str, str]:
+    global _kill_switch
+    _kill_switch = "armed" if body.armed else "disarmed"
+    return {"kill_switch": _kill_switch}
+
+
+@app.get("/api/v1/paper/daily-performance")
+def paper_daily_performance() -> dict[str, str]:
+    return {"status": "unavailable", "reason": "no_daily_equity_history"}
 
 
 @app.get("/api/v1/performance", response_model=ProvisionalPerformance)

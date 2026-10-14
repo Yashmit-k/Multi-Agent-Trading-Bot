@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+html,
 body {
-  @apply bg-slate-50 text-slate-900;
+  background: #0b0f14;
+  color: #e6edf3;
+}
+
+h1,
+h2,
+h3 {
+  color: #e6edf3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }

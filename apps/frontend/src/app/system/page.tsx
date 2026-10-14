@@ -1,17 +1,21 @@
 import { fetchApi } from "@/lib/api";
 import type { ProvisionalSystemStatus } from "@/api/generated/provisional";
 import { ErrorState } from "@/components/States";
+import { PageFrame } from "@/components/shell/PageFrame";
 
 export default async function SystemPage() {
   try {
     const status = await fetchApi<ProvisionalSystemStatus>("/api/v1/system/status");
     return (
-      <div>
-        <h1 className="text-2xl font-bold">System</h1>
-        <pre className="text-sm">{JSON.stringify(status, null, 2)}</pre>
-      </div>
+      <PageFrame title="System">
+        <pre className="overflow-auto rounded-[12px] border border-[#26303C] bg-[#121922] p-3 text-sm">{JSON.stringify(status, null, 2)}</pre>
+      </PageFrame>
     );
   } catch (error) {
-    return <ErrorState message={error instanceof Error ? error.message : "unknown"} />;
+    return (
+      <PageFrame title="System">
+        <ErrorState message={error instanceof Error ? error.message : "unknown"} />
+      </PageFrame>
+    );
   }
 }
