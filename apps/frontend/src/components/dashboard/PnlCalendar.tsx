@@ -95,7 +95,7 @@ export function PnlCalendar({ endKey, days, selected, onSelect, pnlBasisLabel, e
       ) : null}
       {!heatmap ? (
         <p className="text-sm text-[#94A3B8]">
-          No daily series is shown. Missing data is not a grey zero heatmap.
+          Days stay blank until daily P&L is recorded.
         </p>
       ) : (
         <>

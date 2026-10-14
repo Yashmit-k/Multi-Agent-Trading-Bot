@@ -27,3 +27,12 @@ describe("signal provenance", () => {
     expect(excludedAgents(undefined)).toEqual([]);
   });
 });
+
+describe("source label", () => {
+  it("does not call an idle LLM agent deterministic", async () => {
+    const { sourceLabel } = await import("@/lib/signal-provenance");
+    expect(sourceLabel("fundamental", { metadata: { insufficient_data: true } })).toContain("no input data");
+    expect(sourceLabel("momentum", { metadata: {} })).toContain("deterministic");
+    expect(sourceLabel("news", { metadata: { llm: [{ model: "openai/gpt-oss-20b" }] } })).toBe("LLM openai/gpt-oss-20b");
+  });
+});

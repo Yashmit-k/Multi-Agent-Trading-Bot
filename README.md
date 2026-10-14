@@ -2,7 +2,7 @@
 
 > **Assessment submission**
 >
-> - Live demo: _add the public URL after deploying (see [`deploy/README.md`](deploy/README.md))_
+> - Live demo: **https://13-238-176-73.sslip.io** (AWS EC2 t3.small, ap-southeast-2; see [`deploy/README.md`](deploy/README.md))
 > - [Project synopsis](docs/submission/synopsis.md) — problem, solution, target user, scope vs CA2
 > - [Design document](docs/submission/design.md) — architecture diagram, agent roles, orchestration pattern, technology choices
 > - [Input definition](docs/submission/input-definition.md) and [Output definition](docs/submission/output-definition.md), with real samples

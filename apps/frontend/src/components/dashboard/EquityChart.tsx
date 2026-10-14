@@ -15,7 +15,7 @@ export function EquityChart({
       <section className="rounded-[12px] border border-[#26303C] bg-[#121922] p-4" data-testid="equity-chart">
         <h2 className="mb-2 text-lg font-semibold text-[#E6EDF3]">Equity history</h2>
         <p data-testid="equity-graph-empty" className="text-sm text-[#94A3B8]">
-          Daily equity history is not stored. Core has no daily P&amp;L series. This is not a zero line.
+          Daily equity history is not stored yet. The curve appears once end-of-day snapshots are stored; until then nothing is drawn, rather than a flat zero line.
         </p>
       </section>
     );

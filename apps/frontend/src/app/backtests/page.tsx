@@ -1,3 +1,4 @@
+export const metadata = { title: "Backtests · StockX" };
 import { fetchApi } from "@/lib/api";
 import { EmptyState, ErrorState } from "@/components/States";
 import { PageFrame } from "@/components/shell/PageFrame";

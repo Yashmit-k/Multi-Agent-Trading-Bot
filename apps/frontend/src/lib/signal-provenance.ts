@@ -2,6 +2,8 @@
 type Llm = { model?: string; fallback?: boolean };
 type Headline = { title?: string; source?: string };
 
+import { AGENT_KIND, decodeEntities } from "@/lib/format";
+
 export type Provenance = {
   reasons: string[];
   llm: string | null;
@@ -22,7 +24,9 @@ export function provenance(payload: Record<string, unknown>): Provenance {
   return {
     reasons: Array.isArray(payload.reason_codes) ? (payload.reason_codes as string[]) : [],
     llm,
-    headlines: Array.isArray(metadata.headlines) ? (metadata.headlines as Headline[]) : [],
+    headlines: Array.isArray(metadata.headlines)
+      ? (metadata.headlines as Headline[]).map((item) => ({ ...item, title: item.title ? decodeEntities(item.title) : item.title }))
+      : [],
     insufficient: metadata.insufficient_data === true,
   };
 }
@@ -32,4 +36,12 @@ export function excludedAgents(raw: string | undefined): string[] {
     .split(",")
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean);
+}
+
+// One plain-language line on where a signal's opinion came from.
+export function sourceLabel(agent: string, payload: Record<string, unknown>): string {
+  const p = provenance(payload);
+  if (p.llm) return p.llm;
+  if (AGENT_KIND[agent] === "llm") return p.insufficient ? "no LLM call: no input data for this symbol" : "LLM agent (no model detail recorded)";
+  return "deterministic rules on live candles";
 }

@@ -1,3 +1,4 @@
+export const metadata = { title: "Agent trace · StockX" };
 import { AgentTrace } from "@/components/trace/AgentTrace";
 import { PageFrame } from "@/components/shell/PageFrame";
 import { excludedAgents } from "@/lib/signal-provenance";

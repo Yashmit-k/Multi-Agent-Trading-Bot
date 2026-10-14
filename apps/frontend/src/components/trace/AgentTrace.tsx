@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { fetchApi } from "@/lib/api";
 import { ErrorState } from "@/components/States";
-import { provenance } from "@/lib/signal-provenance";
+import { provenance, sourceLabel } from "@/lib/signal-provenance";
 
 export type TraceEvent = {
   event_id: string;
@@ -198,7 +198,7 @@ function SignalDetail({ event, excluded }: { event: TraceEvent; excluded: string
   return (
     <div className="text-[#64748B]">
       {p.reasons.length ? <div>reasons: {p.reasons.join(", ")}</div> : null}
-      {p.llm ? <div>source: {p.llm}</div> : <div>source: deterministic rules on live candles</div>}
+      <div>source: {sourceLabel(event.agent ?? "", event.payload)}</div>
       {p.headlines.slice(0, 2).map((item) => (
         <div key={item.title}>
           “{item.title}” <span className="text-[#475569]">({item.source})</span>

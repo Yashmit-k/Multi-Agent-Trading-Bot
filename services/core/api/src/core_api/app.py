@@ -117,8 +117,15 @@ def create_app(
             "trading_mode": resolved.trading_mode.value,
             "live_enabled": False,
             "exchange_scope": "NSE",
-            "zerodha_configured": zerodha.credentials_present(),
+            # Same meaning as /zerodha/status: a Kite client exists (API key and secret set).
+            "zerodha_configured": app.state.kite_client is not None or zerodha.credentials_present(),
         }
+
+    @app.get("/api/v1/system/health")
+    def system_health(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        """One check per component of the pipeline, for the System page."""
+        now = datetime.now(timezone.utc)
+        return {"as_of": now.isoformat(), "live_enabled": False, "checks": _health_checks(app, repository, resolved, now)}
 
     @app.get("/api/v1/market/instruments")
     def instruments(_: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
@@ -130,9 +137,12 @@ def create_app(
         _: Annotated[None, Depends(require_user)],
         timeframe: str = "1d",
         as_of: datetime | None = None,
+        last: int | None = None,
     ) -> list[dict[str, object]]:
+        """Completed bars, oldest first. ``last`` keeps the newest N (at most 5000)."""
         moment = as_of or datetime.now(timezone.utc)
-        bars = repository.candles_until(symbol, Timeframe(timeframe), moment)
+        bounded = None if last is None else max(1, min(last, 5000))
+        bars = repository.candles_until(symbol, Timeframe(timeframe), moment, last=bounded)
         return [bar.model_dump(mode="json") for bar in bars]
 
     @app.get("/api/v1/market/overview")
@@ -185,8 +195,17 @@ def create_app(
         rows = []
         for item in repository.members_at(moment):
             body = _instrument_body(item)
-            candle = repository.latest_candle(item.symbol, Timeframe.D1)
-            body["last_price"] = "" if candle is None else str(candle.close)
+            bars = repository.candles_until(item.symbol, Timeframe.D1, moment, last=2)
+            last = bars[-1] if bars else None
+            previous = bars[-2] if len(bars) >= 2 else None
+            body["last_price"] = "" if last is None else str(last.close)
+            body["prev_close"] = None if previous is None else str(previous.close)
+            body["change_pct"] = (
+                None
+                if last is None or previous is None or previous.close == 0
+                else format(((last.close / previous.close) - 1) * 100, ".4f")
+            )
+            body["bar_end"] = None if last is None else last.end.isoformat()
             rows.append(body)
         return rows
 
@@ -274,6 +293,29 @@ def create_app(
         session_id: str | None = None,
     ) -> list[dict[str, object]]:
         return [item.model_dump(mode="json") for item in repository.list_proposals(_session_argument(repository, session_id))]
+
+    @app.get("/api/v1/decisions/chain")
+    def decision_chain(
+        _: Annotated[None, Depends(require_user)],
+        session_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, object]]:
+        """Each proposal with its risk decision and order, newest first."""
+        proposals = sorted(
+            repository.list_proposals(_session_argument(repository, session_id)), key=lambda item: item.timestamp, reverse=True
+        )[: max(1, min(limit, 500))]
+        rows = []
+        for proposal in proposals:
+            risk = repository.risk_for_proposal(proposal.proposal_id)
+            order = repository.order_for_proposal(proposal.proposal_id)
+            rows.append(
+                {
+                    "proposal": proposal.model_dump(mode="json"),
+                    "risk": None if risk is None else risk.model_dump(mode="json"),
+                    "order": None if order is None else order.model_dump(mode="json"),
+                }
+            )
+        return rows
 
     @app.get("/api/v1/decisions/{proposal_id}")
     def decision(proposal_id: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
@@ -965,6 +1007,95 @@ def _intelligence_rows(app: FastAPI, kind: str, symbol: str, as_of: str | None) 
         return client.rows(kind, symbol, as_of)
     except Exception as exc:
         raise HTTPException(status_code=503, detail="intelligence_unavailable") from exc
+
+
+QUANT_AGENTS = ("technical", "momentum", "mean_reversion", "volume", "regime")
+INTEL_AGENTS = ("news", "fundamental", "valuation", "earnings")
+
+
+def _check(component: str, status: str, detail: str, **extra: object) -> dict[str, object]:
+    return {"component": component, "status": status, "detail": detail, **extra}
+
+
+def _age_minutes(stamp: object, now: datetime) -> float | None:
+    if stamp is None:
+        return None
+    moment = stamp if isinstance(stamp, datetime) else datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+    return round((now - moment.astimezone(timezone.utc)).total_seconds() / 60, 1)
+
+
+def _health_checks(app: FastAPI, repository: CoreRepository, settings: Settings, now: datetime) -> list[dict[str, object]]:
+    checks = [_check("Core API", "ok", f"mode {settings.trading_mode.value}, live trading disabled")]
+    try:
+        repository.paper_running()
+        checks.append(_check("PostgreSQL", "ok", "store reachable"))
+    except Exception as exc:
+        checks.append(_check("PostgreSQL", "down", type(exc).__name__))
+    client = getattr(app.state.publisher, "_client", None)
+    if client is None:
+        checks.append(_check("Redis event bus", "warn", "in-memory publisher (no Redis configured)"))
+    else:
+        try:
+            client.ping()
+            checks.append(_check("Redis event bus", "ok", "publishing EventEnvelopes on domain channels"))
+        except Exception as exc:
+            checks.append(_check("Redis event bus", "down", type(exc).__name__))
+    if app.state.kite_client is None:
+        checks.append(_check("Zerodha Kite", "down", "API key/secret not configured"))
+    elif not app.state.zerodha_access_token:
+        checks.append(_check("Zerodha Kite", "warn", "configured but logged out; log in before 09:15 IST"))
+    else:
+        checks.append(_check("Zerodha Kite", "ok", "authenticated (market data only; orders never sent)"))
+    ingestion = app.state.ingestion.snapshot()
+    age = _age_minutes(ingestion.get("last_success_at"), now)
+    if ingestion.get("last_error"):
+        checks.append(_check("Market-data collector", "warn", f"last error: {ingestion['last_error']}", last_success_at=ingestion.get("last_success_at")))
+    elif age is None:
+        checks.append(_check("Market-data collector", "warn", "no successful poll since start"))
+    else:
+        checks.append(_check("Market-data collector", "ok", f"last poll {age} min ago", last_success_at=ingestion.get("last_success_at")))
+    latest = {item["agent_name"]: item for item in repository.latest_signal_per_agent()}
+    for group, names, label in (("Quant agents", QUANT_AGENTS, "deterministic rules"), ("Intelligence agents", INTEL_AGENTS, "LLM")):
+        ages = {name: _age_minutes(latest.get(name, {}).get("timestamp"), now) for name in names}
+        missing = [name for name, value in ages.items() if value is None]
+        newest = min((value for value in ages.values() if value is not None), default=None)
+        status = "ok" if not missing else "warn"
+        detail = f"{len(names) - len(missing)}/{len(names)} {label} agents have published"
+        if newest is not None:
+            detail += f"; newest signal {newest} min ago"
+        if missing:
+            detail += f"; silent: {', '.join(missing)}"
+        checks.append(_check(group, status, detail, agents=ages))
+    intel = _intelligence_health(app)
+    llm = intel.get("llm_status") if isinstance(intel.get("llm_status"), dict) else {}
+    if intel.get("status") != "ok":
+        checks.append(_check("Intelligence service", "down", str(intel.get("reason", "unavailable"))))
+    else:
+        mode = intel.get("llm_mode", "fixture")
+        detail = f"LLM {llm.get('model', '?')} via {llm.get('provider', '?')}" if mode == "openai" else "LLM not configured: heuristic fallback only"
+        detail += f"; last run {_age_minutes(intel.get('last_run_at'), now)} min ago; {intel.get('fallbacks', 0)} fallbacks since start"
+        checks.append(_check("Intelligence service", "ok" if mode == "openai" else "warn", detail, llm=llm))
+    events = repository.list_system_events(limit=1)
+    if not events:
+        checks.append(_check("Trace recorder", "warn", "no bus messages recorded yet"))
+    else:
+        checks.append(_check("Trace recorder", "ok", f"newest recorded message {_age_minutes(events[0]['recorded_at'], now)} min ago"))
+    beat = heartbeat_view(app.state.worker_heartbeat_at, now, int(app.state.worker_heartbeat_interval_seconds))
+    running = repository.paper_running()
+    if beat["status"] == "available":
+        checks.append(_check("Paper worker (orchestrator)", "ok", f"heartbeat at {beat['heartbeat_at']}"))
+    else:
+        checks.append(_check("Paper worker (orchestrator)", "idle", "stopped: starts only on explicit authorization"))
+    book = repository.active_paper_session()
+    checks.append(
+        _check(
+            "Paper session",
+            "ok" if book is not None else "warn",
+            f"{'active session ' + book.session_id[:8] if book else 'no active session'}; paper {'running' if running else 'stopped'}; "
+            f"kill switch {'armed' if repository.kill_switch_armed() else 'disarmed'}",
+        )
+    )
+    return checks
 
 
 def _intelligence_health(app: FastAPI) -> dict[str, object]:

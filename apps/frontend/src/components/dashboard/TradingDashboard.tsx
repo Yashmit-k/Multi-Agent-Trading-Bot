@@ -91,7 +91,7 @@ export function TradingDashboard() {
                   </option>
                 ))
               ) : (
-                <option value="">No session-history API</option>
+                <option value="">Current session only</option>
               )}
             </select>
           </label>
@@ -223,7 +223,7 @@ function SummaryCards({
           Date {endKey ?? "—"} · complete {today ? String(today.complete) : "n/a"} · {snapshot.pnl_basis}
         </p>
         {snapshot.mode === "real" ? (
-          <p className="text-xs text-[#94A3B8]">Not inferred from browser time. Cumulative portfolio P&L is not today’s P&L.</p>
+          <p className="text-xs text-[#94A3B8]">Shown only once Core stores a daily P&L figure. Total P&L above is cumulative, not today’s.</p>
         ) : null}
       </Card>
       <Card title="Win rate">
@@ -291,7 +291,7 @@ function MarketPanel({ snapshot }: { snapshot: DashboardSnapshot }) {
       ) : (
         <ul className="space-y-1 text-[#E6EDF3]">
           <li>
-            NIFTY proxy {market.nifty_last ?? "—"}
+            Avg member close ₹{market.nifty_last ?? "—"}
           </li>
           <li>
             Breadth {market.breadth_advancers ?? "—"}/{market.breadth_decliners ?? "—"}
@@ -300,7 +300,7 @@ function MarketPanel({ snapshot }: { snapshot: DashboardSnapshot }) {
             as_of {market.as_of ? formatIstInstant(market.as_of) : "unavailable"}
             {market.mode ? ` · mode ${market.mode}` : ""}
           </li>
-          <li className="text-xs text-[#94A3B8]">Mean of stored member closes from GET /api/v1/market/overview. Not an official Nifty print.</li>
+          <li className="text-xs text-[#94A3B8]">Equal-weight average of the 50 constituents' last daily closes. This is not the NIFTY 50 index level.</li>
         </ul>
       )}
     </section>

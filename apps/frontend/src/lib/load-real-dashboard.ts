@@ -77,7 +77,7 @@ function emptyRealSnapshot(note: string): DashboardSnapshot {
     win_rate: {
       pct: null,
       sample: null,
-      definition: "No Core closed-trade pairing convention is published for paper. Latest stored backtest is not paper session P&L.",
+      definition: "Win rate needs closed round-trip trades. None have closed in this paper session yet.",
     },
     positions: [],
     orders: [],
@@ -164,7 +164,7 @@ export async function loadRealDashboard(): Promise<DashboardSnapshot> {
       pct: null,
       sample: null,
       definition:
-        "No Core closed-trade pairing convention is published for paper. Latest stored backtest is not paper session P&L.",
+        "Win rate needs closed round-trip trades. None have closed in this paper session yet.",
     },
     positions: positions.ok ? (positions.value as Array<Record<string, unknown>>) : [],
     orders: orders.ok ? (orders.value as Array<Record<string, unknown>>) : [],

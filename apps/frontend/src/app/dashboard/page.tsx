@@ -1,3 +1,4 @@
+export const metadata = { title: "Overview · StockX" };
 import { Suspense } from "react";
 import { TradingDashboard } from "@/components/dashboard/TradingDashboard";
 
