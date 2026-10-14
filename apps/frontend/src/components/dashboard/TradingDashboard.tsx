@@ -240,10 +240,10 @@ function SummaryCards({
         <p className="text-sm text-[#94A3B8]">
           Executions listed {snapshot.trades.length} · orders {snapshot.orders.length}. Unfilled orders are not completed trades.
         </p>
-        <Link href="/positions" className="text-sm text-cyan-400 hover:underline">
+        <Link prefetch={false} href="/positions" className="text-sm text-cyan-400 hover:underline">
           Positions
         </Link>{" "}
-        <Link href="/orders" className="text-sm text-cyan-400 hover:underline">
+        <Link prefetch={false} href="/orders" className="text-sm text-cyan-400 hover:underline">
           Orders
         </Link>
       </Card>
@@ -347,10 +347,10 @@ function ActivityPanel({ snapshot }: { snapshot: DashboardSnapshot }) {
         </>
       )}
       <div className="mt-3 flex gap-3">
-        <Link href="/orders" className="text-sm text-cyan-400 hover:underline">
+        <Link prefetch={false} href="/orders" className="text-sm text-cyan-400 hover:underline">
           Orders
         </Link>
-        <Link href="/positions" className="text-sm text-cyan-400 hover:underline">
+        <Link prefetch={false} href="/positions" className="text-sm text-cyan-400 hover:underline">
           Positions
         </Link>
       </div>
@@ -373,7 +373,7 @@ function RiskPanel({ snapshot }: { snapshot: DashboardSnapshot }) {
         </li>
         <li>Core API {s.core}</li>
       </ul>
-      <Link href="/risk" className="mt-3 inline-block text-sm text-cyan-400 hover:underline">
+      <Link prefetch={false} href="/risk" className="mt-3 inline-block text-sm text-cyan-400 hover:underline">
         Open Risk controls
       </Link>
     </section>
