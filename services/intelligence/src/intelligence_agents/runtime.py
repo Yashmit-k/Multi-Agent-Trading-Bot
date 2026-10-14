@@ -73,7 +73,12 @@ def make_router(settings: IntelligenceSettings) -> LLMRouter:
         timeout=settings.llm_timeout_seconds,
         daily_budget_usd=settings.llm_daily_budget_usd,
         tier2_enabled=settings.tier2_enabled,
-        use_cache=False,
+        # Live modes reuse an assessment for unchanged text, so a repeated headline costs
+        # no LLM call. BACKTEST stays uncached and uses the fixture provider.
+        use_cache=settings.trading_mode is not TradingMode.BACKTEST,
+        min_interval_seconds=settings.llm_min_interval_seconds,
+        max_output_tokens=settings.llm_max_output_tokens,
+        json_mode=settings.llm_json_mode,
     )
 
 

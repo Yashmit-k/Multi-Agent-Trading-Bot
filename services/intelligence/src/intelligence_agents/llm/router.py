@@ -101,7 +101,8 @@ class LLMRouter:
                     self._tracker.record(assessment.prompt_tokens, assessment.completion_tokens)
                 except Exception:
                     logger.warning("llm_tier2_failed")
-        if self._use_cache:
+        # A fixture fallback is never cached, so the next cycle retries the real model.
+        if self._use_cache and not assessment.fallback:
             self._cache.put(request.content_hash, assessment.model, assessment)
         return assessment
 
@@ -142,6 +143,9 @@ def build_router(
     tier2_enabled: bool,
     use_cache: bool,
     openai_client: object | None = None,
+    min_interval_seconds: float = 0.0,
+    max_output_tokens: int = 160,
+    json_mode: bool = False,
 ) -> LLMRouter:
     fixture = FixtureLLMProvider()
     tracker = CostTracker(daily_budget_usd=daily_budget_usd)
@@ -159,7 +163,11 @@ def build_router(
         )
     from intelligence_agents.llm.openai_compat import OpenAICompatibleProvider
 
-    kwargs = {}
+    kwargs: dict[str, object] = {
+        "min_interval_seconds": min_interval_seconds,
+        "max_output_tokens": max_output_tokens,
+        "json_mode": json_mode,
+    }
     if openai_client is not None:
         kwargs["client"] = openai_client
     name = provider_name_from_url(base_url)

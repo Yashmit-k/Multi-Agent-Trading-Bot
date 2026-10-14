@@ -37,6 +37,9 @@ class IntelligenceSettings:
     rss_max_items: int
     service_mode: str
     fundamentals_csv: str = ""
+    llm_min_interval_seconds: float = 0.0
+    llm_max_output_tokens: int = 160
+    llm_json_mode: bool = False
 
     @classmethod
     def from_env(cls) -> IntelligenceSettings:
@@ -68,6 +71,9 @@ class IntelligenceSettings:
             rss_max_items=int(os.environ.get("NEWS_RSS_MAX_ITEMS", "100")),
             service_mode=os.environ.get("INTELLIGENCE_SERVICE_MODE", "oneshot").strip().lower(),
             fundamentals_csv=os.environ.get("INTELLIGENCE_FUNDAMENTALS_CSV", "").strip(),
+            llm_min_interval_seconds=float(os.environ.get("LLM_MIN_INTERVAL_SECONDS", "0")),
+            llm_max_output_tokens=int(os.environ.get("LLM_MAX_OUTPUT_TOKENS", "160")),
+            llm_json_mode=os.environ.get("LLM_JSON_MODE", "false").strip().lower() == "true",
         )
         settings.validate()
         return settings

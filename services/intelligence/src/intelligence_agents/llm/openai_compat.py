@@ -37,6 +37,10 @@ class OpenAICompatibleProvider:
         retries: int = 1,
         client: httpx.Client | None = None,
         sleeper: Callable[[float], None] | None = None,
+        min_interval_seconds: float = 0.0,
+        clock: Callable[[], float] = time.monotonic,
+        max_output_tokens: int = MAX_OUTPUT_TOKENS,
+        json_mode: bool = False,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
@@ -50,14 +54,29 @@ class OpenAICompatibleProvider:
         self.last_failure_type: str | None = None
         self.last_generation: str | None = None
         self.quota_exhausted = False
+        self._min_interval = max(0.0, min_interval_seconds)
+        self._clock = clock
+        self._last_call: float | None = None
+        # Reasoning models spend output tokens before the JSON answer, so they need a larger cap.
+        self._max_output_tokens = max_output_tokens
+        self._json_mode = json_mode
+
+    def _pace(self) -> None:
+        """Space requests at least min_interval apart to stay under a provider's per-minute limit."""
+        if self._min_interval and self._last_call is not None:
+            wait = self._last_call + self._min_interval - self._clock()
+            if wait > 0:
+                self._sleep(wait)
+        self._last_call = self._clock()
 
     def complete(self, request: LLMRequest, *, tier: str) -> object:
         last_error: Exception | None = None
-        delay = 0.2
+        delay = max(0.2, 2 * self._min_interval)
         for attempt in range(self._retries + 1):
             content = ""
             started = time.perf_counter()
             try:
+                self._pace()
                 logger.info(
                     "llm_request",
                     extra={"model": self.model, "llm_host": self.host, "tier": tier, "agent_task": request.task},
@@ -187,12 +206,14 @@ class OpenAICompatibleProvider:
         body = {
             "model": self.model,
             "temperature": 0,
-            "max_tokens": MAX_OUTPUT_TOKENS,
+            "max_tokens": self._max_output_tokens,
             "messages": [
                 {"role": "system", "content": f"{SYSTEM_PROMPT} {instruction_for(request.task)}"},
                 {"role": "user", "content": wrap_untrusted(request.user_payload)},
             ],
         }
+        if self._json_mode:
+            body["response_format"] = {"type": "json_object"}
         headers = {"Authorization": f"Bearer {self._api_key}"}
         response = self._client.post(
             f"{self._base_url}/chat/completions",

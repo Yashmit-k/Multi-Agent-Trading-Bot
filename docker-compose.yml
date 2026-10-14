@@ -103,6 +103,10 @@ services:
       CORE_API_URL: http://core-api:8000
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
+      # Free tiers allow about 30 requests a minute; 2.5 s spacing stays under it.
+      LLM_MIN_INTERVAL_SECONDS: ${LLM_MIN_INTERVAL_SECONDS:-2.5}
+      LLM_MAX_OUTPUT_TOKENS: ${LLM_MAX_OUTPUT_TOKENS:-600}
+      LLM_JSON_MODE: ${LLM_JSON_MODE:-true}
     depends_on:
       core-api:
         condition: service_healthy
