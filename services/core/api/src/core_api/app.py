@@ -1070,7 +1070,11 @@ def _health_checks(app: FastAPI, repository: CoreRepository, settings: Settings,
         checks.append(_check(group, status, detail, agents=ages))
     intel = _intelligence_health(app)
     llm = intel.get("llm_status") if isinstance(intel.get("llm_status"), dict) else {}
-    if intel.get("status") != "ok":
+    if intel.get("status") == "degraded" and intel.get("runner_running"):
+        # The runner is alive but a recent cycle failed (for example a restart of a peer service).
+        detail = f"running, {intel.get('consecutive_failures', 0)} recent failed cycle(s): {intel.get('last_error') or intel.get('reason')}"
+        checks.append(_check("Intelligence service", "warn", detail, llm=llm))
+    elif intel.get("status") != "ok":
         checks.append(_check("Intelligence service", "down", str(intel.get("reason", "unavailable"))))
     else:
         mode = intel.get("llm_mode", "fixture")

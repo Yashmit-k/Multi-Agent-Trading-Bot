@@ -69,3 +69,22 @@ def test_decision_chain_joins_risk_and_order(repository: CoreRepository) -> None
     assert rows[0]["proposal"]["symbol"] == "RELIANCE"
     assert rows[0]["risk"]["status"] == "APPROVED"
     assert rows[0]["order"]["proposal_id"] == rows[0]["proposal"]["proposal_id"]
+
+
+def test_degraded_but_running_intelligence_is_a_warning(repository: CoreRepository) -> None:
+    app = create_app(
+        Settings(database_url="sqlite://", redis_url="redis://localhost:6379/0", core_api_token="core",
+                 internal_signal_token="internal", max_clock_skew_seconds=5, trading_mode=TradingMode.PAPER),
+        repository,
+        MemoryEventPublisher(),
+    )
+
+    class Intel:
+        def health(self):
+            return {"status": "degraded", "runner_running": True, "consecutive_failures": 1, "last_error": "dns", "llm_mode": "openai"}
+
+    app.state.intelligence_client = Intel()
+    body = TestClient(app).get("/api/v1/system/health", headers={"Authorization": "Bearer core"}).json()
+    intel = next(item for item in body["checks"] if item["component"] == "Intelligence service")
+    assert intel["status"] == "warn"
+    assert "dns" in intel["detail"]
