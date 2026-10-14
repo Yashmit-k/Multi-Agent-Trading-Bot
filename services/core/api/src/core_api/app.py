@@ -71,7 +71,7 @@ def create_app(
     app = FastAPI(title="Core trading API", version="1.0.0", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://127.0.0.1:3000", "http://localhost:3000"],
+        allow_origins=_cors_origins(),
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
     )
@@ -164,6 +164,10 @@ def create_app(
     @app.get("/api/v1/signals")
     def signals(_: Annotated[None, Depends(require_user)]) -> list[dict]:
         return repository.list_signal_payloads()
+
+    @app.get("/api/v1/signals/latest")
+    def latest_signals(_: Annotated[None, Depends(require_user)]) -> list[dict]:
+        return repository.latest_signal_per_agent()
 
     @app.get("/api/v1/signals/{symbol}")
     def signals_for_symbol(symbol: str, _: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
@@ -269,6 +273,26 @@ def create_app(
         if proposal is None:
             raise HTTPException(status_code=404, detail="unknown_proposal")
         return proposal.model_dump(mode="json")
+
+    @app.get("/api/v1/trace")
+    def trace(
+        _: Annotated[None, Depends(require_user)],
+        correlation_id: str | None = None,
+        event_type: str | None = None,
+        source: str | None = None,
+        limit: int = 200,
+    ) -> dict[str, object]:
+        bounded = max(1, min(limit, 1000))
+        events = repository.list_system_events(correlation_id=correlation_id, event_type=event_type, source=source, limit=bounded)
+        return {"count": len(events), "live_enabled": False, "events": [_trace_item(item) for item in events]}
+
+    @app.get("/api/v1/trace/{correlation_id}")
+    def trace_chain(correlation_id: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        events = repository.list_system_events(correlation_id=correlation_id, limit=1000)
+        if not events:
+            raise HTTPException(status_code=404, detail="unknown_correlation_id")
+        ordered = sorted(events, key=lambda item: (item["envelope"].get("timestamp", ""), item["recorded_at"]))
+        return {"correlation_id": correlation_id, "count": len(ordered), "events": [_trace_item(item) for item in ordered]}
 
     @app.get("/api/v1/risk/status")
     def risk_status(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
@@ -1004,6 +1028,29 @@ def _not_ready(path: str):
 
     endpoint.__name__ = "later_" + path.strip("/").replace("/", "_").replace("{", "").replace("}", "")
     return endpoint
+
+
+def _cors_origins() -> list[str]:
+    raw = os.environ.get("CORE_API_CORS_ORIGINS", "")
+    extra = [item.strip() for item in raw.split(",") if item.strip()]
+    return ["http://127.0.0.1:3000", "http://localhost:3000", *extra]
+
+
+def _trace_item(item: dict) -> dict[str, object]:
+    envelope = item["envelope"]
+    payload = envelope.get("payload") if isinstance(envelope.get("payload"), dict) else {}
+    return {
+        "event_id": item["event_id"],
+        "event_type": item["event_type"],
+        "recorded_at": item["recorded_at"].isoformat(),
+        "timestamp": envelope.get("timestamp"),
+        "channel": envelope.get("channel"),
+        "source": envelope.get("source"),
+        "agent": payload.get("agent_name"),
+        "symbol": payload.get("symbol"),
+        "correlation_id": envelope.get("correlation_id"),
+        "payload": payload,
+    }
 
 
 def _publisher(redis_url: str) -> EventPublisher:

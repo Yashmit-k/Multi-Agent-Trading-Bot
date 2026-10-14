@@ -1,0 +1,6 @@
+# DOMAIN is a hostname that resolves to this VM, e.g. trading.example.com or
+# 203-0-113-7.sslip.io. Caddy obtains the HTTPS certificate automatically.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy frontend:3000
+}

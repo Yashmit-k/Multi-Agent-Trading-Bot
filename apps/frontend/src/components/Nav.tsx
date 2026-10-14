@@ -9,6 +9,7 @@ const LINKS = [
   ["/stocks", "Stocks"],
   ["/signals", "Signals"],
   ["/agents", "Agents"],
+  ["/trace", "Agent trace"],
   ["/news", "News"],
   ["/portfolio", "Portfolio"],
   ["/positions", "Positions"],

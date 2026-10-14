@@ -1,17 +1,29 @@
 const PREFIX = "/api/v1/";
 
+function onServer(): boolean {
+  return typeof window === "undefined";
+}
+
+// Server components call Core directly (API_INTERNAL_BASE_URL, e.g. http://core-api:8000).
+// The browser calls same-origin /api/v1/*, which the Next proxy route forwards with the
+// server-side token, unless NEXT_PUBLIC_API_BASE_URL points it somewhere else (mock API).
 export function apiUrl(path: string): string {
   if (!path.startsWith(PREFIX) && path !== "/api/health") {
     throw new Error(`refusing non-versioned API path: ${path}`);
   }
-  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+  const base = onServer()
+    ? process.env.API_INTERNAL_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? ""
+    : process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
   return `${base}${path}`;
 }
 
+function authHeaders(): Record<string, string> {
+  const token = onServer() ? process.env.CORE_API_TOKEN ?? process.env.NEXT_PUBLIC_CORE_API_TOKEN : process.env.NEXT_PUBLIC_CORE_API_TOKEN;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function fetchApi<T>(path: string): Promise<T> {
-  const token = process.env.NEXT_PUBLIC_CORE_API_TOKEN;
-  const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-  const response = await fetch(apiUrl(path), { signal: AbortSignal.timeout(15000), headers });
+  const response = await fetch(apiUrl(path), { signal: AbortSignal.timeout(15000), headers: authHeaders(), cache: "no-store" });
   if (response.status === 501) {
     throw new Error("not_implemented");
   }
@@ -22,11 +34,7 @@ export async function fetchApi<T>(path: string): Promise<T> {
 }
 
 export async function postApi<T>(path: string, body: unknown): Promise<T> {
-  const token = process.env.NEXT_PUBLIC_CORE_API_TOKEN;
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
+  const headers: HeadersInit = { "Content-Type": "application/json", ...authHeaders() };
   const response = await fetch(apiUrl(path), {
     method: "POST",
     signal: AbortSignal.timeout(15000),
