@@ -68,7 +68,7 @@ export function Badge({ children, tone = "muted" }: { children: React.ReactNode;
 
 export function SymbolLink({ symbol }: { symbol: string }) {
   return (
-    <Link href={`/stocks/${encodeURIComponent(symbol)}`} className="font-medium text-[#E6EDF3] hover:text-[#60A5FA]">
+    <Link prefetch={false} href={`/stocks/${encodeURIComponent(symbol)}`} className="font-medium text-[#E6EDF3] hover:text-[#60A5FA]">
       {symbol}
     </Link>
   );

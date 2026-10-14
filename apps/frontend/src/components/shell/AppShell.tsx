@@ -42,7 +42,7 @@ export function AppShell({
             {LINKS.map(([href, label]) => {
               const active = pathname === href || pathname.startsWith(`${href}/`);
               return (
-                <Link
+                <Link prefetch={false}
                   key={href}
                   href={href}
                   className={
@@ -62,7 +62,7 @@ export function AppShell({
             {LINKS.map(([href, label]) => {
               const active = pathname === href || pathname.startsWith(`${href}/`);
               return (
-                <Link
+                <Link prefetch={false}
                   key={href}
                   href={href}
                   className={`shrink-0 rounded px-2 py-1 ${active ? "bg-[#171F2A] text-[#E6EDF3]" : "text-[#94A3B8]"}`}

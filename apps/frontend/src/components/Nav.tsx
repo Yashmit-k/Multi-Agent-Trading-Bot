@@ -28,7 +28,7 @@ export function Nav() {
       {LINKS.map(([href, label]) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
         return (
-          <Link
+          <Link prefetch={false}
             key={href}
             href={href}
             className={active ? "font-semibold text-slate-900 no-underline" : "text-slate-600 underline"}
