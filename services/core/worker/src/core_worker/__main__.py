@@ -13,7 +13,7 @@ from core_paper.costs import CostSchedule
 from core_paper.trading_calendar import cash_session_open
 from core_worker.heartbeat import publish_heartbeat
 from core_worker.loop import run_once
-from core_worker.paper_schedule import broker_allows_entries, run_scheduled_cycle
+from core_worker.paper_schedule import broker_allows_entries, excluded_agent_weights, run_scheduled_cycle
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,8 @@ slip_raw = os.environ.get("PAPER_SLIPPAGE_BPS", "0")
 schedule = None if cost_raw is None else CostSchedule.research(Decimal(cost_raw), Decimal(slip_raw))
 api_base = os.environ.get("CORE_API_URL", "http://core-api:8000")
 api_token = os.environ.get("CORE_API_TOKEN", "")
+weights = excluded_agent_weights(os.environ.get("FUSION_EXCLUDED_AGENTS", ""))
+logger.info("fusion_excluded_agents agents=%s", os.environ.get("FUSION_EXCLUDED_AGENTS", ""))
 while True:
     now = datetime.now(timezone.utc)
     publish_heartbeat(api_base, api_token, now, interval_seconds=interval)
@@ -49,5 +51,6 @@ while True:
             schedule=schedule,
             now=now,
             broker_authenticated=authenticated,
+            weights=weights,
         )
     time.sleep(interval)

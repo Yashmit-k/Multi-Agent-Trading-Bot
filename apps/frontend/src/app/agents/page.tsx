@@ -1,6 +1,9 @@
 import { fetchApi } from "@/lib/api";
 import { ErrorState } from "@/components/States";
 import { PageFrame } from "@/components/shell/PageFrame";
+import { excludedAgents, provenance } from "@/lib/signal-provenance";
+
+export const dynamic = "force-dynamic";
 
 type AgentRow = {
   agent_name: string;
@@ -20,7 +23,8 @@ type SignalRow = {
   signal: number;
   confidence: number;
   timestamp: string;
-  reasoning?: string;
+  reason_codes?: string[];
+  metadata?: Record<string, unknown>;
 };
 
 const KIND: Record<string, string> = {
@@ -50,10 +54,11 @@ export default async function AgentsPage() {
     const agents = await fetchApi<AgentRow[]>("/api/v1/agents");
     const signals = await fetchApi<SignalRow[]>("/api/v1/signals/latest").catch(() => [] as SignalRow[]);
     const latest = latestByAgent(signals);
+    const excluded = excludedAgents(process.env.FUSION_EXCLUDED_AGENTS);
     return (
       <PageFrame
         title="Agents"
-        description="Every agent returns the same shape: a score from -1 to +1, a confidence from 0 to 1, and its reasoning. No agent places an order."
+        description="Every agent returns the same shape: a score from -1 to +1, a confidence from 0 to 1, and its reasons. No agent places an order."
       >
         <div className="grid gap-3 md:grid-cols-2">
           {agents.map((agent) => {
@@ -64,6 +69,9 @@ export default async function AgentsPage() {
                   <h2 className="font-semibold">{agent.agent_name}</h2>
                   <span className={agent.enabled ? "text-[#22C55E]" : "text-[#94A3B8]"}>{agent.enabled ? "enabled" : "disabled"}</span>
                 </div>
+                {excluded.includes(agent.agent_name) ? (
+                  <div className="text-xs text-[#F59E0B]">Excluded from fusion: no live data source, so it cannot influence trades.</div>
+                ) : null}
                 <div className="text-xs text-[#94A3B8]">
                   {KIND[agent.agent_name] ?? "agent"} · {agent.mode} · features {agent.feature_version}
                   {agent.reason ? ` · ${agent.reason}` : ""}
@@ -74,7 +82,7 @@ export default async function AgentsPage() {
                       Latest: <b>{last.symbol}</b> {last.horizon} · score {last.signal.toFixed(2)} · confidence {last.confidence.toFixed(2)}
                     </div>
                     <div className="text-[#64748B]">{last.timestamp}</div>
-                    {last.reasoning ? <p className="mt-1 text-[#CBD5E1]">{last.reasoning}</p> : null}
+                    <Detail signal={last} />
                   </div>
                 ) : (
                   <p className="mt-2 text-xs text-[#94A3B8]">No stored signal from this agent.</p>
@@ -92,4 +100,20 @@ export default async function AgentsPage() {
       </PageFrame>
     );
   }
+}
+
+function Detail({ signal }: { signal: SignalRow }) {
+  const p = provenance(signal as unknown as Record<string, unknown>);
+  return (
+    <div className="mt-1 space-y-0.5 text-[#CBD5E1]">
+      {p.reasons.length ? <div>Reasons: {p.reasons.join(", ")}</div> : null}
+      <div className="text-[#94A3B8]">Source: {p.llm ?? "deterministic rules on live candles"}</div>
+      {p.insufficient ? <div className="text-[#94A3B8]">Insufficient data for this symbol.</div> : null}
+      {p.headlines.slice(0, 3).map((item) => (
+        <div key={item.title}>
+          “{item.title}” <span className="text-[#64748B]">({item.source})</span>
+        </div>
+      ))}
+    </div>
+  );
 }
