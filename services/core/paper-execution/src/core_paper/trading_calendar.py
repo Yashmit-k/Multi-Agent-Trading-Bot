@@ -7,6 +7,7 @@ when this schedule was read on 2026-10-12. Dates outside the covered range
 fail closed.
 """
 
+import os
 from dataclasses import dataclass, replace
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -20,7 +21,29 @@ COVERAGE_END = date(2026, 12, 31)
 ORDINARY_OPEN = time(9, 15)
 ORDINARY_CLOSE = time(15, 30)
 ENTRY_START = time(9, 20)
-ENTRY_END = time(10, 30)
+DEFAULT_ENTRY_END = time(10, 30)
+LATEST_ENTRY_END = time(15, 15)
+
+
+def _entry_end_from_env(raw: str | None) -> time:
+    """PAPER_ENTRY_END=HH:MM widens the new-entry window; exits run all session regardless.
+
+    Bounded to 09:25..15:15 so an order never activates in the closing auction.
+    An unparseable value fails closed to the default.
+    """
+    if not raw:
+        return DEFAULT_ENTRY_END
+    try:
+        hours, minutes = (int(part) for part in raw.strip().split(":"))
+        parsed = time(hours, minutes)
+    except ValueError:
+        return DEFAULT_ENTRY_END
+    if parsed.minute % 5 or not (time(9, 25) <= parsed <= LATEST_ENTRY_END):
+        return DEFAULT_ENTRY_END
+    return parsed
+
+
+ENTRY_END = _entry_end_from_env(os.environ.get("PAPER_ENTRY_END"))
 TEST_EXTENSION_DATE = date(2026, 10, 13)
 TEST_EXTENSION_END = time(11, 0)
 TEST_EXTENSION_SOURCE = "ordinary-cash-session+paper-test-20261013-1100"

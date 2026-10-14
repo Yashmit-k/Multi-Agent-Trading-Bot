@@ -224,7 +224,7 @@ def require_fresh_constituents(repository: CoreRepository, now: datetime) -> Non
 
 
 def require_ordinary_entry_window(now: datetime) -> None:
-    """Ordinary cash session, 09:20 inclusive to 10:30 exclusive IST."""
+    """Ordinary cash session, 09:20 inclusive to ENTRY_END exclusive IST (10:30 by default)."""
     require_entry_window(now, mode=TradingMode.PAPER, allow_extension=False)
 
 
@@ -232,12 +232,13 @@ def require_entry_window(now: datetime, *, mode: TradingMode, allow_extension: b
     """New-entry gate. The 11:00 end applies only to the opted-in 13 October 2026 paper test."""
     from datetime import time
 
-    from core_paper.trading_calendar import ENTRY_END, IST, paper_test_entry_window, session_for
+    from core_paper.trading_calendar import ENTRY_END, ENTRY_START, IST, paper_test_entry_window, session_for
 
     local = now.astimezone(IST)
     window = session_for(local.date())
-    if window is None or (window.entry_start, window.entry_end) != (time(9, 20), time(10, 30)):
-        raise CycleRefused("session is not an ordinary 09:20-10:30 entry window")
+    label = f"{ENTRY_START.strftime('%H:%M')}-{ENTRY_END.strftime('%H:%M')}"
+    if window is None or (window.entry_start, window.entry_end) != (ENTRY_START, ENTRY_END):
+        raise CycleRefused(f"session is not an ordinary {label} entry window")
     end = ENTRY_END
     if allow_extension and mode == TradingMode.PAPER:
         extended = paper_test_entry_window(now)
@@ -247,7 +248,7 @@ def require_entry_window(now: datetime, *, mode: TradingMode, allow_extension: b
     if not (window.entry_start_at <= local < end_at):
         if end == time(11, 0):
             raise CycleRefused("outside the 13 October 2026 paper entry window ending 11:00 IST")
-        raise CycleRefused("outside 09:20 inclusive to 10:30 exclusive IST")
+        raise CycleRefused(f"outside {label.replace('-', ' inclusive to ')} exclusive IST")
 
 
 def _sized(proposal, cash: Decimal, schedule: CostSchedule):
