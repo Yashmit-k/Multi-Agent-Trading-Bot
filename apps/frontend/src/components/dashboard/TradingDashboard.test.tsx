@@ -43,8 +43,10 @@ describe("PnlCalendar geometry", () => {
       />,
     );
     const wrap = screen.getByTestId("calendar-grid-wrap");
-    const weeks = wrap.querySelectorAll('[role="row"]');
-    expect(weeks.length).toBe(53);
+    expect(screen.getByTestId("weekday-labels").textContent).toBe("SunMonTueWedThuFriSat");
+    const rows = [...Array(7)].map((_, weekday) => screen.getByTestId(`heatmap-row-${weekday}`));
+    expect(rows.length).toBe(7);
+    expect(rows[0].children.length).toBe(54);
     const cell = container.querySelector("[data-date]") as HTMLElement;
     expect(cell.className).toContain("aspect-square");
     if (wrap.scrollWidth > 0 && wrap.clientHeight > 0) {
@@ -97,5 +99,94 @@ describe("dashboard isolation", () => {
     rerender(<EquityChart mode="demo" days={demoDashboard().days} startingCash={1_000_000} />);
     expect(screen.queryByTestId("equity-graph-empty")).toBeNull();
     expect(screen.getByTestId("equity-chart").textContent).toContain("DEMO fixture");
+    const equitySource = readFileSync("src/components/dashboard/EquityChart.tsx", "utf8");
+    expect(equitySource).toContain("<svg");
+    expect(equitySource).not.toContain("lightweight-charts");
+    rerender(<EquityChart mode="demo" days={[]} startingCash={1_000_000} />);
+    expect(screen.getByTestId("equity-demo-empty").textContent).toContain("No demo equity series");
+    expect(screen.queryByRole("img", { name: "Demo cumulative equity" })).toBeNull();
+  });
+
+  it("does not mount Arm/Disarm on the dashboard", () => {
+    const source = readFileSync("src/components/dashboard/TradingDashboard.tsx", "utf8");
+    expect(source).not.toContain("KillSwitchControl");
+    render(<TradingDashboard />);
+    expect(screen.queryByRole("button", { name: "Arm" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Disarm" })).toBeNull();
+    expect(screen.getByTestId("risk-panel").textContent).toContain("Open Risk controls");
+  });
+});
+
+describe("calendar missing series", () => {
+  const calendarProps = {
+    endKey: "2026-10-10",
+    selected: null as string | null,
+    onSelect: () => undefined,
+    pnlBasisLabel: "Net P&L",
+    referenceEquity: 1_000_000,
+  };
+
+  it("hides the heatmap when the daily series is empty", () => {
+    const { rerender } = render(
+      <PnlCalendar
+        {...calendarProps}
+        days={[]}
+        emptyReason="Daily paper P&L series is unavailable. Cells are missing data, not zero P&L."
+      />,
+    );
+    expect(screen.getByTestId("pnl-empty").textContent).toContain("unavailable");
+    expect(screen.queryByTestId("calendar-grid-wrap")).toBeNull();
+    rerender(
+      <PnlCalendar {...calendarProps} days={demoDashboard().days} emptyReason={null} />,
+    );
+    expect(screen.queryByTestId("pnl-empty")).toBeNull();
+    expect(screen.getByTestId("calendar-grid-wrap")).toBeTruthy();
+    expect(screen.getByLabelText("Trading P&L calendar")).toBeTruthy();
+  });
+
+  it("selects a calendar date on click", () => {
+    const onSelect = vi.fn();
+    const snap = demoDashboard();
+    const key = snap.days.find((day) => day.has_activity)?.calendar_date_ist ?? snap.days[5]?.calendar_date_ist;
+    render(
+      <PnlCalendar
+        {...calendarProps}
+        days={snap.days}
+        emptyReason={null}
+        onSelect={onSelect}
+      />,
+    );
+    fireEvent.click(screen.getByTestId(`cell-${key}`));
+    expect(onSelect).toHaveBeenCalledWith(key);
+  });
+
+  it("shows signed P&L on hover for a profit or loss day", () => {
+    const snap = demoDashboard();
+    const day = snap.days.find((item) => {
+      const kind = visualState(item).kind;
+      return (kind === "profit" || kind === "loss") && item.net_pnl_inr != null;
+    });
+    expect(day).toBeTruthy();
+    render(<PnlCalendar {...calendarProps} days={snap.days} emptyReason={null} />);
+    fireEvent.mouseEnter(screen.getByTestId(`cell-${day!.calendar_date_ist}`));
+    const tip = screen.getByTestId("cell-tooltip");
+    expect(tip.textContent).toContain(day!.calendar_date_ist.slice(0, 4));
+    expect(tip.textContent).toMatch(/Daily Net P&L/);
+    expect(tip.textContent).not.toMatch(/Daily Net P&L ₹0\.00/);
+    fireEvent.focus(screen.getByTestId(`cell-${day!.calendar_date_ist}`));
+    expect(screen.getByTestId("cell-tooltip")).toBeTruthy();
+  });
+
+  it("does not treat missing days as zero P&L in the tooltip", () => {
+    const snap = demoDashboard();
+    const missing = snap.days.find((item) => visualState(item).kind === "missing");
+    expect(missing).toBeTruthy();
+    render(<PnlCalendar {...calendarProps} days={snap.days} emptyReason={null} />);
+    fireEvent.mouseEnter(screen.getByTestId(`cell-${missing!.calendar_date_ist}`));
+    const tip = screen.getByTestId("cell-tooltip");
+    expect(tip.textContent).toContain("Daily P&L data unavailable.");
+    expect(tip.textContent).toContain("No data");
+    expect(tip.textContent).not.toContain("Daily Net P&L");
+    expect(tip.textContent).not.toContain("₹0.00");
   });
 });

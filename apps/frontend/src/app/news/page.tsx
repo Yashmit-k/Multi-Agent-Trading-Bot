@@ -1,13 +1,13 @@
 import { NotAvailableState } from "@/components/States";
+import { PageFrame } from "@/components/shell/PageFrame";
 
 export default function NewsPage() {
   return (
-    <div>
-      <h1 className="text-2xl font-bold">News</h1>
+    <PageFrame
+      title="News"
+      description="Per-symbol news lives on each stock page via GET /api/v1/stocks/{symbol}/news."
+    >
       <NotAvailableState feature="Global news list" />
-      <p className="mt-2 text-sm text-[#94A3B8]">
-        Per-symbol news lives on each stock page via GET /api/v1/stocks/{"{symbol}"}/news.
-      </p>
-    </div>
+    </PageFrame>
   );
 }

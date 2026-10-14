@@ -36,9 +36,8 @@ export function AppShell({
     <div className="min-h-screen bg-[#0B0F14] text-[#E6EDF3]">
       <ModeBanner mode={mode} killSwitch={killSwitch} />
       <div className="flex min-h-[calc(100vh-40px)]">
-        <aside className="hidden w-52 shrink-0 border-r border-[#26303C] bg-[#0F141B] md:block">
-          <p className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-[#94A3B8]">Flexi</p>
-          <nav className="flex flex-col gap-0.5 px-2 pb-4 text-sm">
+        <aside className="hidden w-[214px] shrink-0 border-r border-[#26303C] bg-[#0F141B] md:block">
+          <nav className="flex flex-col gap-0.5 px-2 py-4 text-sm">
             {LINKS.map(([href, label]) => {
               const active = pathname === href || pathname.startsWith(`${href}/`);
               return (

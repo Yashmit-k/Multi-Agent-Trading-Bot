@@ -82,6 +82,7 @@ function emptyRealSnapshot(note: string): DashboardSnapshot {
     positions: [],
     orders: [],
     trades: [],
+    market: null,
     status: {
       core: "unavailable",
       trading_mode: "UNKNOWN",
@@ -120,8 +121,19 @@ export async function loadRealDashboard(): Promise<DashboardSnapshot> {
   const nested = port.snapshot;
   const snap =
     nested && typeof nested === "object" ? (nested as Record<string, unknown>) : {};
-  const marketAsOf = overview.ok ? String(overview.value.as_of ?? "") : "";
+  const ov = overview.ok ? overview.value : null;
+  const marketAsOf = ov && typeof ov.as_of === "string" ? ov.as_of : "";
   const tradingDate = marketAsOf ? istDateKeyFromInstant(marketAsOf) : null;
+  const market =
+    ov == null
+      ? null
+      : {
+          as_of: marketAsOf || null,
+          nifty_last: typeof ov.nifty_last === "string" ? ov.nifty_last : null,
+          breadth_advancers: typeof ov.breadth_advancers === "number" ? ov.breadth_advancers : null,
+          breadth_decliners: typeof ov.breadth_decliners === "number" ? ov.breadth_decliners : null,
+          mode: typeof ov.mode === "string" ? ov.mode : null,
+        };
 
   const sessions: PaperSession[] = paper.ok ? activePaperSession(pap) : [];
 
@@ -157,6 +169,7 @@ export async function loadRealDashboard(): Promise<DashboardSnapshot> {
     positions: positions.ok ? (positions.value as Array<Record<string, unknown>>) : [],
     orders: orders.ok ? (orders.value as Array<Record<string, unknown>>) : [],
     trades: trades.ok ? (trades.value as Array<Record<string, unknown>>) : [],
+    market,
     status: {
       core: system.ok ? String(sys.status ?? "ok") : `unavailable (${system.error})`,
       trading_mode: String(sys.trading_mode ?? pap.trading_mode ?? "UNKNOWN"),

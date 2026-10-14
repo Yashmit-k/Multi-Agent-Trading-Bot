@@ -37,6 +37,15 @@ function mockReads(paper: Record<string, unknown> | Error) {
     if (path === "/api/v1/system/status") {
       return { status: "ok", trading_mode: "PAPER", live_enabled: false };
     }
+    if (path === "/api/v1/market/overview") {
+      return {
+        as_of: "2026-10-10T04:30:00Z",
+        nifty_last: "24812.55",
+        breadth_advancers: 32,
+        breadth_decliners: 18,
+        mode: "PAPER",
+      };
+    }
     throw new Error("api_503");
   });
 }
@@ -55,6 +64,7 @@ function stub(): DashboardSnapshot {
     positions: [],
     orders: [],
     trades: [],
+    market: null,
     status: {
       core: "ok",
       trading_mode: "PAPER",
@@ -89,6 +99,11 @@ describe("loadRealDashboard session id", () => {
     const demoIds = demoDashboard().sessions.map((session) => session.session_id);
     expect(demoIds).not.toContain(snapshot.selected_session_id);
     expect(demoDashboard().mode).toBe("demo");
+    expect(snapshot.market?.nifty_last).toBe("24812.55");
+    expect(snapshot.market?.breadth_advancers).toBe(32);
+    expect(snapshot.market?.breadth_decliners).toBe(18);
+    const called = vi.mocked(fetchApi).mock.calls.map((call) => call[0]);
+    expect(called).not.toContain("/api/v1/signals");
   });
 
   it("leaves the session empty when paper status has no session id", async () => {

@@ -22,6 +22,13 @@ describe("checkpoint 4 page contracts", () => {
     expect(source).not.toContain("/api/v1/paper/daily-performance");
   });
 
+  it("keeps the interactive kill switch on the Risk page only", () => {
+    const risk = readFileSync("src/app/risk/page.tsx", "utf8");
+    const dashboard = readFileSync("src/components/dashboard/TradingDashboard.tsx", "utf8");
+    expect(risk).toContain("KillSwitchControl");
+    expect(dashboard).not.toContain("KillSwitchControl");
+  });
+
   it("does not treat backtest performance as paper P&L", () => {
     const dashboard = readFileSync("src/app/dashboard/page.tsx", "utf8");
     const loader = readFileSync("src/lib/load-real-dashboard.ts", "utf8");

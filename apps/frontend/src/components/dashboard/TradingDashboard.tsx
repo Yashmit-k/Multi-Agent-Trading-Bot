@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { EquityChart } from "@/components/dashboard/EquityChart";
-import { KillSwitchControl } from "@/components/KillSwitchControl";
 import { PnlCalendar } from "@/components/dashboard/PnlCalendar";
 import { demoDashboard } from "@/lib/demo/dashboard-fixtures";
 import type { DailyPnlDay, DashboardSnapshot } from "@/lib/daily-pnl";
@@ -167,9 +166,10 @@ export function TradingDashboard() {
             day={sessionDays.find((item) => item.calendar_date_ist === selectedDay)}
             onClear={() => setSelectedDay(null)}
           />
-          <div className="grid gap-4 lg:grid-cols-2">
-            <StatusPanel snapshot={snapshot} />
-            <Tables snapshot={snapshot} />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <MarketPanel snapshot={snapshot} />
+            <ActivityPanel snapshot={snapshot} />
+            <RiskPanel snapshot={snapshot} />
           </div>
         </>
       ) : null}
@@ -281,74 +281,101 @@ function DayDetail({ dateKey, day, onClear }: { dateKey: string | null; day?: Da
   );
 }
 
-function StatusPanel({ snapshot }: { snapshot: DashboardSnapshot }) {
-  const s = snapshot.status;
+function MarketPanel({ snapshot }: { snapshot: DashboardSnapshot }) {
+  const market = snapshot.market;
   return (
-    <section className="rounded-[12px] border border-[#26303C] bg-[#121922] p-4 text-sm">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">Status</h2>
-      <ul className="space-y-1 text-[#E6EDF3]">
-        <li>Core API {s.core}</li>
-        <li>Mode {s.trading_mode} · live_enabled {String(s.live_enabled)}</li>
-        <li>Paper running {s.paper_running === null ? "—" : String(s.paper_running)}</li>
-        <li>
-          {s.kill_switch ? (
-            <KillSwitchControl killSwitch={s.kill_switch} live={s.trading_mode === "LIVE"} />
-          ) : (
-            <>Kill switch —</>
-          )}
-        </li>
-        <li>Zerodha configured {s.zerodha_configured === null ? "—" : String(s.zerodha_configured)}</li>
-        <li>Zerodha authenticated {s.zerodha_authenticated === null ? "—" : String(s.zerodha_authenticated)}</li>
-        <li>{s.worker}</li>
-        <li className="text-[#94A3B8]">{snapshot.contract_note}</li>
-      </ul>
+    <section data-testid="market-panel" className="rounded-[12px] border border-[#26303C] bg-[#121922] p-4 text-sm">
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">Market</h2>
+      {market == null ? (
+        <p className="text-[#94A3B8]">Market overview is unavailable.</p>
+      ) : (
+        <ul className="space-y-1 text-[#E6EDF3]">
+          <li>
+            NIFTY proxy {market.nifty_last ?? "—"}
+          </li>
+          <li>
+            Breadth {market.breadth_advancers ?? "—"}/{market.breadth_decliners ?? "—"}
+          </li>
+          <li className="text-[#94A3B8]">
+            as_of {market.as_of ? formatIstInstant(market.as_of) : "unavailable"}
+            {market.mode ? ` · mode ${market.mode}` : ""}
+          </li>
+          <li className="text-xs text-[#94A3B8]">Mean of stored member closes from GET /api/v1/market/overview. Not an official Nifty print.</li>
+        </ul>
+      )}
     </section>
   );
 }
 
-function Tables({ snapshot }: { snapshot: DashboardSnapshot }) {
+function ActivityPanel({ snapshot }: { snapshot: DashboardSnapshot }) {
+  const empty = snapshot.orders.length === 0 && snapshot.trades.length === 0;
   return (
-    <section className="rounded-[12px] border border-[#26303C] bg-[#121922] p-4 text-sm">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">Positions and orders</h2>
-      {snapshot.positions.length === 0 ? (
-        <p className="text-[#94A3B8]">No open positions.</p>
+    <section data-testid="activity-panel" className="rounded-[12px] border border-[#26303C] bg-[#121922] p-4 text-sm">
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">Activity</h2>
+      {empty ? (
+        <p className="text-[#94A3B8]">No recent orders or executions.</p>
       ) : (
-        <table className="mb-3 w-full font-mono tabular-nums">
-          <thead>
-            <tr className="text-left text-[#94A3B8]">
-              <th>Symbol</th>
-              <th>Qty</th>
-              <th>Unrealized</th>
-            </tr>
-          </thead>
-          <tbody>
-            {snapshot.positions.map((row) => (
-              <tr key={String(row.symbol)}>
-                <td>{String(row.symbol)}</td>
-                <td>{String(row.quantity)}</td>
-                <td>{row.unrealized_pnl == null ? "—" : String(row.unrealized_pnl)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <>
+          {snapshot.trades.length === 0 ? (
+            <p className="text-[#94A3B8]">No executions.</p>
+          ) : (
+            <ul className="mb-3 space-y-1 font-mono tabular-nums">
+              {snapshot.trades.slice(0, 8).map((row, index) => (
+                <li key={String(row.execution_id ?? index)}>
+                  {String(row.symbol)} {String(row.side ?? "")} {String(row.quantity ?? "")}
+                </li>
+              ))}
+            </ul>
+          )}
+          {snapshot.orders.length === 0 ? (
+            <p className="text-[#94A3B8]">No orders.</p>
+          ) : (
+            <ul className="space-y-1">
+              {snapshot.orders.slice(0, 8).map((row) => {
+                const status = String(row.status ?? "");
+                const review = status === "legacy_order_requires_review";
+                return (
+                  <li key={String(row.order_id)}>
+                    {String(row.symbol)} {status}
+                    {review ? " — legacy review, not a pending fill" : ""}
+                    {status === "CANCELLED" ? " (cancelled; not a completed trade)" : ""}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
       )}
-      {snapshot.orders.length === 0 ? (
-        <p className="text-[#94A3B8]">No orders.</p>
-      ) : (
-        <ul className="space-y-1">
-          {snapshot.orders.map((row) => {
-            const status = String(row.status ?? "");
-            const review = status === "legacy_order_requires_review";
-            return (
-              <li key={String(row.order_id)}>
-                {String(row.symbol)} {status}
-                {review ? " — legacy review, not a pending fill" : ""}
-                {status === "CANCELLED" ? " (cancelled; not a completed trade)" : ""}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      <div className="mt-3 flex gap-3">
+        <Link href="/orders" className="text-sm text-cyan-400 hover:underline">
+          Orders
+        </Link>
+        <Link href="/positions" className="text-sm text-cyan-400 hover:underline">
+          Positions
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function RiskPanel({ snapshot }: { snapshot: DashboardSnapshot }) {
+  const s = snapshot.status;
+  return (
+    <section data-testid="risk-panel" className="rounded-[12px] border border-[#26303C] bg-[#121922] p-4 text-sm">
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">Risk</h2>
+      <ul className="space-y-1 text-[#E6EDF3]">
+        <li>
+          Kill switch {s.kill_switch ?? "—"}
+        </li>
+        <li>Paper running {s.paper_running === null ? "—" : String(s.paper_running)}</li>
+        <li>
+          Mode {s.trading_mode} · live_enabled {String(s.live_enabled)}
+        </li>
+        <li>Core API {s.core}</li>
+      </ul>
+      <Link href="/risk" className="mt-3 inline-block text-sm text-cyan-400 hover:underline">
+        Open Risk controls
+      </Link>
     </section>
   );
 }

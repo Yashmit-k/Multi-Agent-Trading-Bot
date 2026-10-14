@@ -51,6 +51,13 @@ export type DashboardSnapshot = {
   positions: Array<Record<string, unknown>>;
   orders: Array<Record<string, unknown>>;
   trades: Array<Record<string, unknown>>;
+  market: {
+    as_of: string | null;
+    nifty_last: string | null;
+    breadth_advancers: number | null;
+    breadth_decliners: number | null;
+    mode: string | null;
+  } | null;
   status: {
     core: string;
     trading_mode: string;
