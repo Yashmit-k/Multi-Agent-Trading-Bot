@@ -33,11 +33,35 @@ export async function fetchApi<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function postApi<T>(path: string, body: unknown): Promise<T> {
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public detail: unknown,
+  ) {
+    super(typeof detail === "string" ? detail : `api_${status}`);
+  }
+}
+
+// A readable message from a failed write: the server's detail, joined field errors, or the status.
+export function errorText(error: unknown): string {
+  if (error instanceof ApiError) {
+    const detail = error.detail as { errors?: unknown } | string | null;
+    if (typeof detail === "string") return detail.replaceAll("_", " ");
+    if (detail && typeof detail === "object" && "errors" in detail) {
+      const errors = detail.errors;
+      if (Array.isArray(errors)) return errors.join("; ");
+      if (errors && typeof errors === "object") return Object.entries(errors).map(([key, value]) => `${key}: ${value}`).join("; ");
+    }
+    return `request failed (${error.status})`;
+  }
+  return error instanceof Error ? error.message : "unknown error";
+}
+
+export async function postApi<T>(path: string, body: unknown, options: { timeoutMs?: number } = {}): Promise<T> {
   const headers: HeadersInit = { "Content-Type": "application/json", ...authHeaders() };
   const response = await fetch(apiUrl(path), {
     method: "POST",
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(options.timeoutMs ?? 15000),
     headers,
     body: JSON.stringify(body),
   });
@@ -45,7 +69,13 @@ export async function postApi<T>(path: string, body: unknown): Promise<T> {
     throw new Error("not_implemented");
   }
   if (!response.ok) {
-    throw new Error(`api_${response.status}`);
+    let detail: unknown = null;
+    try {
+      detail = ((await response.json()) as { detail?: unknown }).detail ?? null;
+    } catch {
+      detail = null;
+    }
+    throw new ApiError(response.status, detail);
   }
   return (await response.json()) as T;
 }

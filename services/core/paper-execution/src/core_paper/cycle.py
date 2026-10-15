@@ -21,6 +21,7 @@ from contracts.schemas.order import Order
 from contracts.schemas.portfolio import PortfolioSnapshot
 from contracts.schemas.position import Position
 from core_db.repository import DAILY_ENTRY_LIMIT, CoreRepository
+from core_risk.settings import DEFAULTS as DEFAULT_SETTINGS, RiskSettings, parse_settings
 from core_decision import build_proposal, proposal_id_for
 from core_fusion import fuse
 from core_paper.costs import CostSchedule, fee_on, slipped_price
@@ -101,6 +102,7 @@ def run_paper_cycle(
         _settle_open_orders(repository, publisher, costs, starting_cash, now=moment)
         return 0
     written = 0
+    settings = load_risk_settings(repository)
     blocked = _new_entry_block(
         repository,
         moment,
@@ -109,6 +111,7 @@ def run_paper_cycle(
         require_universe_fresh=require_universe_fresh,
         broker_authenticated=broker_authenticated,
         allow_test_extension=allow_test_extension,
+        settings=settings,
     )
     if blocked is not None:
         logger.info("new_entries_blocked reason=%s", blocked)
@@ -147,7 +150,7 @@ def run_paper_cycle(
                     continue  # one position per stock: no adding to an existing holding
                 if proposal.side == Side.SELL:
                     proposal = proposal.model_copy(update={"quantity": held})  # a signal exit sells the whole holding
-                proposal = _sized(proposal, repository.available_cash(starting_cash), costs)
+                proposal = _with_brackets(_sized(proposal, repository.available_cash(starting_cash), costs, settings.max_order_notional), settings)
                 proposal = proposal.model_copy(update={"metadata": {**proposal.metadata, "stops_monitored": True, "same_bar_exit": "stop_first", "decided_at": moment.isoformat()}})
                 if repository.insert_proposal(proposal):
                     _publish(publisher, EventType.DECISION_CREATED, f"decision.created:{proposal.proposal_id}", as_of, proposal.proposal_id, proposal)
@@ -161,7 +164,8 @@ def run_paper_cycle(
                     cash=repository.available_cash(starting_cash),
                     held_quantity=repository.held_quantity(proposal.symbol),
                     timestamp=as_of,
-                    portfolio=portfolio_context(repository, starting_cash, moment) if portfolio_limits else None,
+                    max_notional=settings.max_order_notional,
+                    portfolio=portfolio_context(repository, starting_cash, moment, settings) if portfolio_limits else None,
                 )
                 if repository.insert_risk_decision(decision):
                     event_type = EventType.RISK_APPROVED if decision.status == RiskStatus.APPROVED else EventType.RISK_REJECTED
@@ -177,7 +181,7 @@ def run_paper_cycle(
                 _queue(repository, proposal, as_of, reason="signal", fill_at="next_open")
                 continue
             before = {item.order_id for item in repository.list_orders()}
-            queue_entry(repository, proposal, as_of, entry_window=extension, placed_at=moment)
+            queue_entry(repository, proposal, as_of, entry_window=extension, placed_at=moment, cap=settings.max_order_notional, daily_limit=settings.daily_entry_limit)
             queued = [item for item in repository.list_orders() if item.order_id not in before]
             created_orders += len(queued)
             for order in queued:
@@ -192,7 +196,24 @@ def run_paper_cycle(
 _PENDING = {OrderStatus.CREATED, OrderStatus.VALIDATED, OrderStatus.RISK_APPROVED, OrderStatus.SUBMITTED, OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED}
 
 
-def portfolio_context(repository: CoreRepository, starting_cash: Decimal, moment: datetime) -> PortfolioContext:
+def load_risk_settings(repository: CoreRepository) -> RiskSettings:
+    """The user's saved paper risk settings over the defaults; a bad stored value falls back to its default."""
+    stored = repository.get_setting("risk")
+    return parse_settings(stored["payload"] if stored else None, strict=False)
+
+
+def _with_brackets(proposal, settings: RiskSettings):
+    """Stop and target from the user's percentages, around the same entry price as before."""
+    if proposal.side != Side.BUY or (settings.stop_loss_pct == DEFAULT_SETTINGS.stop_loss_pct and settings.take_profit_pct == DEFAULT_SETTINGS.take_profit_pct):
+        return proposal
+    entry = proposal.entry_price
+    cent = Decimal("0.01")
+    stop = (entry * (1 - settings.stop_loss_pct / 100)).quantize(cent)
+    target = (entry * (1 + settings.take_profit_pct / 100)).quantize(cent)
+    return proposal.model_copy(update={"stop_loss": stop, "take_profit": target, "metadata": {**proposal.metadata, "brackets": "user_settings"}})
+
+
+def portfolio_context(repository: CoreRepository, starting_cash: Decimal, moment: datetime, settings: RiskSettings | None = None) -> PortfolioContext:
     """The active book for portfolio risk checks: held shares at cost plus BUYs queued but not filled."""
     exposure: dict[str, Decimal] = {}
     for position in repository.list_positions():
@@ -202,7 +223,17 @@ def portfolio_context(repository: CoreRepository, starting_cash: Decimal, moment
         if order.side == Side.BUY and order.status in _PENDING:
             price = order.limit_price or Decimal(str(order.metadata.get("reference_price") or "0"))
             exposure[order.symbol] = exposure.get(order.symbol, Decimal("0")) + price * order.quantity
-    return PortfolioContext(starting_cash=starting_cash, exposure=exposure, entries_today=repository.daily_entry_count(moment))
+    limits = settings or DEFAULT_SETTINGS
+    return PortfolioContext(
+        starting_cash=starting_cash,
+        exposure=exposure,
+        entries_today=repository.daily_entry_count(moment),
+        max_positions=limits.max_open_positions,
+        max_per_sector=limits.max_per_sector,
+        max_exposure_fraction=limits.max_exposure_fraction,
+        max_per_stock=limits.max_per_stock,
+        daily_entry_limit=limits.daily_entry_limit,
+    )
 
 
 class CycleRefused(RuntimeError):
@@ -222,8 +253,12 @@ def _new_entry_block(
     require_universe_fresh: bool,
     broker_authenticated: bool,
     allow_test_extension: bool,
+    settings: RiskSettings | None = None,
 ) -> str | None:
     """Why this cycle must not submit a new buy. Settlement has already run."""
+    limits = settings or DEFAULT_SETTINGS
+    if not limits.auto_entries:
+        return "auto_entries_off"
     if not broker_authenticated:
         return "broker_unauthenticated"
     if enforce_entry_window:
@@ -236,7 +271,7 @@ def _new_entry_block(
             require_fresh_constituents(repository, now)
         except CycleRefused as exc:
             return str(exc)
-    if repository.daily_entry_count(now) >= DAILY_ENTRY_LIMIT:
+    if repository.daily_entry_count(now) >= limits.daily_entry_limit:
         return "daily_entry_cap"
     return None
 
@@ -288,12 +323,12 @@ def require_entry_window(now: datetime, *, mode: TradingMode, allow_extension: b
         raise CycleRefused(f"outside {label.replace('-', ' inclusive to ')} exclusive IST")
 
 
-def _sized(proposal, cash: Decimal, schedule: CostSchedule):
+def _sized(proposal, cash: Decimal, schedule: CostSchedule, max_notional: Decimal = MAX_NOTIONAL):
     from core_paper.backtest import _shares
 
     if proposal.side != Side.BUY:
         return proposal
-    quantity = _shares(cash, proposal.entry_price, MAX_NOTIONAL, schedule)
+    quantity = _shares(cash, proposal.entry_price, max_notional, schedule)
     if quantity < 1:
         return proposal
     return proposal.model_copy(

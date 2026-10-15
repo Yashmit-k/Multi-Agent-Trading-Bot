@@ -171,6 +171,9 @@ services:
       API_INTERNAL_BASE_URL: http://core-api:8000
       CORE_API_TOKEN: ${CORE_API_TOKEN}
       FRONTEND_ALLOW_POST_PATHS: ${FRONTEND_ALLOW_POST_PATHS:-}
+      # Operator sign-in for settings, manual paper orders and strategies. Unset = read-only site.
+      OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:-}
+      OPERATOR_SESSION_SECRET: ${OPERATOR_SESSION_SECRET:-}
       FUSION_EXCLUDED_AGENTS: ${FUSION_EXCLUDED_AGENTS:-fundamental,valuation,earnings,ml}
       PAPER_ENTRY_END: ${PAPER_ENTRY_END:-15:15}
     depends_on:

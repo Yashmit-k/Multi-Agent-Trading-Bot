@@ -55,7 +55,9 @@ def test_fees_are_reserved_above_the_notional_cap() -> None:
 
 
 def test_a_larger_cap_or_missing_schedule_cannot_raise_the_limit() -> None:
-    assert affordable_quantity(Decimal("1000000"), Decimal("100"), ZERODHA_EQUITY_RI, Decimal("100000")) == 200
+    # A user cap is honoured up to the hard ceiling (Rs 1,00,000); asking for more cannot raise it.
+    assert affordable_quantity(Decimal("1000000"), Decimal("100"), ZERODHA_EQUITY_RI, None) == 200
+    assert affordable_quantity(Decimal("1000000"), Decimal("100"), ZERODHA_EQUITY_RI, Decimal("250000")) == 1000
     with pytest.raises(Exception):
         affordable_quantity(Decimal("1000000"), Decimal("100"), None, Decimal("100000"))
 
@@ -65,7 +67,7 @@ def test_queue_entry_persists_the_limit_price_times_quantity(repository: CoreRep
     _daily(repository, "RELIANCE", Decimal("99.76"))
     proposal = _proposal("RELIANCE", DECISION).model_copy(update={"quantity": 100000, "entry_price": Decimal("99.76")})
     repository.insert_proposal(proposal)
-    order = queue_entry(repository, proposal, DECISION, schedule=ZERODHA_EQUITY_RI, cap=Decimal("100000"))
+    order = queue_entry(repository, proposal, DECISION, schedule=ZERODHA_EQUITY_RI)
     assert order is not None
     assert order.status == OrderStatus.OPEN
     assert order.limit_price is not None

@@ -589,6 +589,242 @@ def create_app(
         except OperatorRejected as exc:
             raise HTTPException(status_code=409, detail=exc.code) from exc
 
+    class RiskSettingsBody(BaseModel):
+        values: dict[str, Any]
+        operator: str = "operator"
+
+    @app.get("/api/v1/settings/risk")
+    def get_risk_settings(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        from core_paper.cycle import load_risk_settings
+        from core_risk.settings import describe_bounds
+
+        stored = repository.get_setting("risk")
+        return {
+            "settings": load_risk_settings(repository).as_json(),
+            "bounds": describe_bounds(),
+            "updated_at": stored["updated_at"] if stored else None,
+            "updated_by": stored["updated_by"] if stored else None,
+        }
+
+    @app.post("/api/v1/settings/risk")
+    def save_risk_settings(body: RiskSettingsBody, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        from core_risk.settings import SettingsError, parse_settings
+
+        stored = repository.get_setting("risk")
+        merged = {**(stored["payload"] if stored else {}), **body.values}
+        try:
+            parsed = parse_settings(merged)
+        except SettingsError as exc:
+            raise HTTPException(status_code=422, detail={"errors": exc.errors}) from exc
+        repository.save_setting("risk", parsed.as_json(), updated_by=body.operator[:64] or "operator", now=datetime.now(timezone.utc))
+        return get_risk_settings(None)
+
+    class ManualOrderBody(BaseModel):
+        symbol: str
+        side: str
+        quantity: int | None = None
+        limit_price: Decimal | None = None
+        override_limits: bool = False
+        note: str = ""
+        operator: str = "operator"
+
+    def _manual(body: ManualOrderBody) -> dict[str, object]:
+        from contracts.enums import Side
+        from core_paper.manual import ManualOrderRejected, place_manual_order
+
+        try:
+            side = Side(body.side.upper())
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="side_must_be_BUY_or_SELL") from exc
+        try:
+            return place_manual_order(
+                repository,
+                app.state.publisher,
+                symbol=body.symbol,
+                side=side,
+                quantity=body.quantity,
+                limit_price=body.limit_price,
+                override_limits=body.override_limits,
+                operator=body.operator[:64] or "operator",
+                note=body.note,
+                now=datetime.now(timezone.utc),
+            )
+        except ManualOrderRejected as exc:
+            raise HTTPException(status_code=409, detail=exc.code) from exc
+
+    @app.post("/api/v1/paper/orders/manual")
+    def manual_order(body: ManualOrderBody, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        return _manual(body)
+
+    class CloseBody(BaseModel):
+        note: str = ""
+        operator: str = "operator"
+
+    @app.post("/api/v1/paper/positions/{symbol}/close")
+    def close_position(symbol: str, body: CloseBody, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        return _manual(ManualOrderBody(symbol=symbol, side="SELL", note=body.note or "manual close", operator=body.operator))
+
+    @app.post("/api/v1/paper/orders/{order_id}/cancel")
+    def cancel_active_order(order_id: str, body: CloseBody, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        book = repository.active_paper_session()
+        order = next((item for item in repository.list_orders() if item.order_id == order_id), None)
+        if book is None or order is None:
+            raise HTTPException(status_code=404, detail="order_not_found")
+        try:
+            return cancel_order(
+                repository,
+                session_id=book.session_id,
+                order_id=order_id,
+                operator_id=body.operator[:64] or "operator",
+                reason=body.note or "manual cancel",
+                expected_status=order.status.value,
+            )
+        except OperatorRejected as exc:
+            raise HTTPException(status_code=409, detail=exc.code) from exc
+
+    # --- strategy lab and watchlist -----------------------------------------------------------
+
+    def _load_bars(symbol: str, timeframe: str, start: datetime, end: datetime):  # type: ignore[no-untyped-def]
+        from core_api.strategy_lab import Bars
+        import numpy as np
+
+        rows = repository.ohlcv(symbol, timeframe, start, end)
+        if not rows:
+            return None
+        columns = list(zip(*rows))
+        return Bars(list(columns[0]), *(np.array(column, dtype=float) for column in columns[1:]))
+
+    def _universe() -> list[str]:
+        members = repository.members_at(datetime.now(timezone.utc))
+        return sorted(item.symbol for item in members)
+
+    def _definition(raw: dict[str, Any]):  # type: ignore[no-untyped-def]
+        from core_api.strategy_lab import StrategyDefinition
+
+        try:
+            return StrategyDefinition.model_validate(raw)
+        except ValidationError as exc:
+            raise HTTPException(status_code=422, detail={"errors": [f"{'.'.join(str(p) for p in e['loc'])}: {e['msg']}" for e in exc.errors()]}) from exc
+
+    def _run(definition, start: str, end: str) -> dict[str, object]:  # type: ignore[no-untyped-def]
+        from core_api.strategy_lab import BacktestRequest, run_strategy
+
+        try:
+            request = BacktestRequest.model_validate({"start": start, "end": end})
+        except ValidationError as exc:
+            raise HTTPException(status_code=422, detail="invalid_dates") from exc
+        bench_start = datetime.combine(request.start, datetime.min.time(), _IST).astimezone(timezone.utc)
+        bench_end = datetime.combine(request.end, datetime.max.time(), _IST).astimezone(timezone.utc)
+        try:
+            return run_strategy(definition, request, _load_bars, _universe(), benchmark=_load_bars("NIFTY50", "1d", bench_start, bench_end))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.get("/api/v1/strategies/catalog")
+    def strategy_catalog(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        from core_api.strategy_lab import MAX_5M_DAYS, MAX_5M_SYMBOLS, TEMPLATES, operand_catalog
+
+        return {"operands": operand_catalog(), "templates": TEMPLATES, "universe": _universe(), "limits": {"max_5m_symbols": MAX_5M_SYMBOLS, "max_5m_days": MAX_5M_DAYS}}
+
+    @app.get("/api/v1/strategies")
+    def list_user_strategies(_: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
+        return repository.list_strategies()
+
+    class StrategyBody(BaseModel):
+        strategy_id: str | None = None
+        definition: dict[str, Any]
+
+    @app.post("/api/v1/strategies")
+    def save_user_strategy(body: StrategyBody, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        definition = _definition(body.definition)
+        strategy_id = body.strategy_id or f"strat-{uuid4().hex[:12]}"
+        repository.save_strategy(strategy_id, definition.name, definition.model_dump(mode="json"), datetime.now(timezone.utc))
+        return repository.get_strategy(strategy_id) or {}
+
+    @app.get("/api/v1/strategies/{strategy_id}")
+    def get_user_strategy(strategy_id: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        found = repository.get_strategy(strategy_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail="strategy_not_found")
+        runs = [run for run in repository.list_backtests() if run.get("kind") == "strategy_lab" and run.get("strategy_id") == strategy_id]
+        found["runs"] = [
+            {"backtest_id": run["backtest_id"], "start": run["start"], "end": run["end"], "metrics": run["metrics"], "created_at": run.get("created_at")}
+            for run in runs
+        ]
+        return found
+
+    @app.post("/api/v1/strategies/{strategy_id}/delete")
+    def delete_user_strategy(strategy_id: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        return {"deleted": repository.delete_strategy(strategy_id)}
+
+    class RunBody(BaseModel):
+        start: str
+        end: str
+        definition: dict[str, Any] | None = None
+
+    @app.post("/api/v1/strategies/{strategy_id}/backtest")
+    def backtest_user_strategy(strategy_id: str, body: RunBody, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        found = repository.get_strategy(strategy_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail="strategy_not_found")
+        report = _run(_definition(found["definition"]), body.start, body.end)
+        backtest_id = f"lab-{uuid4().hex[:12]}"
+        report |= {"strategy_id": strategy_id, "created_at": datetime.now(timezone.utc).isoformat()}
+        repository.insert_backtest(backtest_id, f"live-db:{strategy_id}", report)
+        return report | {"backtest_id": backtest_id}
+
+    @app.post("/api/v1/strategies/preview/backtest")
+    def preview_backtest(body: RunBody, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        if body.definition is None:
+            raise HTTPException(status_code=422, detail="definition_required")
+        return _run(_definition(body.definition), body.start, body.end)
+
+    @app.get("/api/v1/strategies/{strategy_id}/scan")
+    def scan_user_strategy(strategy_id: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        from core_api.strategy_lab import evaluate
+
+        found = repository.get_strategy(strategy_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail="strategy_not_found")
+        definition = _definition(found["definition"])
+        now = datetime.now(timezone.utc)
+        lookback = timedelta(days=500) if definition.timeframe == "1d" else timedelta(days=10)
+        symbols = _universe() if definition.symbols == ["ALL"] else definition.symbols
+        hits = []
+        for symbol in symbols:
+            bars = _load_bars(symbol, definition.timeframe, now - lookback, now)
+            if bars is None or len(bars.close) < 2:
+                continue
+            if evaluate(bars, definition.entry, mode="all")[-1]:
+                hits.append({"symbol": symbol, "bar_end": bars.end[-1].isoformat(), "close": round(float(bars.close[-1]), 2)})
+        return {"strategy_id": strategy_id, "as_of": now.isoformat(), "matches": hits, "scanned": len(symbols)}
+
+    @app.get("/api/v1/watchlist")
+    def watchlist(_: Annotated[None, Depends(require_user)], min_score: int = 7) -> dict[str, object]:
+        from core_api.watchlist import build_watchlist
+
+        now = datetime.now(timezone.utc)
+        cached = getattr(app.state, "watchlist_cache", None)
+        if cached and (now - cached[0]) < timedelta(minutes=10):
+            report = cached[1]
+        else:
+            # Agents' view: mean of each fused agent's newest SWING signal x confidence over the last 3 days.
+            latest: dict[tuple[str, str], tuple[str, float]] = {}
+            for signal_id, agent, horizon, symbol, stamp, value, confidence in repository.signal_points_since(now - timedelta(days=3)):
+                if horizon != "SWING" or agent in {"fundamental", "valuation", "earnings", "ml"}:
+                    continue
+                key = (symbol, agent)
+                if key not in latest or str(stamp) > latest[key][0]:
+                    latest[key] = (str(stamp), float(value) * float(confidence))
+            grouped: dict[str, list[float]] = {}
+            for (symbol, _agent), (_, weighted) in latest.items():
+                grouped.setdefault(symbol, []).append(weighted)
+            views = {symbol: sum(values) / len(values) for symbol, values in grouped.items()}
+            report = build_watchlist(_universe(), lambda symbol: _load_bars(symbol, "1d", now - timedelta(days=900), now), views)
+            app.state.watchlist_cache = (now, report)
+        threshold = max(0, min(min_score, 10))
+        return {**report, "min_score": threshold, "watchlist": [row for row in report["all"] if int(row["score"]) >= threshold]}
+
     @app.get("/api/v1/zerodha/status")
     def zerodha_status(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
         times = _token_times(repository, datetime.now(timezone.utc))
@@ -655,7 +891,7 @@ def create_app(
 
     @app.get("/api/v1/backtests")
     def list_backtests(_: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
-        return repository.list_backtests()
+        return [run for run in repository.list_backtests() if run.get("kind") != "strategy_lab"]
 
     @app.get("/api/v1/backtests/{backtest_id}")
     def get_backtest(backtest_id: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
@@ -680,7 +916,7 @@ def create_app(
 
     @app.get("/api/v1/performance")
     def latest_performance(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
-        runs = repository.list_backtests()
+        runs = [run for run in repository.list_backtests() if run.get("kind") != "strategy_lab"]
         if not runs:
             raise HTTPException(status_code=404, detail="no_backtest")
         return runs[0]["performance"]

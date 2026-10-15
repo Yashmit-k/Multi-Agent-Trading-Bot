@@ -2,6 +2,8 @@ import { fetchApi } from "@/lib/api";
 import { ErrorState } from "@/components/States";
 import { PageFrame } from "@/components/shell/PageFrame";
 import { Empty, SymbolLink, Table, Td } from "@/components/ui";
+import { RowAction } from "@/components/operator/ManualOrder";
+import { OperatorLogin } from "@/components/operator/OperatorGate";
 import { inr, istTime, price } from "@/lib/format";
 
 export const metadata = { title: "Positions · StockX" };
@@ -22,11 +24,14 @@ export default async function PositionsPage() {
   try {
     const rows = await fetchApi<Position[]>("/api/v1/positions");
     return (
-      <PageFrame title="Positions" description="Open paper positions in the active session. Long only: the risk engine rejects short sales.">
+      <PageFrame title="Positions" description="Open paper positions in the active session. Long only: the risk engine rejects short sales. The operator can close any position.">
+        <div className="mb-3">
+          <OperatorLogin compact />
+        </div>
         {rows.length === 0 ? (
           <Empty>No open positions. A position opens when a paper BUY order fills on a later 5-minute bar.</Empty>
         ) : (
-          <Table head={["Symbol", "Qty", "Avg price (₹)", "Mark (₹)", "Value", "Unrealized", "Realized", "Opened (IST)"]} minWidth={820}>
+          <Table head={["Symbol", "Qty", "Avg price (₹)", "Mark (₹)", "Value", "Unrealized", "Realized", "Opened (IST)", ""]} minWidth={820}>
             {rows.map((row) => {
               const unrealized = Number(row.unrealized_pnl);
               return (
@@ -41,6 +46,11 @@ export default async function PositionsPage() {
                   <Td className={`tabular-nums ${unrealized >= 0 ? "text-[#22C55E]" : "text-[#EF4444]"}`}>{inr(row.unrealized_pnl)}</Td>
                   <Td className="tabular-nums">{inr(row.realized_pnl)}</Td>
                   <Td className="whitespace-nowrap text-xs text-[#94A3B8]">{istTime(row.opened_at)}</Td>
+                  <Td>
+                    {row.quantity > 0 ? (
+                      <RowAction path={`/api/v1/paper/positions/${encodeURIComponent(row.symbol)}/close`} label="Close" confirmText={`Sell all ${row.quantity} ${row.symbol} at the next 5-minute open (paper)?`} body={{ note: "closed from Positions page" }} />
+                    ) : null}
+                  </Td>
                 </tr>
               );
             })}
