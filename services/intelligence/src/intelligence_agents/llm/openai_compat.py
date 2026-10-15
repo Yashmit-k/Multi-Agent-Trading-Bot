@@ -61,8 +61,8 @@ class OpenAICompatibleProvider:
         # Reasoning models spend output tokens before the JSON answer, so they need a larger cap.
         self._max_output_tokens = max_output_tokens
         self._json_mode = json_mode
-        # Only sent when set; "none" or empty omits it for non-reasoning models.
-        self._reasoning_effort = "" if reasoning_effort in {"", "none"} else reasoning_effort
+        # Sent as given ("none" turns Gemini thinking off); empty or "omit" leaves it out for models that reject it.
+        self._reasoning_effort = "" if reasoning_effort in {"", "omit"} else reasoning_effort
 
     def _pace(self) -> None:
         """Space requests at least min_interval apart to stay under a provider's per-minute limit."""

@@ -111,7 +111,7 @@ services:
       LLM_MAX_OUTPUT_TOKENS: ${LLM_MAX_OUTPUT_TOKENS:-600}
       # Groq's JSON validator rejects reasoning-model output, so JSON mode is off by default.
       LLM_JSON_MODE: ${LLM_JSON_MODE:-false}
-      # For reasoning models such as openai/gpt-oss-20b; set "none" for models that reject it.
+      # "none" disables Gemini thinking (fastest); "low" suits gpt-oss; "omit" leaves the field out.
       LLM_REASONING_EFFORT: ${LLM_REASONING_EFFORT:-low}
     depends_on:
       core-api:
