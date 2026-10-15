@@ -11,8 +11,9 @@ from decimal import Decimal
 from contracts.enums import RiskStatus, Side, TradingMode
 from contracts.schemas.risk_decision import RiskCheck, RiskDecision
 from contracts.schemas.trade_proposal import TradeProposal
+from core_risk.portfolio import PortfolioContext
 
-RISK_VERSION = "1.0.0"
+RISK_VERSION = "1.1.0"
 MAX_NOTIONAL = Decimal("20000")
 
 
@@ -25,7 +26,9 @@ def assess(
     held_quantity: int,
     timestamp: datetime,
     max_notional: Decimal | None = None,
+    portfolio: PortfolioContext | None = None,
 ) -> RiskDecision:
+    """Six order checks always; five portfolio checks on BUYs when the paper book is supplied."""
     bound = MAX_NOTIONAL if max_notional is None else max_notional
     notional = proposal.entry_price * proposal.quantity
     checks = [
@@ -40,6 +43,8 @@ def assess(
         ),
         _check("stop_and_target_side", _brackets_ok(proposal), "stop or target is on the wrong side of entry"),
     ]
+    if portfolio is not None and proposal.side == Side.BUY:
+        checks += [_check(name, passed, failure) for name, passed, failure in portfolio.checks(proposal.symbol, notional)]
     failed = [check for check in checks if not check.passed]
     approved = not failed
     return RiskDecision(
@@ -52,7 +57,7 @@ def assess(
         rejection_reason=None if approved else "; ".join(check.detail for check in failed),
         approved_quantity=proposal.quantity if approved else 0,
         approved_price=proposal.entry_price if approved else None,
-        metadata={"kill_switch": "noop"},
+        metadata={"kill_switch": "noop", "portfolio_checks": portfolio is not None and proposal.side == Side.BUY},
     )
 
 

@@ -176,7 +176,8 @@ def test_two_buys_cannot_reserve_the_same_cash(repository: CoreRepository) -> No
     _daily(repository, "TCS", Decimal("442"))
     _store(repository, _signal(signal_id="sig-rel", timestamp=DECISION, valid_until=DECISION + timedelta(days=2)))
     _store(repository, _signal(signal_id="sig-tcs", symbol="TCS", timestamp=DECISION, valid_until=DECISION + timedelta(days=2)))
-    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=cash, now=DECISION, enforce_entry_window=False)
+    # This book holds cash for one order only; the 30% exposure cap would block both buys, so it is off here.
+    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=cash, now=DECISION, enforce_entry_window=False, portfolio_limits=False)
     orders = [item for item in repository.list_orders() if item.status == OrderStatus.OPEN]
     assert len(orders) == 1
     assert repository.available_cash(cash) < cash
