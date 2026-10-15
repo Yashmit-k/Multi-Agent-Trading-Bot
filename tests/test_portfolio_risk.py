@@ -79,3 +79,39 @@ def test_sells_and_callers_without_a_book_are_unchanged() -> None:
 
 def test_unknown_stocks_are_their_own_sector() -> None:
     assert sector_of("LT") == "OWN:LT" and sector_of("INFY") == "NIFTY IT"
+
+
+def test_positions_and_portfolio_are_marked_to_the_latest_bar(repository) -> None:
+    from datetime import timedelta
+
+    from fastapi.testclient import TestClient
+
+    from contracts.enums import Exchange, Timeframe
+    from contracts.schemas.market import Candle
+    from contracts.schemas.portfolio import PortfolioSnapshot
+    from contracts.schemas.position import Position
+    from core_api.app import create_app
+    from core_api.settings import Settings
+    from core_ingestion.service import MemoryEventPublisher
+
+    repository.open_paper_session(CASH)
+    repository.save_position(Position(symbol="INFY", quantity=10, average_price=Decimal("1000"), market_price=Decimal("1000"),
+                                      market_value=Decimal("10000"), realized_pnl=Decimal("0"), unrealized_pnl=Decimal("0"),
+                                      opened_at=NOW, updated_at=NOW))
+    repository.insert_snapshot("s1", PortfolioSnapshot(timestamp=NOW, cash=Decimal("989990"), equity=Decimal("999990"),
+                                                       market_value=Decimal("10000"), gross_exposure=Decimal("10000"), net_exposure=Decimal("10000"),
+                                                       realized_pnl=Decimal("-10"), unrealized_pnl=Decimal("0"), total_pnl=Decimal("-10"), drawdown=Decimal("0")))
+    repository.upsert_candles([Candle(symbol="INFY", exchange=Exchange.NSE, timeframe=Timeframe.M5, open=Decimal("1040"), high=Decimal("1052"),
+                                      low=Decimal("1039"), close=Decimal("1050"), volume=100, start=NOW, end=NOW + timedelta(minutes=5))])
+    app = create_app(Settings(database_url="sqlite://", redis_url="redis://localhost:6379/0", core_api_token="core",
+                              internal_signal_token="internal", max_clock_skew_seconds=5, trading_mode=TradingMode.PAPER),
+                     repository, MemoryEventPublisher())
+    client = TestClient(app)
+    headers = {"Authorization": "Bearer core"}
+    position = client.get("/api/v1/positions", headers=headers).json()[0]
+    assert Decimal(position["market_price"]) == Decimal("1050")
+    assert Decimal(position["unrealized_pnl"]) == Decimal("500")
+    portfolio = client.get("/api/v1/portfolio", headers=headers).json()
+    assert Decimal(portfolio["equity"]) == Decimal("989990") + Decimal("10500")
+    assert Decimal(portfolio["total_pnl"]) == Decimal("-10") + Decimal("500")
+    assert Decimal(portfolio["snapshot"]["unrealized_pnl"]) == Decimal("500")

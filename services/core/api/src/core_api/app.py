@@ -309,8 +309,10 @@ def create_app(
         for proposal in proposals:
             risk = repository.risk_for_proposal(proposal.proposal_id)
             order = repository.order_for_proposal(proposal.proposal_id)
+            event = repository.get_system_event(f"decision.created:{proposal.proposal_id}")
             rows.append(
                 {
+                    "decided_at": None if event is None else event["recorded_at"].isoformat(),
                     "proposal": proposal.model_dump(mode="json"),
                     "risk": None if risk is None else risk.model_dump(mode="json"),
                     "order": None if order is None else order.model_dump(mode="json"),
@@ -376,6 +378,10 @@ def create_app(
         book = repository.active_paper_session() if session_id is None else repository.paper_session(session_id)
         base = book.starting_cash if book is not None and book.starting_cash is not None else resolved.paper_starting_cash
         body = _portfolio_body(repository.latest_snapshot(argument), base)
+        active = repository.active_paper_session()
+        if active is not None and book is not None and book.session_id == active.session_id:
+            # Only the open book is revalued at current prices; a closed session keeps its last snapshot.
+            _mark_portfolio(body, [_marked(repository, item) for item in repository.list_positions(argument)], base)
         body["session_id"] = None if book is None else book.session_id
         body["live_enabled"] = False
         return body
@@ -385,7 +391,11 @@ def create_app(
         _: Annotated[None, Depends(require_user)],
         session_id: str | None = None,
     ) -> list[dict[str, object]]:
-        return [item.model_dump(mode="json") for item in repository.list_positions(_session_argument(repository, session_id))]
+        active = repository.active_paper_session()
+        rows = repository.list_positions(_session_argument(repository, session_id))
+        if session_id is not None and (active is None or session_id != active.session_id):
+            return [item.model_dump(mode="json") for item in rows]
+        return [_marked(repository, item) for item in rows]
 
     @app.get("/api/v1/orders")
     def orders(
@@ -901,6 +911,43 @@ def _overview_body(repository: CoreRepository, moment: datetime, mode: TradingMo
         "breadth_decliners": decliners,
         "mode": mode.value,
     }
+
+
+def _marked(repository: CoreRepository, position) -> dict[str, object]:
+    """Position valued at the latest stored 5-minute close (daily close as fallback)."""
+    body = position.model_dump(mode="json")
+    bar = repository.latest_candle(position.symbol, Timeframe.M5) or repository.latest_candle(position.symbol, Timeframe.D1)
+    if bar is None or position.quantity == 0:
+        body["price_as_of"] = None
+        return body
+    price = bar.close
+    body["market_price"] = str(price)
+    body["market_value"] = str(price * position.quantity)
+    body["unrealized_pnl"] = str((price - position.average_price) * position.quantity)
+    body["price_as_of"] = bar.end.isoformat()
+    return body
+
+
+def _mark_portfolio(body: dict[str, object], marked: list[dict[str, object]], starting_cash: Decimal) -> None:
+    """Revalue the latest snapshot's holdings at current marks; cash and realized P&L are unchanged."""
+    snapshot = body.get("snapshot")
+    if not isinstance(snapshot, dict):
+        return
+    market_value = sum((Decimal(item["market_value"]) for item in marked), Decimal("0"))
+    unrealized = sum((Decimal(item["unrealized_pnl"]) for item in marked), Decimal("0"))
+    equity = Decimal(str(snapshot["cash"])) + market_value
+    total = Decimal(str(snapshot["realized_pnl"])) + unrealized
+    del starting_cash
+    snapshot.update(
+        market_value=str(market_value),
+        gross_exposure=str(market_value),
+        net_exposure=str(market_value),
+        unrealized_pnl=str(unrealized),
+        equity=str(equity),
+        total_pnl=str(total),
+    )
+    stamps = [item["price_as_of"] for item in marked if item.get("price_as_of")]
+    body.update(equity=str(equity), total_pnl=str(total), gross_exposure=str(market_value), marked_at=max(stamps) if stamps else None)
 
 
 def _portfolio_body(snapshot: object, starting_cash: Decimal) -> dict[str, object]:

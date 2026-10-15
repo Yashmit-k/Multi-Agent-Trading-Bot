@@ -547,6 +547,13 @@ class CoreRepository:
                 return False
             return True
 
+    def get_system_event(self, event_id: str) -> dict | None:
+        with self._session_factory() as session:
+            row = session.get(SystemEventRow, event_id)
+            if row is None:
+                return None
+            return {"event_id": row.event_id, "event_type": row.event_type, "recorded_at": as_utc(row.recorded_at), "envelope": dict(row.payload)}
+
     def list_system_events(
         self,
         *,
