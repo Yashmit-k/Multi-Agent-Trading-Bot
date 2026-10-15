@@ -750,6 +750,14 @@ class CoreRepository:
             ).first()
         return None if row is None else _candle(row)
 
+    def earliest_candle_end(self, symbol: str, timeframe: Timeframe | str) -> datetime | None:
+        parsed = timeframe if isinstance(timeframe, Timeframe) else Timeframe(timeframe)
+        with self._session_factory() as session:
+            value = session.scalar(
+                select(func.min(CandleRow.end)).where(CandleRow.symbol == symbol.strip().upper(), CandleRow.timeframe == parsed.value)
+            )
+        return None if value is None else as_utc(value)
+
     def insert_proposal(self, proposal: TradeProposal) -> bool:
         instrument = self._require_instrument(proposal.symbol)
         session_id = self._trading_session_id()

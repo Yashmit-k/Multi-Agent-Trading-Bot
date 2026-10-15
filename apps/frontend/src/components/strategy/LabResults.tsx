@@ -30,6 +30,9 @@ export function LabResults({ result }: { result: LabResult }) {
           <span>
             {result.symbols_tested} stocks · {result.start} to {result.end} · CAGR {pct(m.cagr)} · avg hold {m.average_bars_held?.toFixed(1) ?? "—"} bars
           </span>
+          {result.benchmark?.from && result.benchmark.from > result.start ? (
+            <span className="text-[#F59E0B]">NIFTY 50 data starts {result.benchmark.from}, so the benchmark covers a shorter period.</span>
+          ) : null}
           {result.trades_skipped_by_portfolio ? <span>{result.trades_skipped_by_portfolio} signals skipped (no free slot or cash)</span> : null}
         </div>
       </Card>

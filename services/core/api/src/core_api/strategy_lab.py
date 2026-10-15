@@ -445,6 +445,8 @@ def run_strategy(
             base = points[0][1]
             bench = {
                 "symbol": "NIFTY50",
+                "from": points[0][0].isoformat(),
+                "to": points[-1][0].isoformat(),
                 "total_return": points[-1][1] / base - 1,
                 "curve": [{"date": d.isoformat(), "equity": round(strategy.initial_cash * c / base, 2)} for d, c in points],
             }
