@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from contracts.enums import Timeframe
 from core_db.repository import CoreRepository
@@ -202,6 +202,10 @@ def _poll_locked(
                 state.last_error = "authentication_failed"
                 return True
         state.symbols = rows
+        # Market context for the regime agent. Not tradable and not part of the freshness counts.
+        for index in INDEX_INSTRUMENTS:
+            if repository.get_by_symbol(index) is not None:
+                _one_symbol(provider, repository, index, moment, seed_if_empty=True)
         errors = [row.last_error for row in rows if row.last_error]
         fetch_errors = [item for item in errors if item not in {"needs_seed"}]
         if any(row.written > 0 or row.last_error is None for row in rows) or not rows:
@@ -227,11 +231,18 @@ def _poll_locked(
         state._lock.release()
 
 
+# NSE indices the regime agent reads: symbol -> (Kite trading symbol, instrument token).
+INDEX_INSTRUMENTS: dict[str, tuple[str, int]] = {"NIFTY50": ("NIFTY 50", 256265), "INDIAVIX": ("INDIA VIX", 264969)}
+INDEX_SEED_DAYS = {Timeframe.D1: 400, Timeframe.M5: 5}
+
+
 def _one_symbol(
     provider: ZerodhaMarketDataProvider,
     repository: CoreRepository,
     symbol: str,
     now: datetime,
+    *,
+    seed_if_empty: bool = False,
 ) -> SymbolIngestion:
     row = SymbolIngestion(symbol=symbol)
     for timeframe, label in ((Timeframe.D1, "daily"), (Timeframe.M5, "intraday")):
@@ -245,6 +256,8 @@ def _one_symbol(
             row.intraday_end = None if end is None else end.isoformat()
             row.intraday_fresh = fresh
         window = incremental_range(end, timeframe, now)
+        if window is None and end is None and seed_if_empty:
+            window = (now - timedelta(days=INDEX_SEED_DAYS[timeframe]), now)
         if window is None:
             if end is None:
                 row.last_error = "needs_seed"

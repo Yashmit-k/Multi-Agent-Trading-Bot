@@ -12,7 +12,16 @@ from quant_agents.vote import Vote
 
 WEIGHTS = {
     "volume_price": 1.0,
+    "volume_surge": 1.0,
+    "volume_extreme": 1.0,
+    "volume_conviction": 1.0,
 }
+
+# Thresholds on Feature Engine ratios. Graded votes keep one heavy day from reading as full confidence:
+# the scorer sets confidence to |weighted vote mean|, so a single vote could only ever be 0 or 1.
+SURGE = 2.0
+EXTREME = 3.0
+CONVICTION_CORR = 0.3
 
 
 class VolumeAgent(BaseQuantAgent):
@@ -25,12 +34,16 @@ class VolumeAgent(BaseQuantAgent):
         last_volume = view.get("last_volume")
         volume_mean = view.get("volume_mean")
         ret = view.get("return_1")
-        if last_volume is not None and volume_mean is not None and ret is not None:
-            heavy = last_volume > volume_mean
-            if heavy and ret > 0:
-                votes.append(Vote("volume_price", 1, WEIGHTS["volume_price"]))
-            elif heavy and ret < 0:
-                votes.append(Vote("volume_price", -1, WEIGHTS["volume_price"]))
-            else:
-                votes.append(Vote("volume_price", 0, WEIGHTS["volume_price"]))
+        if last_volume is None or volume_mean is None or ret is None:
+            return AgentDecision(votes=tuple(votes))
+        direction = 1 if ret > 0 else -1 if ret < 0 else 0
+        heavy = last_volume > volume_mean
+        votes.append(Vote("volume_price", direction if heavy else 0, WEIGHTS["volume_price"]))
+        relative = view.get("relative_volume")
+        if relative is not None:
+            votes.append(Vote("volume_surge", direction if relative > SURGE else 0, WEIGHTS["volume_surge"]))
+            votes.append(Vote("volume_extreme", direction if relative > EXTREME else 0, WEIGHTS["volume_extreme"]))
+        correlation = view.get("price_volume_corr")
+        if correlation is not None:
+            votes.append(Vote("volume_conviction", direction if heavy and correlation > CONVICTION_CORR else 0, WEIGHTS["volume_conviction"]))
         return AgentDecision(votes=tuple(votes))

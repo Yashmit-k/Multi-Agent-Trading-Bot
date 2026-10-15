@@ -108,6 +108,8 @@ def test_health_retry_then_one_feature_fetch() -> None:
             if state["health"] == 1:
                 raise httpx.ConnectError("refused", request=request)
             return httpx.Response(200, json={"status": "ok"})
+        if request.url.path.endswith(("/NIFTY50", "/INDIAVIX")):
+            return httpx.Response(404, json={"detail": "no_features"})  # index bars not collected yet
         state["features"] += 1
         if state["features"] == 1:
             raise httpx.ConnectError("refused", request=request)
@@ -128,3 +130,20 @@ def test_health_retry_then_one_feature_fetch() -> None:
     assert state["features"] == 2
     assert written == 5
     assert len(sink.signals) == 5
+
+
+def test_index_feature_sets_reach_the_regime_agent() -> None:
+    from contracts.enums import AgentName
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/health":
+            return httpx.Response(200, json={"status": "ok"})
+        symbol = request.url.path.rsplit("/", 1)[-1]
+        body = _feature_set().model_dump(mode="json")
+        body["symbol"] = symbol
+        return httpx.Response(200, json=body)
+
+    sink = _MemorySink()
+    run_paper_pass("http://core-api:8000", "read", ("RELIANCE",), sink, client=httpx.Client(transport=httpx.MockTransport(handler)), sleep=lambda _d: None)
+    regime = next(item for item in sink.signals if item.agent_name == AgentName.REGIME)
+    assert "regime.index_features_missing" not in regime.reason_codes

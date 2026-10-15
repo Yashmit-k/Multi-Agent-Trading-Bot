@@ -80,6 +80,11 @@ def create_app(
     app.state.repository = repository
     app.state.publisher = publisher
     app.state.kite_client = kite_client
+    if kite_client is not None:
+        from core_market_data.collector import INDEX_INSTRUMENTS
+
+        for symbol, (trading_symbol, token) in INDEX_INSTRUMENTS.items():
+            repository.upsert_instrument(symbol=symbol, trading_symbol=trading_symbol, instrument_token=token)
     from core_market_data.collector import HistoricalGate, IngestionState
 
     app.state.ingestion = IngestionState()
