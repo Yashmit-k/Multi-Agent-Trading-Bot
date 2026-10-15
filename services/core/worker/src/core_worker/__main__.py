@@ -13,6 +13,7 @@ from core_paper.costs import CostSchedule
 from core_paper.trading_calendar import cash_session_open
 from core_worker.heartbeat import publish_heartbeat
 from core_worker.loop import run_once
+from core_paper.daily import write_daily_if_due
 from core_worker.paper_schedule import broker_allows_entries, excluded_agent_weights, run_scheduled_cycle
 
 logger = logging.getLogger(__name__)
@@ -53,4 +54,9 @@ while True:
             broker_authenticated=authenticated,
             weights=weights,
         )
+    try:
+        # End-of-day book, once per trading day after the close (no-op at other times).
+        write_daily_if_due(repository, now)
+    except Exception:
+        logger.exception("daily_equity_write_failed")
     time.sleep(interval)

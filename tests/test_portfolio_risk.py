@@ -184,3 +184,12 @@ def test_a_morning_order_on_yesterdays_bar_is_stamped_and_counted_today(reposito
     assert order.metadata["activation_at"] == bar_end.isoformat()
     assert repository.daily_entry_count(placed) == 1
     assert repository.daily_entry_count(bar_end) == 0
+
+
+def test_target_exit_above_the_buy_cap_is_not_blocked() -> None:
+    """A 19,000 buy that reaches +4% is worth about 19,760; a full-size buy at +4% is over 20,000 and must still sell."""
+    sell = _proposal("INFY", side=Side.SELL, price="1040", quantity=20)  # 20,800 notional
+    decision = _decide(sell, None, held=20)
+    assert decision.status.value == "APPROVED"
+    buy = _proposal("INFY", price="1040", quantity=20)
+    assert "notional_cap" in _failed(_decide(buy, None))

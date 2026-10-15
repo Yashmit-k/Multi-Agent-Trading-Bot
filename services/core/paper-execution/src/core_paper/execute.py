@@ -349,7 +349,7 @@ def settle_sell(repository: CoreRepository, order: Order, *, starting_cash: Deci
     decision_end = datetime.fromisoformat(str(order.metadata["decision_end"]))
     later = [
         bar
-        for bar in repository.stored_candles(order.symbol, Timeframe.M5)
+        for bar in repository.stored_candles(order.symbol, Timeframe.M5, start=decision_end, end=now)
         if bar.end.astimezone(timezone.utc) > decision_end.astimezone(timezone.utc)
         and bar.end.astimezone(timezone.utc) <= now.astimezone(timezone.utc)
     ]

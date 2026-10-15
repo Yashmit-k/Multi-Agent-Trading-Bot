@@ -70,6 +70,6 @@ export type DashboardSnapshot = {
     market_as_of: string | null;
     last_refresh: string;
   };
-  daily_endpoint: "missing" | "unavailable" | "demo_fixture";
+  daily_endpoint: "missing" | "unavailable" | "demo_fixture" | "available";
   contract_note: string;
 };

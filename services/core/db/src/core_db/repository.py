@@ -33,6 +33,7 @@ from core_db.models import (
     BacktestRunRow,
     CandleRow,
     CashReservationRow,
+    DailyEquityRow,
     ChargeLedgerRow,
     DpChargeRow,
     ExecutionRow,
@@ -539,6 +540,29 @@ class CoreRepository:
             if row is None or as_utc(row.issued_at) < as_utc(not_before):
                 return None
             return row.access_token
+
+    def daily_equity_exists(self, session_id: str, trading_day: str) -> bool:
+        with self._session_factory() as session:
+            return session.get(DailyEquityRow, f"{session_id}:{trading_day}") is not None
+
+    def insert_daily_equity(self, session_id: str, trading_day: str, written_at: datetime, payload: dict) -> bool:
+        """Store one end-of-day book; an existing row for that session and day is kept, not overwritten."""
+        with self._session_factory() as session:
+            key = f"{session_id}:{trading_day}"
+            if session.get(DailyEquityRow, key) is not None:
+                return False
+            session.add(DailyEquityRow(daily_id=key, session_id=session_id, trading_day=trading_day, written_at=as_utc(written_at), payload=payload))
+            try:
+                session.commit()
+            except IntegrityError:
+                session.rollback()
+                return False
+            return True
+
+    def list_daily_equity(self, session_id: str) -> list[dict]:
+        with self._session_factory() as session:
+            rows = session.scalars(select(DailyEquityRow).where(DailyEquityRow.session_id == session_id).order_by(DailyEquityRow.trading_day))
+            return [{**dict(row.payload), "written_at": as_utc(row.written_at).isoformat()} for row in rows]
 
     def insert_system_event(self, event_id: str, event_type: str, recorded_at: datetime, payload: dict) -> bool:
         """Store one bus message. A repeated event_id is ignored and returns False."""

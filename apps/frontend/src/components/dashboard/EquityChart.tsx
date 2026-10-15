@@ -10,6 +10,36 @@ export function EquityChart({
   days: DailyPnlDay[];
   startingCash: number | null;
 }) {
+  if (mode !== "demo" && days.length > 0) {
+    // Core end-of-day equity per IST trading day; the last point may be today's provisional book.
+    const series = days.map((day) => ({
+      key: day.calendar_date_ist,
+      equity: (day as DailyPnlDay & { equity_inr?: number | null }).equity_inr ?? (day.start_of_day_equity_inr ?? 0) + (day.net_pnl_inr ?? 0),
+      complete: day.complete,
+    }));
+    const base = days[0].start_of_day_equity_inr ?? series[0].equity;
+    const all = [{ key: "start", equity: base, complete: true }, ...series];
+    const lo = Math.min(...all.map((item) => item.equity));
+    const hi = Math.max(...all.map((item) => item.equity));
+    const range = hi - lo || 1;
+    const path = all
+      .map((item, index) => `${index === 0 ? "M" : "L"}${(8 + (index / Math.max(all.length - 1, 1)) * 704).toFixed(1)} ${(8 + (1 - (item.equity - lo) / range) * 124).toFixed(1)}`)
+      .join(" ");
+    const last = series[series.length - 1];
+    return (
+      <section className="rounded-[12px] border border-[#26303C] bg-[#121922] p-4" data-testid="equity-chart">
+        <h2 className="mb-2 text-lg font-semibold text-[#E6EDF3]">Equity history</h2>
+        <p className="mb-2 text-xs text-[#94A3B8]">Paper-account equity at each close (Core end-of-day books){last.complete ? "" : "; the last point is today, provisional"}.</p>
+        <svg viewBox="0 0 720 140" className="h-36 w-full" role="img" aria-label="Paper equity by trading day">
+          <path d={path} fill="none" stroke={last.equity >= base ? "#22C55E" : "#EF4444"} strokeWidth="2" />
+        </svg>
+        <p className="mt-2 font-mono text-sm tabular-nums text-[#94A3B8]">
+          Start ₹{base.toLocaleString("en-IN", { maximumFractionDigits: 2 })} · Latest ₹{last.equity.toLocaleString("en-IN", { maximumFractionDigits: 2 })} ({formatSignedInr(last.equity - base)})
+        </p>
+      </section>
+    );
+  }
+
   if (mode !== "demo") {
     return (
       <section className="rounded-[12px] border border-[#26303C] bg-[#121922] p-4" data-testid="equity-chart">

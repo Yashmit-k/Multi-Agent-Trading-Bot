@@ -15,6 +15,7 @@ const LINKS = [
   ["/portfolio", "Portfolio"],
   ["/positions", "Positions"],
   ["/orders", "Orders"],
+  ["/journal", "Journal"],
   ["/backtests", "Backtests"],
   ["/performance", "Performance"],
   ["/risk", "Risk"],
