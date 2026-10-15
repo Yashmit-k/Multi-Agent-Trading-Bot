@@ -1,0 +1,229 @@
+{
+  "protocol": "services/quant/docs/exit-rules-protocol.md",
+  "books": {
+    "INTRADAY": {
+      "sessions": {
+        "first": "2025-09-24",
+        "last": "2026-10-05",
+        "count": 250
+      },
+      "buy_proposals": 193559,
+      "sell_proposals": 213052,
+      "rules": {
+        "E0": {
+          "trades": 20706,
+          "win_rate": 0.1559451366753598,
+          "mean_net_return_per_trade": -0.004022842327728995,
+          "total_net_pnl": -1555099.2509803574,
+          "profit_factor": 0.2771362129610729,
+          "average_hold_sessions": 0.25297015357867286,
+          "max_drawdown_rupees": 1555099.2509803583,
+          "exit_reasons": {
+            "signal": 20162,
+            "target": 294,
+            "stop": 222,
+            "end_of_data": 28
+          },
+          "mean_session_pnl_lower_bound": -6800.695687708342,
+          "profitable": false
+        },
+        "E1": {
+          "trades": 20614,
+          "win_rate": 0.1549432424565829,
+          "mean_net_return_per_trade": -0.003986554251577809,
+          "total_net_pnl": -1534220.7996856004,
+          "profit_factor": 0.2832377577351081,
+          "average_hold_sessions": 0.2541476666343262,
+          "max_drawdown_rupees": 1534220.7996856007,
+          "exit_reasons": {
+            "signal": 20229,
+            "target": 217,
+            "end_of_data": 28,
+            "stop": 140
+          },
+          "mean_session_pnl_lower_bound": -6751.305436073795,
+          "profitable": false,
+          "vs_live": {
+            "total_difference": 20878.451294756873,
+            "difference_lower_bound": -7.67522998937288,
+            "first_half": 3322.8411793142004,
+            "second_half": 17555.610115442672,
+            "beats_live": false
+          }
+        },
+        "E2": {
+          "trades": 20706,
+          "win_rate": 0.1559451366753598,
+          "mean_net_return_per_trade": -0.004022842327728995,
+          "total_net_pnl": -1555099.2509803574,
+          "profit_factor": 0.2771362129610729,
+          "average_hold_sessions": 0.25297015357867286,
+          "max_drawdown_rupees": 1555099.2509803583,
+          "exit_reasons": {
+            "signal": 20162,
+            "target": 294,
+            "stop": 222,
+            "end_of_data": 28
+          },
+          "mean_session_pnl_lower_bound": -6800.695687708342,
+          "profitable": false,
+          "vs_live": {
+            "total_difference": 0.0,
+            "difference_lower_bound": 0.0,
+            "first_half": 0.0,
+            "second_half": 0.0,
+            "beats_live": false
+          }
+        },
+        "E3": {
+          "trades": 23771,
+          "win_rate": 0.15350637331201886,
+          "mean_net_return_per_trade": -0.004071438607795945,
+          "total_net_pnl": -1804941.1541070512,
+          "profit_factor": 0.18931301851093094,
+          "average_hold_sessions": 0.0,
+          "max_drawdown_rupees": 1804941.1541070517,
+          "exit_reasons": {
+            "signal": 17633,
+            "target": 42,
+            "time": 6036,
+            "stop": 60
+          },
+          "mean_session_pnl_lower_bound": -7579.554734506997,
+          "profitable": false,
+          "vs_live": {
+            "total_difference": -249841.9031266938,
+            "difference_lower_bound": -1413.5288352572702,
+            "first_half": -123880.00378249661,
+            "second_half": -125961.89934419717,
+            "beats_live": false
+          }
+        },
+        "E4": {
+          "trades": 23738,
+          "win_rate": 0.15359339455725,
+          "mean_net_return_per_trade": -0.004068269567951799,
+          "total_net_pnl": -1800922.4504879513,
+          "profit_factor": 0.18926569039224797,
+          "average_hold_sessions": 0.0,
+          "max_drawdown_rupees": 1800922.450487952,
+          "exit_reasons": {
+            "signal": 17651,
+            "time": 6036,
+            "target": 22,
+            "stop": 29
+          },
+          "mean_session_pnl_lower_bound": -7565.603653450591,
+          "profitable": false,
+          "vs_live": {
+            "total_difference": -245823.19950759385,
+            "difference_lower_bound": -1397.2860078548329,
+            "first_half": -123297.2643358252,
+            "second_half": -122525.93517176865,
+            "beats_live": false
+          }
+        }
+      }
+    },
+    "SWING": {
+      "sessions": {
+        "first": "2024-07-01",
+        "last": "2026-10-05",
+        "count": 556
+      },
+      "buy_proposals": 7112,
+      "sell_proposals": 5751,
+      "rules": {
+        "E0": {
+          "trades": 2418,
+          "win_rate": 0.3081058726220017,
+          "mean_net_return_per_trade": -0.00540123805915276,
+          "total_net_pnl": -246789.6535335565,
+          "profit_factor": 0.6651592883579448,
+          "average_hold_sessions": 3.8081058726220016,
+          "max_drawdown_rupees": 257948.92440458256,
+          "exit_reasons": {
+            "target": 733,
+            "stop": 1513,
+            "signal": 171,
+            "end_of_data": 1
+          },
+          "mean_session_pnl_lower_bound": -662.2989442876355,
+          "profitable": false
+        },
+        "E1": {
+          "trades": 2203,
+          "win_rate": 0.3091239219246482,
+          "mean_net_return_per_trade": -0.005152698779369743,
+          "total_net_pnl": -214561.46048407507,
+          "profit_factor": 0.6975564841723885,
+          "average_hold_sessions": 4.447571493418066,
+          "max_drawdown_rupees": 229685.74762852595,
+          "exit_reasons": {
+            "stop": 1347,
+            "signal": 190,
+            "target": 665,
+            "end_of_data": 1
+          },
+          "mean_session_pnl_lower_bound": -621.9382763715173,
+          "profitable": false,
+          "vs_live": {
+            "total_difference": 32228.193049481444,
+            "difference_lower_bound": -36.815195737134204,
+            "first_half": 27264.921903856615,
+            "second_half": 4963.2711456248235,
+            "beats_live": false
+          }
+        },
+        "E2": {
+          "trades": 2925,
+          "win_rate": 0.34735042735042737,
+          "mean_net_return_per_trade": -0.005129032263525483,
+          "total_net_pnl": -282270.2296575805,
+          "profit_factor": 0.6289152665443566,
+          "average_hold_sessions": 2.7029059829059827,
+          "max_drawdown_rupees": 292558.1389070811,
+          "exit_reasons": {
+            "target": 569,
+            "stop": 1496,
+            "signal": 121,
+            "time": 739
+          },
+          "mean_session_pnl_lower_bound": -723.3858672056373,
+          "profitable": false,
+          "vs_live": {
+            "total_difference": -35480.57612402399,
+            "difference_lower_bound": -127.08413125112853,
+            "first_half": -11494.754429612029,
+            "second_half": -23985.82169441196,
+            "beats_live": false
+          }
+        },
+        "E4": {
+          "trades": 2817,
+          "win_rate": 0.3546325878594249,
+          "mean_net_return_per_trade": -0.004883707415342424,
+          "total_net_pnl": -257200.63361165937,
+          "profit_factor": 0.6525941305656316,
+          "average_hold_sessions": 2.921547745828896,
+          "max_drawdown_rupees": 262355.08462826663,
+          "exit_reasons": {
+            "stop": 1370,
+            "signal": 137,
+            "time": 789,
+            "target": 521
+          },
+          "mean_session_pnl_lower_bound": -686.9380849923779,
+          "profitable": false,
+          "vs_live": {
+            "total_difference": -10410.980078102877,
+            "difference_lower_bound": -117.20846119586311,
+            "first_half": 5.920534016340753,
+            "second_half": -10416.900612119216,
+            "beats_live": false
+          }
+        }
+      }
+    }
+  }
+}
