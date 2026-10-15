@@ -91,7 +91,11 @@ export default async function BacktestsPage({ searchParams }: { searchParams: Pr
         </Card>
         <BacktestSummary performance={selected.performance} />
         <Card title="Equity curve">
-          <EquityLine points={selected.equity_curve} />
+          {/* Points before the run start are indicator warm-up with no trading; they are left out. */}
+          <EquityLine points={selected.equity_curve.filter((point) => point.timestamp >= selected.start)} />
+          <p className="mt-2 text-xs text-[#64748B]">
+            Ends at {inr(selected.portfolio_value)}, a net P&amp;L of {inr(selected.performance.net_pnl)} after costs.
+          </p>
         </Card>
       </PageFrame>
     );

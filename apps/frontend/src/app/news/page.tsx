@@ -12,26 +12,35 @@ export const dynamic = "force-dynamic";
 // headline list comes from that signal's metadata, so nothing here is a fixture.
 export default async function NewsPage() {
   try {
-    const rows = await loadSignals({ agent: "news", limit: 400 });
+    const rows = await loadSignals({ agent: "news", limit: 800 });
+    // One row per distinct headline and stock, newest first: every live headline the News agent scored.
     const seen = new Set<string>();
-    const scored = rows.filter((row) => {
-      if (provenance(row as unknown as Record<string, unknown>).headlines.length === 0 || seen.has(row.symbol)) return false;
-      seen.add(row.symbol);
-      return true;
-    });
+    const scored: Array<{ row: (typeof rows)[number]; title: string; source?: string }> = [];
+    for (const row of rows) {
+      for (const item of provenance(row as unknown as Record<string, unknown>).headlines) {
+        const key = `${row.symbol}|${item.title}`;
+        if (!item.title || seen.has(key)) continue;
+        seen.add(key);
+        scored.push({ row, title: item.title, source: item.source });
+      }
+    }
+    const shown = scored.slice(0, 200);
+    const stocks = new Set(shown.map((item) => item.row.symbol)).size;
     return (
       <PageFrame
         title="News"
-        description="Live RSS headlines (ET Markets, Business Standard, Mint) mapped to NIFTY 50 stocks and scored by the News agent. Newest score per stock."
+        description="Live RSS headlines mapped to NIFTY 50 stocks and scored by the News agent (Gemini). Newest first."
       >
-        {scored.length === 0 ? (
+        {shown.length === 0 ? (
           <Empty>The News agent has not scored a live headline yet. Feeds are polled every 5 minutes.</Empty>
         ) : (
-          <Table head={["Stock", "Score", "Headline", "Scored by", "Time (IST)"]} minWidth={820}>
-            {scored.map((row) => {
-              const p = provenance(row as unknown as Record<string, unknown>);
-              return (
-                <tr key={row.signal_id}>
+          <>
+            <p className="text-xs text-[#64748B]">
+              {shown.length} headlines across {stocks} NIFTY 50 stocks, from 16 feeds (ET, Business Standard, Mint, BusinessLine, NDTV Profit, CNBC-TV18). Headlines that name no NIFTY 50 company are not shown.
+            </p>
+            <Table head={["Stock", "Score", "Headline", "Scored by", "Time (IST)"]} minWidth={820}>
+              {shown.map(({ row, title, source }) => (
+                <tr key={`${row.signal_id}-${title}`}>
                   <Td>
                     <SymbolLink symbol={row.symbol} />
                   </Td>
@@ -39,18 +48,14 @@ export default async function NewsPage() {
                     <Score value={row.signal} />
                   </Td>
                   <Td>
-                    {p.headlines.slice(0, 2).map((item) => (
-                      <div key={item.title} className="mb-1">
-                        {item.title} <span className="text-xs text-[#64748B]">({item.source})</span>
-                      </div>
-                    ))}
+                    {title} <span className="text-xs text-[#64748B]">({source})</span>
                   </Td>
                   <Td className="text-xs text-[#94A3B8]">{sourceLabel("news", row as unknown as Record<string, unknown>)}</Td>
                   <Td className="whitespace-nowrap text-xs text-[#94A3B8]">{istTime(row.timestamp)}</Td>
                 </tr>
-              );
-            })}
-          </Table>
+              ))}
+            </Table>
+          </>
         )}
       </PageFrame>
     );

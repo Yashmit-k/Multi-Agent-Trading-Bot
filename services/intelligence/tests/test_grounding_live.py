@@ -33,3 +33,13 @@ def test_insufficient_data_is_a_neutral_llm_answer() -> None:
 def test_invented_codes_are_still_rejected() -> None:
     with pytest.raises(ValidationError):
         quality_gate(_assessment(("rocket_ship",)), task="news", evidence="Infosys shares jump")
+
+
+def test_new_codes_need_matching_evidence() -> None:
+    ok = quality_gate(_assessment(("capital_raise",)), task="news", evidence="Reliance Jio files RHP for IPO; issue opens October 21")
+    assert ok.reason_codes == ("capital_raise",)
+    assert quality_gate(_assessment(("analyst_view",)), task="news", evidence="Brokerage raises target price on TCS").reason_codes == ("analyst_view",)
+    assert quality_gate(_assessment(("results_preview",)), task="news", evidence="Wipro Q2 results preview: margins in focus").reason_codes == ("results_preview",)
+    assert quality_gate(_assessment(("operating_updates",)), task="news", evidence="Tata Motors announces partnership for EV plant").reason_codes == ("operating_updates",)
+    with pytest.raises(ValidationError):
+        quality_gate(_assessment(("capital_raise",)), task="news", evidence="Sun Pharma shares hit 5-month low")
