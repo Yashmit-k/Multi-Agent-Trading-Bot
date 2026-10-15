@@ -192,3 +192,27 @@ def test_volume_agent_grades_its_conviction() -> None:
     assert extreme.signal == 1.0
     assert selloff.signal == -0.75
     assert quiet.signal == 0.0
+
+
+def test_regime_agent_grades_market_tilt() -> None:
+    from quant_agents.agents.regime import RegimeAgent
+    from quant_agents.scoring import score_votes
+
+    class View:
+        def __init__(self, features):
+            self._features = features
+
+        def get(self, name):
+            return self._features.get(name)
+
+    stock = View({"ema_12": 1.0, "ema_26": 0.9, "sma_10": 1.0, "sma_20": 0.9, "volatility_percentile": 50.0})
+    agent = RegimeAgent.__new__(RegimeAgent)
+
+    def score(nifty, vix):
+        decision = agent.interpret(stock, {"NIFTY50": View(nifty), "INDIAVIX": View(vix)})
+        return score_votes(decision.votes, required=RegimeAgent.required_features, missing=())
+
+    all_bullish = score({"return_1": 0.01, "ema_12": 2.0, "ema_26": 1.0}, {"return_1": -0.05})
+    mixed = score({"return_1": 0.01, "ema_12": 1.0, "ema_26": 2.0}, {"return_1": 0.05})
+    assert all_bullish.signal == 1.0
+    assert abs(mixed.signal - (-1 / 3)) < 1e-9
