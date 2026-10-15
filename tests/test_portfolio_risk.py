@@ -161,3 +161,26 @@ def test_same_bar_fills_are_all_debited_from_cash(repository) -> None:
                                               executed_at=NOW, fees=Decimal("22.50"), slippage=Decimal("0"), venue="PAPER", metadata={}))
         expected -= Decimal("10000") + Decimal("22.50")
     assert repository.cash_balance(CASH) == expected
+
+
+def test_a_morning_order_on_yesterdays_bar_is_stamped_and_counted_today(repository) -> None:
+    """The decision bar (yesterday 15:30) assigns the window; the placement time stamps created_at."""
+    from datetime import timedelta
+
+    from contracts.enums import Exchange, Timeframe
+    from contracts.schemas.market import Candle
+    from core_paper.execute import queue_entry
+
+    repository.open_paper_session(CASH)
+    bar_end = datetime(2026, 10, 14, 10, 0, tzinfo=timezone.utc)
+    placed = datetime(2026, 10, 15, 3, 55, tzinfo=timezone.utc)  # 09:25 IST
+    repository.upsert_candles([Candle(symbol="INFY", exchange=Exchange.NSE, timeframe=Timeframe.D1, open=Decimal("1000"), high=Decimal("1010"),
+                                      low=Decimal("990"), close=Decimal("1000"), volume=10, start=bar_end - timedelta(hours=6, minutes=15), end=bar_end)])
+    proposal = _proposal("INFY").model_copy(update={"proposal_id": "morning", "timestamp": bar_end})
+    repository.insert_proposal(proposal)
+    order = queue_entry(repository, proposal, bar_end, placed_at=placed)
+    assert order is not None and order.created_at == placed
+    assert order.metadata["entry_session_date"] == "2026-10-15"
+    assert order.metadata["activation_at"] == bar_end.isoformat()
+    assert repository.daily_entry_count(placed) == 1
+    assert repository.daily_entry_count(bar_end) == 0
