@@ -100,6 +100,7 @@ services:
       NEWS_RSS_URLS: ${NEWS_RSS_URLS:-https://economictimes.indiatimes.com/markets/stocks/rssfeeds/2146842.cms,https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms,https://www.business-standard.com/rss/markets-106.rss,https://www.livemint.com/rss/markets,https://www.livemint.com/rss/companies}
       INTELLIGENCE_STORE: sqlite
       INTELLIGENCE_SQLITE_PATH: /var/lib/intelligence/intel-rss.db
+      INTELLIGENCE_FUNDAMENTALS_CSV: ${INTELLIGENCE_FUNDAMENTALS_CSV:-/data/intelligence/fundamentals.csv}
       INTELLIGENCE_EVAL_INTERVAL_SECONDS: "600"
       INTELLIGENCE_SYMBOLS: *nifty50
       CORE_API_URL: http://core-api:8000
@@ -119,6 +120,8 @@ services:
       - "8101:8080"
     volumes:
       - intelligence-data:/var/lib/intelligence
+      # Real quarterly fundamentals (see data/intelligence/README.md). Missing file = warning, agents stay idle.
+      - ./data/intelligence:/data/intelligence:ro
 
   quant:
     build:
