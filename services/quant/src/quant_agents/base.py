@@ -25,7 +25,7 @@ from quant_agents.vote import Vote
 
 logger = logging.getLogger(__name__)
 
-AGENT_VERSION = "1.0.0"
+AGENT_VERSION = "1.1.0"
 
 
 @dataclass(frozen=True, slots=True)

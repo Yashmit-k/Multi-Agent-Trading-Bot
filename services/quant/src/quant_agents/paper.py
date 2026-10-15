@@ -35,6 +35,7 @@ _ML_SKIP_REASONS = frozenset(
 
 _AGENTS = (TechnicalAgent, MomentumAgent, MeanReversionAgent, VolumeAgent, RegimeAgent)
 _SWING = {"horizon": Horizon.SWING, "timeframe": Timeframe.D1, "regime_index_symbols": ()}
+INDEX_SYMBOLS = ("NIFTY50", "INDIAVIX")
 
 
 class _OneFeatureProvider:
@@ -210,6 +211,13 @@ def run_paper_pass(
             logger.error("quant_core_api_unavailable")
             return 0
         ml_registry = _open_ml_registry(ml_demo, ml_demo_dir, ml_artifact_dir)
+        # NIFTY 50 and INDIA VIX for the regime agent; absent until Core has collected them.
+        index_sets = tuple(
+            item for item in (fetch_feature(owned, base_url, read_token, name, attempts=1, sleep=sleep) for name in INDEX_SYMBOLS) if item is not None
+        )
+        config = dict(configuration or _SWING)
+        if index_sets:
+            config["regime_index_symbols"] = tuple(item.symbol for item in index_sets)
         for symbol in symbols:
             feature_set = fetch_feature(owned, base_url, read_token, symbol, sleep=sleep)
             if feature_set is None:
@@ -219,7 +227,8 @@ def run_paper_pass(
                 symbol,
                 feature_set,
                 sink,
-                configuration=configuration,
+                configuration=config,
+                index_sets=index_sets,
                 ml_registry=ml_registry,
                 ml_demo=ml_demo,
             )
