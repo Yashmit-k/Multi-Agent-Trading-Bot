@@ -42,6 +42,10 @@ export function excludedAgents(raw: string | undefined): string[] {
 export function sourceLabel(agent: string, payload: Record<string, unknown>): string {
   const p = provenance(payload);
   if (p.llm) return p.llm;
-  if (AGENT_KIND[agent] === "llm") return p.insufficient ? "no LLM call: no input data for this symbol" : "LLM agent (no model detail recorded)";
+  if (AGENT_KIND[agent] === "llm") {
+    if (p.insufficient) return "no LLM call: no input data for this symbol";
+    if (agent !== "news") return "sample data, no live feed: not used in trades";
+    return "LLM score (model not recorded on this signal)";
+  }
   return "deterministic rules on live candles";
 }

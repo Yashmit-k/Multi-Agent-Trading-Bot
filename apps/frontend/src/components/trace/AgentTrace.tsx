@@ -204,7 +204,7 @@ function SignalDetail({ event, excluded }: { event: TraceEvent; excluded: string
           “{item.title}” <span className="text-[#475569]">({item.source})</span>
         </div>
       ))}
-      {event.agent && excluded.includes(event.agent) ? <div className="text-[#F59E0B]">excluded from fusion (no live data source)</div> : null}
+      {event.agent && excluded.includes(event.agent) ? <div className="text-[#F59E0B]">excluded from fusion: no live data feed, cannot affect trades</div> : null}
     </div>
   );
 }
