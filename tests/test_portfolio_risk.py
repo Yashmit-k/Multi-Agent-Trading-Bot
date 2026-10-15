@@ -115,3 +115,27 @@ def test_positions_and_portfolio_are_marked_to_the_latest_bar(repository) -> Non
     assert Decimal(portfolio["equity"]) == Decimal("989990") + Decimal("10500")
     assert Decimal(portfolio["total_pnl"]) == Decimal("989990") + Decimal("10500") - CASH  # net of charges
     assert Decimal(portfolio["snapshot"]["unrealized_pnl"]) == Decimal("500")
+
+
+def test_intraday_entries_are_priced_off_the_five_minute_close(repository) -> None:
+    from datetime import timedelta
+
+    from contracts.enums import Exchange, Timeframe
+    from contracts.schemas.market import Candle
+    from core_paper.execute import INTRADAY_REFERENCE_RULE, _reference
+    from core_paper.limits import REFERENCE_RULE
+
+    day_end = NOW - timedelta(hours=20)
+    bar_end = NOW
+    repository.upsert_candles([
+        Candle(symbol="INFY", exchange=Exchange.NSE, timeframe=Timeframe.D1, open=Decimal("1000"), high=Decimal("1010"), low=Decimal("990"),
+               close=Decimal("1000"), volume=10, start=day_end - timedelta(hours=6, minutes=15), end=day_end),
+        Candle(symbol="INFY", exchange=Exchange.NSE, timeframe=Timeframe.M5, open=Decimal("1019"), high=Decimal("1021"), low=Decimal("1018"),
+               close=Decimal("1020"), volume=10, start=bar_end - timedelta(minutes=5), end=bar_end),
+    ])
+    intraday = _proposal("INFY").model_copy(update={"horizon": Horizon.INTRADAY})
+    bar, _, rule = _reference(repository, intraday, NOW)
+    assert bar.close == Decimal("1020") and rule == INTRADAY_REFERENCE_RULE
+    swing = _proposal("INFY")
+    bar, _, rule = _reference(repository, swing, NOW)
+    assert bar.close == Decimal("1000") and rule == REFERENCE_RULE

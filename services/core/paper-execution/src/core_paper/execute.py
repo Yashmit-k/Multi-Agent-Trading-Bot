@@ -10,7 +10,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_DOWN
 
-from contracts.enums import Exchange, OrderStatus, OrderType, Side, Timeframe, TradingMode
+from contracts.enums import Exchange, Horizon, OrderStatus, OrderType, Side, Timeframe, TradingMode
 from contracts.schemas.execution import Execution
 from contracts.schemas.market import Candle
 from contracts.schemas.order import Order
@@ -107,7 +107,7 @@ def queue_entry(
         repository.commit_policy_order(order, None)
         return order
     priced = require_schedule(schedule)
-    daily, candle_id = repository.completed_daily(proposal.symbol, as_of)  # type: ignore[misc]
+    daily, candle_id, reference_rule = _reference(repository, proposal, as_of)
     window = _requested_window(entry_window) if entry_window is not None else assign_entry_window(as_of)
     limit = buy_limit(daily.close, instrument.tick_size)
     cash = repository.available_cash(repository.active_paper_session().starting_cash)  # type: ignore[union-attr]
@@ -142,7 +142,7 @@ def queue_entry(
         "reason": "entry",
         "product_type": PRODUCT_CNC,
         "policy_version": POLICY_VERSION,
-        "reference_rule": REFERENCE_RULE,
+        "reference_rule": reference_rule,
         "reference_price": str(daily.close),
         "reference_candle_end": daily.end.astimezone(timezone.utc).isoformat(),
         "reference_candle_id": candle_id,
@@ -171,6 +171,20 @@ def queue_entry(
         return existing
     logger.info("daily_entry_cap day=%s", order.created_at.astimezone(IST).date().isoformat())
     return None
+
+
+INTRADAY_REFERENCE_RULE = "latest_completed_5m_close_v1"
+
+
+def _reference(repository: CoreRepository, proposal, as_of: datetime):
+    """Price an entry off the bar the decision used: the 5m close for INTRADAY, the daily close otherwise."""
+    if proposal.horizon == Horizon.INTRADAY:
+        bars = repository.candles_until(proposal.symbol, Timeframe.M5, as_of, last=1)
+        if bars:
+            bar = bars[-1]
+            return bar, f"NSE:{bar.symbol}:5m:{bar.start.astimezone(timezone.utc).isoformat()}", INTRADAY_REFERENCE_RULE
+    daily, candle_id = repository.completed_daily(proposal.symbol, as_of)  # type: ignore[misc]
+    return daily, candle_id, REFERENCE_RULE
 
 
 def settle_entries(
