@@ -573,10 +573,13 @@ def create_app(
 
     @app.get("/api/v1/zerodha/status")
     def zerodha_status(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        times = _token_times(repository, datetime.now(timezone.utc))
+        expired = times.get("hours_left") is not None and times["hours_left"] <= 0
         return {
             "configured": app.state.kite_client is not None,
-            "authenticated": bool(app.state.zerodha_access_token),
+            "authenticated": bool(app.state.zerodha_access_token) and not expired,
             "live_enabled": False,
+            **times,
         }
 
     @app.get("/api/v1/zerodha/connect")
@@ -1111,9 +1114,17 @@ def _health_checks(app: FastAPI, repository: CoreRepository, settings: Settings,
     if app.state.kite_client is None:
         checks.append(_check("Zerodha Kite", "down", "API key/secret not configured"))
     elif not app.state.zerodha_access_token:
-        checks.append(_check("Zerodha Kite", "warn", "configured but logged out; log in before 09:15 IST"))
+        checks.append(_check("Zerodha Kite", "warn", "logged out: log in before 09:15 IST", **_token_times(repository, now)))
     else:
-        checks.append(_check("Zerodha Kite", "ok", "authenticated (market data only; orders never sent)"))
+        times = _token_times(repository, now)
+        hours = times.get("hours_left")
+        if hours is not None and hours <= 0:
+            checks.append(_check("Zerodha Kite", "down", "login expired at 06:00 IST: log in again before 09:15 IST", **times))
+        elif hours is not None and hours < 3:
+            checks.append(_check("Zerodha Kite", "warn", f"login expires in {hours:.1f} h (06:00 IST): log in again before 09:15 IST", **times))
+        else:
+            left = f"; expires in {hours:.0f} h" if hours is not None else ""
+            checks.append(_check("Zerodha Kite", "ok", f"authenticated (market data only; orders never sent){left}", **times))
     ingestion = app.state.ingestion.snapshot()
     age = _age_minutes(ingestion.get("last_success_at"), now)
     if ingestion.get("last_error"):
@@ -1373,6 +1384,19 @@ def _journal(repository: CoreRepository, limit: int) -> list[dict[str, object]]:
             "pnl": None if pnl is None else str(pnl),
         })
     return trades
+
+
+def _token_times(repository: CoreRepository, now: datetime) -> dict[str, object]:
+    """When the stored Kite token was issued and when it expires (06:00 IST after issue)."""
+    issued = repository.broker_token_issued_at("zerodha")
+    if issued is None:
+        return {"issued_at": None, "expires_at": None, "hours_left": None}
+    local = issued.astimezone(_IST)
+    expiry = local.replace(hour=6, minute=0, second=0, microsecond=0)
+    if local >= expiry:
+        expiry += timedelta(days=1)
+    left = (expiry.astimezone(timezone.utc) - now).total_seconds() / 3600
+    return {"issued_at": issued.isoformat(), "expires_at": expiry.astimezone(timezone.utc).isoformat(), "hours_left": round(left, 2)}
 
 
 def _cors_origins() -> list[str]:
