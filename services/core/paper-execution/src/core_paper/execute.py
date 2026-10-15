@@ -91,8 +91,13 @@ def queue_entry(
     schedule: EquityChargeSchedule | None = ZERODHA_EQUITY_RI,
     cap: Decimal | None = None,
     entry_window: EntryWindow | None = None,
+    placed_at: datetime | None = None,
 ) -> Order | None:
-    """Create one CNC limit order, or a rejected order when the policy cannot be applied."""
+    """Create one CNC limit order, or a rejected order when the policy cannot be applied.
+
+    as_of is the decision bar; it assigns the entry window. placed_at (default as_of) is when the
+    order is created: it stamps created_at, which the daily entry cap counts by IST date.
+    """
     if proposal.side != Side.BUY:
         return None
     if repository.order_for_proposal(proposal.proposal_id) is not None:
@@ -103,7 +108,7 @@ def queue_entry(
     bound = order_notional_cap(cap)
     reason = _entry_block(repository, proposal, as_of, instrument.tick_size, schedule)
     if reason is not None:
-        order = _order(repository, proposal, as_of, instrument, status=OrderStatus.REJECTED, limit=None, metadata={"reason": reason, "product_type": PRODUCT_CNC})
+        order = _order(repository, proposal, placed_at or as_of, instrument, status=OrderStatus.REJECTED, limit=None, metadata={"reason": reason, "product_type": PRODUCT_CNC})
         repository.commit_policy_order(order, None)
         return order
     priced = require_schedule(schedule)
@@ -116,7 +121,7 @@ def queue_entry(
         order = _order(
             repository,
             proposal,
-            as_of,
+            placed_at or as_of,
             instrument,
             status=OrderStatus.REJECTED,
             limit=limit,
@@ -129,7 +134,7 @@ def queue_entry(
         order = _order(
             repository,
             proposal,
-            as_of,
+            placed_at or as_of,
             instrument,
             status=OrderStatus.REJECTED,
             limit=limit,
@@ -163,7 +168,7 @@ def queue_entry(
         "take_profit": str(proposal.take_profit),
     }
     sized = proposal.model_copy(update={"quantity": quantity})
-    order = _order(repository, sized, as_of, instrument, status=OrderStatus.OPEN, limit=limit, metadata=metadata, quantity=quantity)
+    order = _order(repository, sized, placed_at or as_of, instrument, status=OrderStatus.OPEN, limit=limit, metadata=metadata, quantity=quantity)
     if repository.commit_policy_order(order, reserve):
         return order
     existing = repository.order_for_proposal(proposal.proposal_id)

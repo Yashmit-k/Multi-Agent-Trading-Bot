@@ -167,7 +167,7 @@ def run_paper_cycle(
             if repository.order_for_proposal(proposal.proposal_id) is not None:
                 continue
             before = {item.order_id for item in repository.list_orders()}
-            queue_entry(repository, proposal, as_of, entry_window=extension)
+            queue_entry(repository, proposal, as_of, entry_window=extension, placed_at=moment)
             queued = [item for item in repository.list_orders() if item.order_id not in before]
             created_orders += len(queued)
             for order in queued:
