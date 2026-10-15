@@ -119,3 +119,19 @@ def test_defaults_leave_the_request_unchanged() -> None:
     assert seen[0]["max_tokens"] == 160
     assert "response_format" not in seen[0]
     assert "reasoning_effort" not in seen[0]
+
+
+def test_reasoning_effort_none_is_sent_and_omit_is_not() -> None:
+    seen: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return _ok(request)
+
+    for effort in ("none", "omit"):
+        OpenAICompatibleProvider(
+            "https://generativelanguage.googleapis.com/v1beta/openai", "k", "m", retries=0,
+            client=httpx.Client(transport=httpx.MockTransport(handler)), reasoning_effort=effort,
+        ).complete(_request(effort), tier="tier1")
+    assert seen[0]["reasoning_effort"] == "none"
+    assert "reasoning_effort" not in seen[1]
