@@ -81,7 +81,7 @@ export default async function RiskPage() {
                 const failed = (row.risk?.checks ?? []).filter((check) => !check.passed);
                 return (
                   <tr key={row.proposal.proposal_id}>
-                    <Td className="whitespace-nowrap text-xs">{row.decided_at ? istTime(row.decided_at) : "—"}</Td>
+                    <Td className="whitespace-nowrap text-xs">{row.decided_at ? istTime(row.decided_at) : <span title="Decision time was not recorded for decisions made before 10:54 IST on 15 Oct (trace bug, since fixed)">not recorded</span>}</Td>
                     <Td className="whitespace-nowrap text-xs text-[#94A3B8]">{istTime(row.proposal.timestamp)}</Td>
                     <Td>
                       <SymbolLink symbol={row.proposal.symbol} />

@@ -97,7 +97,7 @@ services:
       # rss: live headlines from public Indian market feeds. A separate sqlite file
       # keeps the old fixture articles out of the live news store.
       INTELLIGENCE_DATA_SOURCE: ${INTELLIGENCE_DATA_SOURCE:-rss}
-      NEWS_RSS_URLS: ${NEWS_RSS_URLS:-https://economictimes.indiatimes.com/markets/stocks/rssfeeds/2146842.cms,https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms,https://www.business-standard.com/rss/markets-106.rss,https://www.livemint.com/rss/markets,https://www.livemint.com/rss/companies}
+      NEWS_RSS_URLS: ${NEWS_RSS_URLS:-https://economictimes.indiatimes.com/markets/stocks/rssfeeds/2146842.cms,https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms,https://economictimes.indiatimes.com/news/company/corporate-trends/rssfeeds/2143429.cms,https://economictimes.indiatimes.com/industry/rssfeeds/13352306.cms,https://economictimes.indiatimes.com/markets/ipos/fpos/rssfeeds/14655708.cms,https://www.business-standard.com/rss/markets-106.rss,https://www.business-standard.com/rss/companies-101.rss,https://www.livemint.com/rss/markets,https://www.livemint.com/rss/companies,https://www.livemint.com/rss/money,https://www.livemint.com/rss/news,https://www.thehindubusinessline.com/markets/feeder/default.rss,https://www.thehindubusinessline.com/companies/feeder/default.rss,https://feeds.feedburner.com/ndtvprofit-latest,https://www.cnbctv18.com/commonfeeds/v1/cne/rss/market.xml,https://www.cnbctv18.com/commonfeeds/v1/cne/rss/business.xml}
       INTELLIGENCE_STORE: sqlite
       INTELLIGENCE_SQLITE_PATH: /var/lib/intelligence/intel-rss.db
       INTELLIGENCE_FUNDAMENTALS_CSV: ${INTELLIGENCE_FUNDAMENTALS_CSV:-/data/intelligence/fundamentals.csv}
@@ -108,6 +108,8 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:-}
       # Free tiers allow about 30 requests a minute; 2.5 s spacing stays under it.
       LLM_MIN_INTERVAL_SECONDS: ${LLM_MIN_INTERVAL_SECONDS:-2.5}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
+      NEWS_RSS_MAX_ITEMS: ${NEWS_RSS_MAX_ITEMS:-200}
       LLM_MAX_OUTPUT_TOKENS: ${LLM_MAX_OUTPUT_TOKENS:-600}
       # Groq's JSON validator rejects reasoning-model output, so JSON mode is off by default.
       LLM_JSON_MODE: ${LLM_JSON_MODE:-false}
