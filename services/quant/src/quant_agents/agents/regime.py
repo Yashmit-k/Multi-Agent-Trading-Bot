@@ -11,7 +11,9 @@ from quant_agents.feature_view import FeatureView
 from quant_agents.vote import Vote
 
 WEIGHTS = {
-    "risk_tilt": 0.5,
+    "risk_tilt": 1.0,
+    "index_trend": 1.0,
+    "fear_gauge": 1.0,
 }
 
 
@@ -71,6 +73,18 @@ class RegimeAgent(BaseQuantAgent):
                     votes.append(Vote("risk_tilt", -1, WEIGHTS["risk_tilt"]))
                 else:
                     votes.append(Vote("risk_tilt", 0, WEIGHTS["risk_tilt"]))
+            # Graded with two more index facts, so one daily move is not full confidence.
+            nifty_fast, nifty_slow = nifty.get("ema_12"), nifty.get("ema_26")
+            if nifty_fast is not None and nifty_slow is not None:
+                trend = 1 if nifty_fast > nifty_slow else -1 if nifty_fast < nifty_slow else 0
+                votes.append(Vote("index_trend", trend, WEIGHTS["index_trend"]))
+                reasons.append("regime.index_uptrend" if trend > 0 else "regime.index_downtrend" if trend < 0 else "regime.index_flat")
+            vix_ret = vix.get("return_1")
+            if vix_ret is not None:
+                evidence["vix_return_1"] = vix_ret
+                fear = -1 if vix_ret > 0 else 1 if vix_ret < 0 else 0
+                votes.append(Vote("fear_gauge", fear, WEIGHTS["fear_gauge"]))
+                reasons.append("regime.fear_rising" if fear < 0 else "regime.fear_falling" if fear > 0 else "regime.fear_flat")
         if not votes:
             votes.append(Vote("risk_tilt", 0, WEIGHTS["risk_tilt"]))
         return AgentDecision(
