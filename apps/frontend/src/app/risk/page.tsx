@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 type Check = { name: string; passed: boolean; detail: string };
 type ChainRow = {
+  decided_at: string | null;
   proposal: { proposal_id: string; symbol: string; side: string; quantity: number; entry_price: string; horizon: string; aggregated_signal: number; aggregated_confidence: number; timestamp: string; supporting_signal_ids: string[] };
   risk: { status: string; checks: Check[]; rejection_reason: string | null } | null;
   order: { status: string } | null;
@@ -40,6 +41,7 @@ export default async function RiskPage() {
     ]);
     const mode = system ? parseMode(system.trading_mode) : "UNKNOWN";
     const killSwitch = risk.kill_switch;
+    chain.sort((a, b) => (b.decided_at ?? b.proposal.timestamp).localeCompare(a.decided_at ?? a.proposal.timestamp));
     const approved = chain.filter((row) => row.risk?.status === "APPROVED").length;
     const rejected = chain.filter((row) => row.risk?.status === "REJECTED").length;
     return (
@@ -70,14 +72,16 @@ export default async function RiskPage() {
           </Card>
         </div>
         <Card title="Recent decisions: proposal → risk → order">
+          <p className="mb-2 text-xs text-[#64748B]">Swing decisions use the latest completed daily bar, so a decision made this morning is based on yesterday&apos;s 15:30 close. Exits at the −2% stop or +4% target are handled separately by the bracket monitor all session.</p>
           {chain.length === 0 ? (
-            <Empty>No proposals in this session yet. The decision engine proposes when the fused signal is at least ±0.2 with confidence at least 0.3.</Empty>
+            <Empty>No proposals in this session yet. The decision engine proposes a BUY when the fused signal is at least +0.2 with confidence at least 0.3, and a SELL only for a stock already held.</Empty>
           ) : (
-            <Table head={["Time (IST)", "Symbol", "Proposal", "Fused signal", "Risk", "Failed checks", "Order"]} minWidth={900}>
+            <Table head={["Decided (IST)", "Based on bar", "Symbol", "Proposal", "Fused signal", "Risk", "Failed checks", "Order"]} minWidth={980}>
               {chain.map((row) => {
                 const failed = (row.risk?.checks ?? []).filter((check) => !check.passed);
                 return (
                   <tr key={row.proposal.proposal_id}>
+                    <Td className="whitespace-nowrap text-xs">{row.decided_at ? istTime(row.decided_at) : "—"}</Td>
                     <Td className="whitespace-nowrap text-xs text-[#94A3B8]">{istTime(row.proposal.timestamp)}</Td>
                     <Td>
                       <SymbolLink symbol={row.proposal.symbol} />

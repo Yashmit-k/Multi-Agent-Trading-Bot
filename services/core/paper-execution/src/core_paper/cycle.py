@@ -138,8 +138,11 @@ def run_paper_cycle(
                 proposal = build_proposal(aggregate, candle, as_of, session_id=book.session_id)
                 if proposal is None:
                     continue
+                # Long-only book: a bearish view on a stock we do not hold is not an order to propose.
+                if proposal.side == Side.SELL and repository.held_quantity(instrument.symbol) <= 0:
+                    continue
                 proposal = _sized(proposal, repository.available_cash(starting_cash), costs)
-                proposal = proposal.model_copy(update={"metadata": {**proposal.metadata, "stops_monitored": True, "same_bar_exit": "stop_first"}})
+                proposal = proposal.model_copy(update={"metadata": {**proposal.metadata, "stops_monitored": True, "same_bar_exit": "stop_first", "decided_at": moment.isoformat()}})
                 if repository.insert_proposal(proposal):
                     _publish(publisher, EventType.DECISION_CREATED, f"decision.created:{proposal.proposal_id}", as_of, proposal.proposal_id, proposal)
                     written += 1

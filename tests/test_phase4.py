@@ -198,13 +198,26 @@ def test_risk_rejects_notional_cap(repository: CoreRepository) -> None:
     assert repository.list_orders() == []
 
 
-def test_risk_rejects_sell_without_a_long(repository: CoreRepository) -> None:
+def test_unheld_sell_is_not_proposed_and_risk_still_blocks_shorts(repository: CoreRepository) -> None:
     repository.open_paper_session(CASH)
     repository.upsert_candles(list(candles_for("RELIANCE")))
     _store(repository, _signal(signal_id="sig-sell", signal=-0.8, confidence=0.9, timestamp=FIXTURE_AS_OF))
     publisher = MemoryEventPublisher()
     run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH, enforce_entry_window=False)
-    decision = repository.list_risk_decisions()[0]
+    # Long-only: a bearish view on an unheld stock is not proposed at all, so nothing reaches risk.
+    assert repository.list_proposals() == []
+    assert repository.list_risk_decisions() == []
+    # The risk engine still refuses a short if one is ever submitted directly.
+    from contracts.enums import Horizon, Side
+    from contracts.schemas.trade_proposal import TradeProposal
+    from core_risk import assess
+
+    short = TradeProposal(
+        proposal_id="p-short", symbol="RELIANCE", timestamp=FIXTURE_AS_OF, horizon=Horizon.SWING, side=Side.SELL, quantity=5,
+        entry_price=Decimal("100"), stop_loss=Decimal("102"), take_profit=Decimal("96"), strategy_id="paper-fusion",
+        strategy_version="1.0.0", aggregated_signal=-0.8, aggregated_confidence=0.9, supporting_signal_ids=["sig-sell"], metadata={},
+    )
+    decision = assess(short, mode=TradingMode.PAPER, in_universe=True, cash=CASH, held_quantity=0, timestamp=FIXTURE_AS_OF)
     assert decision.status.value == "REJECTED"
     assert any(check.name == "no_short" and not check.passed for check in decision.checks)
     assert repository.held_quantity("RELIANCE") == 0
