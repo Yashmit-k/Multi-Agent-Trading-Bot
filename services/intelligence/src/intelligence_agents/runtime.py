@@ -64,6 +64,15 @@ def make_stores(settings: IntelligenceSettings):
     return news, funds
 
 
+def make_price_provider(settings: IntelligenceSettings):
+    """Real Zerodha prices from Core in live modes; deterministic fixtures in BACKTEST and fixture mode."""
+    if settings.trading_mode is TradingMode.BACKTEST or settings.data_source == "fixtures":
+        return FakeMarketDataProvider()
+    from intelligence_agents.market import CoreMarketDataProvider
+
+    return CoreMarketDataProvider(settings.core_api_url, settings.core_api_token)
+
+
 def make_router(settings: IntelligenceSettings) -> LLMRouter:
     return build_router(
         api_key=settings.llm_api_key,
@@ -107,9 +116,11 @@ def make_runner(
         EarningsAgent(resolved_clock, router),
     )
 
+    prices = make_price_provider(settings)
+
     def factory(symbol: str, as_of: datetime, horizon: Horizon) -> AgentContext:
         return AgentContext(
-            market_data_provider=FakeMarketDataProvider(),
+            market_data_provider=prices,
             feature_provider=FakeFeatureProvider(),
             news_provider=IntelligenceNewsProvider(news),
             fundamental_provider=IntelligenceFundamentalProvider(funds),

@@ -26,12 +26,15 @@ def refresh_sources(settings: IntelligenceSettings, runner, puller=None) -> None
     if settings.data_source == "rss":
         if puller is None:
             logger.error("rss_puller_missing")
-            return
-        for url in settings.news_rss_urls:
-            try:
-                puller.pull(url)
-            except Exception:
-                logger.exception("rss_cycle_failed")
+        else:
+            for url in settings.news_rss_urls:
+                try:
+                    puller.pull(url)
+                except Exception:
+                    logger.exception("rss_cycle_failed")
+        # Live news and a real fundamentals file can run together.
+        if settings.fundamentals_csv:
+            _load_fundamentals(runner, settings.fundamentals_csv)
         return
     if settings.data_source == "csv-live":
         from intelligence_agents.fundamentals.csv_loader import load_csv
@@ -40,6 +43,22 @@ def refresh_sources(settings: IntelligenceSettings, runner, puller=None) -> None
             load_csv(runner.fund_store, settings.fundamentals_csv)
         except Exception:
             logger.exception("csv_cycle_failed")
+
+
+def _load_fundamentals(runner, path: str) -> None:
+    from pathlib import Path
+
+    from intelligence_agents.fundamentals.csv_loader import load_csv
+
+    if not Path(path).is_file():
+        logger.warning("fundamentals_csv_missing", extra={"path": path})
+        return
+    try:
+        inserted = load_csv(runner.fund_store, path)
+        if inserted:
+            logger.info("fundamentals_csv_loaded", extra={"rows": inserted})
+    except Exception:
+        logger.exception("csv_cycle_failed")
 
 
 def run_cycle(settings: IntelligenceSettings, runner, health: RunnerHealth, router, puller=None) -> None:

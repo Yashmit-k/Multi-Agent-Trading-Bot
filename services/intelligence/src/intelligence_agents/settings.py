@@ -41,6 +41,7 @@ class IntelligenceSettings:
     llm_max_output_tokens: int = 160
     llm_json_mode: bool = False
     llm_reasoning_effort: str = ""
+    core_api_token: str = ""
 
     @classmethod
     def from_env(cls) -> IntelligenceSettings:
@@ -76,6 +77,7 @@ class IntelligenceSettings:
             llm_max_output_tokens=int(os.environ.get("LLM_MAX_OUTPUT_TOKENS", "160")),
             llm_json_mode=os.environ.get("LLM_JSON_MODE", "false").strip().lower() == "true",
             llm_reasoning_effort=os.environ.get("LLM_REASONING_EFFORT", "").strip().lower(),
+            core_api_token=os.environ.get("CORE_API_TOKEN", ""),
         )
         settings.validate()
         return settings
