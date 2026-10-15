@@ -350,18 +350,24 @@ class CoreRepository:
                 candles.append(_candle(row))
             return candles
 
-    def stored_candles(self, symbol: str, timeframe: Timeframe | str) -> list[Candle]:
-        """Every row in the candle table for this symbol and timeframe, with no as_of filter."""
+    def stored_candles(
+        self, symbol: str, timeframe: Timeframe | str, *, start: datetime | None = None, end: datetime | None = None
+    ) -> list[Candle]:
+        """Stored rows for this symbol and timeframe, with no as_of filter.
+
+        start/end narrow the read in SQL (bar start >= start, bar end <= end); without them every row is read.
+        """
         parsed = timeframe if isinstance(timeframe, Timeframe) else Timeframe(timeframe)
         with self._session_factory() as session:
-            rows = session.scalars(
-                select(CandleRow)
-                .where(
-                    CandleRow.symbol == symbol.strip().upper(),
-                    CandleRow.timeframe == parsed.value,
-                )
-                .order_by(CandleRow.start)
+            query = select(CandleRow).where(
+                CandleRow.symbol == symbol.strip().upper(),
+                CandleRow.timeframe == parsed.value,
             )
+            if start is not None:
+                query = query.where(CandleRow.start >= as_utc(start))
+            if end is not None:
+                query = query.where(CandleRow.end <= as_utc(end))
+            rows = session.scalars(query.order_by(CandleRow.start))
             return [_candle(row) for row in rows]
 
     def upsert_feature(self, feature_set: FeatureSet, instrument_id: str) -> None:

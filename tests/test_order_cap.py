@@ -60,11 +60,12 @@ def test_freshness_uses_stored_bars_and_fails_closed() -> None:
         symbol = f"S{index:02d}"
         instrument = repository.upsert_instrument(symbol=symbol, exchange="NSE", trading_symbol=symbol)
         repository.add_membership(instrument.instrument_id, "NIFTY50", datetime(2024, 1, 1, tzinfo=UTC), None)
-        bar_end = end - timedelta(minutes=5) if symbol == "S00" else end
+        # S00 is two bars behind; the feed check tolerates one bar of lag, not two.
+        bar_end = end - timedelta(minutes=10) if symbol == "S00" else end
         repository.upsert_candles([_five(symbol, bar_end - timedelta(minutes=5), bar_end)])
     with pytest.raises(CycleRefused):
         require_fresh_constituents(repository, moment)
-    repository.upsert_candles([_five("S00", start, end)])
+    repository.upsert_candles([_five("S00", start - timedelta(minutes=5), start)])  # now one bar behind
     require_fresh_constituents(repository, moment)
 
 

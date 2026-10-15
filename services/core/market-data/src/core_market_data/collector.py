@@ -288,6 +288,6 @@ def _one_symbol(
                 row.intraday_end = None if stored_end is None else stored_end.isoformat()
                 row.intraday_fresh = stored_fresh
         expected = expected_starts(start, stop, Timeframe.D1 if timeframe == Timeframe.D1 else Timeframe.M5)
-        have = {bar.start.astimezone(timezone.utc) for bar in repository.stored_candles(symbol, timeframe)}
+        have = {bar.start.astimezone(timezone.utc) for bar in repository.stored_candles(symbol, timeframe, start=start, end=stop)}
         row.missing_bars += len({item for item in expected if item not in have})
     return row

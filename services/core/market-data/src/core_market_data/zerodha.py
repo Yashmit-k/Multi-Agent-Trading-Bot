@@ -309,7 +309,8 @@ class ZerodhaMarketDataProvider:
         interval = _KITE_INTERVAL[parsed]
         window_start = _aware(start)
         window_end = _aware(end)
-        stored = self._repository.stored_candles(instrument.symbol, parsed)
+        # Only the requested window is needed to decide which chunks are already complete.
+        stored = self._repository.stored_candles(instrument.symbol, parsed, start=window_start, end=window_end)
         candles: list[Candle] = []
         for chunk_start, chunk_end in _chunks(window_start, window_end, _CHUNK_DAYS[parsed]):
             if chunk_is_complete(stored, chunk_start, chunk_end, parsed):

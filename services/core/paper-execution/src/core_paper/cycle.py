@@ -9,7 +9,7 @@ path uses the versioned Zerodha schedule and does not fall back to 2 bp.
 
 import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Protocol
 
@@ -200,6 +200,7 @@ class CycleRefused(RuntimeError):
 
 
 REQUIRED_MEMBER_COUNT = 50
+FEED_LAG_TOLERANCE = timedelta(minutes=5)
 
 
 def _new_entry_block(
@@ -239,9 +240,13 @@ def require_fresh_constituents(repository: CoreRepository, now: datetime) -> Non
     members = repository.members_at(now)
     if len(members) != REQUIRED_MEMBER_COUNT:
         raise CycleRefused(f"NIFTY50 membership is {len(members)}, required {REQUIRED_MEMBER_COUNT}")
+    # The market-wide feed check tolerates one bar of lag: the collector walks 50 symbols in turn, so a
+    # strict "every symbol has the newest bar" test is false for most of each 5-minute window. The symbol
+    # being traded still needs its own newest bar (require_fresh in run_paper_cycle).
+    tolerance = now - FEED_LAG_TOLERANCE
     for item in members:
         bar = repository.latest_candle(item.symbol, Timeframe.M5)
-        if bar is None or not _candle_is_fresh(bar.end, Timeframe.M5, now):
+        if bar is None or not _candle_is_fresh(bar.end, Timeframe.M5, tolerance):
             raise CycleRefused(f"stale or missing 5m bar for {item.symbol}")
 
 
