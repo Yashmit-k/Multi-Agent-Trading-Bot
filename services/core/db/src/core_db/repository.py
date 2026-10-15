@@ -1133,8 +1133,27 @@ class CoreRepository:
                 raise KeyError(session_id)
             target = book.session_id
             base = book.starting_cash if book.starting_cash is not None else starting_cash
-        snapshot = self.latest_snapshot(target)
-        return base if snapshot is None else snapshot.cash
+        # Cash is derived from the fill ledger, not from the latest snapshot: several fills on the same
+        # 5-minute bar share a snapshot timestamp, so "latest snapshot" is ambiguous and lost debits.
+        return base + self._fill_cash_delta(target)
+
+    def _fill_cash_delta(self, session_id: str | None) -> Decimal:
+        with self._session_factory() as session:
+            executions = list(session.scalars(select(ExecutionRow).where(ExecutionRow.session_id == session_id)))
+            if not executions:
+                return Decimal("0")
+            orders = {row.order_id: row for row in session.scalars(select(OrderRow).where(OrderRow.order_id.in_([row.order_id for row in executions])))}
+        delta = Decimal("0")
+        for row in executions:
+            execution = Execution.model_validate(dict(row.payload))
+            order = orders.get(row.order_id)
+            side = None if order is None else str(order.payload.get("side"))
+            notional = execution.price * execution.quantity
+            if side == "BUY":
+                delta -= notional + execution.fees
+            elif side == "SELL":
+                delta += notional - execution.fees
+        return delta
 
     def paper_running(self) -> bool:
         with self._session_factory() as session:

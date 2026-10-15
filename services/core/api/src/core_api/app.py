@@ -388,7 +388,8 @@ def create_app(
         active = repository.active_paper_session()
         if active is not None and book is not None and book.session_id == active.session_id:
             # Only the open book is revalued at current prices; a closed session keeps its last snapshot.
-            _mark_portfolio(body, [_marked(repository, item) for item in repository.list_positions(argument)], base)
+            _mark_portfolio(body, [_marked(repository, item) for item in repository.list_positions(argument)], base,
+                            cash=repository.cash_balance(base))
         body["session_id"] = None if book is None else book.session_id
         body["live_enabled"] = False
         return body
@@ -935,17 +936,23 @@ def _marked(repository: CoreRepository, position) -> dict[str, object]:
     return body
 
 
-def _mark_portfolio(body: dict[str, object], marked: list[dict[str, object]], starting_cash: Decimal) -> None:
-    """Revalue the latest snapshot's holdings at current marks; cash and realized P&L are unchanged."""
+def _mark_portfolio(body: dict[str, object], marked: list[dict[str, object]], starting_cash: Decimal, *, cash: Decimal) -> None:
+    """Live book: ledger cash plus holdings at current marks.
+
+    total P&L = equity - starting cash (net of every charge);
+    unrealized = holdings at mark - holdings at cost; realized = total - unrealized (closed trades and charges).
+    """
     snapshot = body.get("snapshot")
     if not isinstance(snapshot, dict):
         return
     market_value = sum((Decimal(item["market_value"]) for item in marked), Decimal("0"))
     unrealized = sum((Decimal(item["unrealized_pnl"]) for item in marked), Decimal("0"))
-    equity = Decimal(str(snapshot["cash"])) + market_value
+    equity = cash + market_value
     # Cash already reflects every charge paid, so this is P&L net of costs.
     total = equity - starting_cash
     snapshot.update(
+        cash=str(cash),
+        realized_pnl=str(total - unrealized),
         market_value=str(market_value),
         gross_exposure=str(market_value),
         net_exposure=str(market_value),
