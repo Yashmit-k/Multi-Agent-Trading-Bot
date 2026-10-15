@@ -113,5 +113,5 @@ def test_positions_and_portfolio_are_marked_to_the_latest_bar(repository) -> Non
     assert Decimal(position["unrealized_pnl"]) == Decimal("500")
     portfolio = client.get("/api/v1/portfolio", headers=headers).json()
     assert Decimal(portfolio["equity"]) == Decimal("989990") + Decimal("10500")
-    assert Decimal(portfolio["total_pnl"]) == Decimal("-10") + Decimal("500")
+    assert Decimal(portfolio["total_pnl"]) == Decimal("989990") + Decimal("10500") - CASH  # net of charges
     assert Decimal(portfolio["snapshot"]["unrealized_pnl"]) == Decimal("500")

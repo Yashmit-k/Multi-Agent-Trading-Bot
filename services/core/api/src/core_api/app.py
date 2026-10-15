@@ -936,8 +936,8 @@ def _mark_portfolio(body: dict[str, object], marked: list[dict[str, object]], st
     market_value = sum((Decimal(item["market_value"]) for item in marked), Decimal("0"))
     unrealized = sum((Decimal(item["unrealized_pnl"]) for item in marked), Decimal("0"))
     equity = Decimal(str(snapshot["cash"])) + market_value
-    total = Decimal(str(snapshot["realized_pnl"])) + unrealized
-    del starting_cash
+    # Cash already reflects every charge paid, so this is P&L net of costs.
+    total = equity - starting_cash
     snapshot.update(
         market_value=str(market_value),
         gross_exposure=str(market_value),
