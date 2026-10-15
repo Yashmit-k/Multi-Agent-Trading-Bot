@@ -112,8 +112,9 @@ def test_positions_and_portfolio_are_marked_to_the_latest_bar(repository) -> Non
     assert Decimal(position["market_price"]) == Decimal("1050")
     assert Decimal(position["unrealized_pnl"]) == Decimal("500")
     portfolio = client.get("/api/v1/portfolio", headers=headers).json()
-    assert Decimal(portfolio["equity"]) == Decimal("989990") + Decimal("10500")
-    assert Decimal(portfolio["total_pnl"]) == Decimal("989990") + Decimal("10500") - CASH  # net of charges
+    # No fills were recorded here, so ledger cash is the starting cash; holdings are marked at 1050.
+    assert Decimal(portfolio["equity"]) == CASH + Decimal("10500")
+    assert Decimal(portfolio["snapshot"]["cash"]) == CASH
     assert Decimal(portfolio["snapshot"]["unrealized_pnl"]) == Decimal("500")
 
 
@@ -139,3 +140,24 @@ def test_intraday_entries_are_priced_off_the_five_minute_close(repository) -> No
     swing = _proposal("INFY")
     bar, _, rule = _reference(repository, swing, NOW)
     assert bar.close == Decimal("1000") and rule == REFERENCE_RULE
+
+
+
+def test_same_bar_fills_are_all_debited_from_cash(repository) -> None:
+    """Regression: five buys filled on one 5m bar must all reduce cash (snapshot ties lost two on 15 Oct)."""
+    from contracts.enums import Exchange, OrderStatus, OrderType
+    from contracts.schemas.execution import Execution
+    from contracts.schemas.order import Order
+
+    repository.open_paper_session(CASH)
+    expected = CASH
+    for index, symbol in enumerate(("INFY", "TCS", "HDFCBANK", "ITC", "NTPC")):
+        repository.insert_proposal(_proposal(symbol).model_copy(update={"proposal_id": f"p{index}"}))
+        order = Order(order_id=f"o{index}", client_order_id=f"o{index}", proposal_id=f"p{index}", symbol=symbol, exchange=Exchange.NSE,
+                      side=Side.BUY, order_type=OrderType.LIMIT, quantity=10, limit_price=Decimal("1000"), stop_price=None,
+                      trading_mode=TradingMode.PAPER, status=OrderStatus.FILLED, created_at=NOW, updated_at=NOW, metadata={})
+        repository.insert_order(order)
+        repository.insert_execution(Execution(execution_id=f"e{index}", order_id=f"o{index}", symbol=symbol, quantity=10, price=Decimal("1000"),
+                                              executed_at=NOW, fees=Decimal("22.50"), slippage=Decimal("0"), venue="PAPER", metadata={}))
+        expected -= Decimal("10000") + Decimal("22.50")
+    assert repository.cash_balance(CASH) == expected
