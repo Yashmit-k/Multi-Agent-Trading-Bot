@@ -156,3 +156,23 @@ def test_latest_signal_per_agent(repository: CoreRepository) -> None:
         repository.insert_signal(item.signal_id, item.symbol, item.exchange.value, item.model_dump(mode="json"), datetime.now(timezone.utc))
     names = [row["agent_name"] for row in repository.latest_signal_per_agent()]
     assert sorted(names) == sorted({first.agent_name.value, "news"})
+
+
+def test_quant_length_signal_ids_are_recorded(repository: CoreRepository) -> None:
+    signal = sample_agent_signal("RELIANCE").model_copy(update={"signal_id": "f" * 64})
+    envelope = EventEnvelope(
+        event_id=f"agent.signal:{signal.signal_id}", event_type=EventType.AGENT_SIGNAL, timestamp=signal.timestamp,
+        source="signal-ingestion", correlation_id=signal.signal_id, payload=signal,
+    )
+    assert record_message(repository, "agent.events", envelope.model_dump_json())
+    assert repository.list_system_events(correlation_id=signal.signal_id)[0]["event_id"] == envelope.event_id
+
+
+def test_a_failing_store_does_not_crash_the_recorder(repository: CoreRepository) -> None:
+    channel, raw, _ = _signal_envelope()
+
+    class Broken:
+        def insert_system_event(self, *args, **kwargs):
+            raise RuntimeError("database down")
+
+    assert record_message(Broken(), channel, raw) is False
