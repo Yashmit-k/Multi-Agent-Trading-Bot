@@ -34,7 +34,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       SEED_HISTORY_DAYS: ${SEED_HISTORY_DAYS:-100}
       MARKET_DATA_COLLECTOR: "true"
-      MARKET_DATA_POLL_SECONDS: "60"
+      MARKET_DATA_POLL_SECONDS: "20"
     depends_on:
       postgres:
         condition: service_healthy
