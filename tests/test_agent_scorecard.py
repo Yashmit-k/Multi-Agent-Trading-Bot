@@ -50,3 +50,25 @@ def test_repeats_collapse_and_neutral_is_not_a_hit() -> None:
     assert row["directional"] == 2 and row["hit_rate"] == 0.5
     assert row["proposals_supported"] == 2 and row["in_fusion"] is True
     assert row["beats_coin_flip"] is False
+
+
+def test_scorecard_endpoint_reads_stored_data(repository) -> None:  # type: ignore[no-untyped-def]
+    from core_api.app import _scorecard
+
+    from contracts.enums import Exchange, Timeframe
+    from contracts.schemas.market import Candle
+    from decimal import Decimal
+
+    repository.upsert_instrument(symbol="TCS", exchange="NSE", trading_symbol="TCS")
+    repository.upsert_candles(
+        [
+            Candle(symbol="TCS", exchange=Exchange.NSE, timeframe=Timeframe.M5, open=Decimal("100"), high=Decimal("200"), low=Decimal("99"),
+                   close=Decimal(str(100 + i)), volume=10, start=OPEN + timedelta(minutes=5 * i - 5), end=OPEN + timedelta(minutes=5 * i))
+            for i in range(20)
+        ]
+    )
+    payload = {"agent_name": "momentum", "horizon": "INTRADAY", "timestamp": OPEN.isoformat(), "signal": 0.5, "confidence": 0.5}
+    repository.insert_signal("m1", "TCS", "NSE", payload, OPEN)
+    result = _scorecard(repository, OPEN + timedelta(hours=3), 10)
+    [row] = result["agents"]
+    assert row["agent"] == "momentum" and row["directional"] == 1 and row["hit_rate"] == 1.0

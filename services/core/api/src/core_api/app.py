@@ -89,6 +89,8 @@ def create_app(
 
     app.state.ingestion = IngestionState()
     app.state.zerodha_access_token = _restore_broker_token(repository, kite_client, app.state.ingestion, datetime.now(timezone.utc))
+    app.state.scorecard_cache = {}
+    app.state.scorecard_refreshing = False
     app.state.historical_gate = HistoricalGate()
     app.state.kite_pace = app.state.historical_gate.pace
     app.state.worker_heartbeat_at = None
@@ -257,14 +259,19 @@ def create_app(
         return [_agent_row(name, enabled, latest.get(name)) for name, enabled in _AGENT_ROWS]
 
     @app.get("/api/v1/agents/scorecard")
-    def agent_scorecard(_: Annotated[None, Depends(require_user)], days: int = 10) -> dict[str, object]:
+    def agent_scorecard(_: Annotated[None, Depends(require_user)], background: BackgroundTasks, days: int = 10) -> dict[str, object]:
         days = max(1, min(days, 30))
         now = datetime.now(timezone.utc)
-        cached = getattr(app.state, "scorecard_cache", {}).get(days)
+        cache = app.state.scorecard_cache
+        cached = cache.get(days)
         if cached and (now - cached[0]) < timedelta(minutes=10):
             return cached[1]
+        if cached and not app.state.scorecard_refreshing:  # serve the stale copy; refresh behind it
+            app.state.scorecard_refreshing = True
+            background.add_task(_refresh_scorecard, app, repository, days)
+            return cached[1]
         result = _scorecard(repository, now, days)
-        app.state.scorecard_cache = {**getattr(app.state, "scorecard_cache", {}), days: (now, result)}
+        cache[days] = (now, result)
         return result
 
     @app.get("/api/v1/agents/{agent_name}/health")
@@ -1397,6 +1404,16 @@ def _journal(repository: CoreRepository, limit: int) -> list[dict[str, object]]:
     return trades
 
 
+def _refresh_scorecard(app: FastAPI, repository: CoreRepository, days: int) -> None:
+    try:
+        now = datetime.now(timezone.utc)
+        app.state.scorecard_cache[days] = (now, _scorecard(repository, now, days))
+    except Exception:  # noqa: BLE001 - a failed refresh keeps the stale copy
+        logging.getLogger(__name__).exception("scorecard refresh failed")
+    finally:
+        app.state.scorecard_refreshing = False
+
+
 def _scorecard(repository: CoreRepository, now: datetime, days: int) -> dict[str, object]:
     from core_api import scorecard as sc
 
@@ -1408,10 +1425,7 @@ def _scorecard(repository: CoreRepository, now: datetime, days: int) -> dict[str
         except ValueError:
             continue
         points.append(sc.SignalPoint(signal_id, agent, horizon, symbol, moment, float(signal), float(confidence)))
-    closes = {}
-    for symbol in sorted({point.symbol for point in points}):
-        bars = repository.stored_candles(symbol, Timeframe.M5, start=start - timedelta(days=1))
-        closes[symbol] = sc.Closes([(bar.end, float(bar.close)) for bar in bars])
+    closes = {symbol: sc.Closes(bars) for symbol, bars in repository.closes_since(Timeframe.M5, start - timedelta(days=1)).items()}
     owner = {point.signal_id: point.agent for point in points}
     supported: dict[str, int] = {}
     approved: dict[str, int] = {}

@@ -479,6 +479,18 @@ class CoreRepository:
             )
             return [tuple(row) for row in rows]  # type: ignore[misc]
 
+    def closes_since(self, timeframe: Timeframe | str, start: datetime) -> dict[str, list[tuple[datetime, float]]]:
+        """(bar end, close) per symbol for bars ending at or after start, in one query, without building Candles."""
+        value = timeframe.value if isinstance(timeframe, Timeframe) else str(timeframe)
+        out: dict[str, list[tuple[datetime, float]]] = {}
+        with self._session_factory() as session:
+            rows = session.execute(
+                select(CandleRow.symbol, CandleRow.end, CandleRow.close).where(CandleRow.timeframe == value, CandleRow.end >= start)
+            )
+            for symbol, end, close in rows:
+                out.setdefault(symbol, []).append((as_utc(end), float(close)))
+        return out
+
     def proposal_support_since(self, start: datetime) -> list[tuple[list[str], bool]]:
         """For each proposal since start: its supporting signal ids and whether risk approved it."""
         with self._session_factory() as session:
