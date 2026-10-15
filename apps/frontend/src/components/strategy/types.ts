@@ -46,7 +46,7 @@ export type LabResult = {
   trades_skipped_by_portfolio: number;
   metrics: Metrics;
   halves: { split_date?: string; first_half?: { trades: number; net_pnl: number }; second_half?: { trades: number; net_pnl: number } };
-  benchmark: { symbol: string; total_return: number; curve: Array<{ date: string; equity: number }> } | null;
+  benchmark: { symbol: string; from?: string; to?: string; total_return: number; curve: Array<{ date: string; equity: number }> } | null;
   equity_curve: Array<{ date: string; equity: number }>;
   trades: LabTrade[];
   trades_listed_limit?: number;

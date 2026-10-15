@@ -94,7 +94,16 @@ export function OperatorGate({ children, what }: { children: (operator: boolean)
 // Header chip: shows the operator session and a sign-out, and nothing for visitors.
 export function OperatorChip() {
   const { status } = useOperator();
-  if (!status?.operator) return null;
+  if (!status) return null;
+  if (!status.operator) {
+    if (!status.login_enabled) return null;
+    const here = typeof window === "undefined" ? "/dashboard" : window.location.pathname;
+    return (
+      <a href={`/login?next=${encodeURIComponent(here)}`} className="rounded border border-[#26303C] px-2 py-0.5 text-[#94A3B8] hover:text-[#E6EDF3]">
+        Sign in
+      </a>
+    );
+  }
   return (
     <button
       type="button"
