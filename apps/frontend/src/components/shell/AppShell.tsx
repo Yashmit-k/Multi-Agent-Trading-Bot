@@ -9,8 +9,8 @@ type NavLink = readonly [string, string];
 const GROUPS: ReadonlyArray<readonly [string, ReadonlyArray<NavLink>]> = [
   ["Trading", [["/dashboard", "Overview"], ["/portfolio", "Portfolio"], ["/positions", "Positions"], ["/orders", "Orders"], ["/journal", "Journal"], ["/risk", "Risk"]]],
   ["Agents", [["/agents", "Agents"], ["/trace", "Agent trace"], ["/signals", "Signals"], ["/news", "News"]]],
-  ["Market", [["/market", "Market"], ["/stocks", "Stocks"]]],
-  ["Research", [["/research", "ML research"], ["/backtests", "Backtests"], ["/performance", "Performance"]]],
+  ["Market", [["/market", "Market"], ["/stocks", "Stocks"], ["/watchlist", "Watchlist"]]],
+  ["Research", [["/strategies", "Strategy lab"], ["/research", "ML research"], ["/backtests", "Backtests"], ["/performance", "Performance"]]],
   ["System", [["/system", "Health"], ["/settings", "Settings"]]],
 ];
 

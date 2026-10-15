@@ -53,10 +53,12 @@ logger = logging.getLogger(__name__)
 
 
 def order_notional_cap(requested: Decimal | None = None) -> Decimal:
-    """Hard per-order notional ceiling. A larger requested cap cannot raise it."""
-    if requested is None or requested > MAX_NOTIONAL:
+    """Per-order notional cap: the user setting (default Rs 20,000), never above the hard ceiling."""
+    from core_risk.settings import HARD_MAX_ORDER_NOTIONAL
+
+    if requested is None:
         return MAX_NOTIONAL
-    return requested
+    return min(requested, HARD_MAX_ORDER_NOTIONAL)
 
 
 def affordable_quantity(
@@ -92,6 +94,9 @@ def queue_entry(
     cap: Decimal | None = None,
     entry_window: EntryWindow | None = None,
     placed_at: datetime | None = None,
+    daily_limit: int | None = None,
+    limit_override: Decimal | None = None,
+    quantity_limit: int | None = None,
 ) -> Order | None:
     """Create one CNC limit order, or a rejected order when the policy cannot be applied.
 
@@ -115,8 +120,13 @@ def queue_entry(
     daily, candle_id, reference_rule = _reference(repository, proposal, as_of)
     window = _requested_window(entry_window) if entry_window is not None else assign_entry_window(as_of)
     limit = buy_limit(daily.close, instrument.tick_size)
+    if limit_override is not None:  # a manual limit, never above the standard +25 bp entry limit
+        tick = instrument.tick_size
+        limit = min(limit, (limit_override / tick).to_integral_value(rounding="ROUND_FLOOR") * tick)
     cash = repository.available_cash(repository.active_paper_session().starting_cash)  # type: ignore[union-attr]
     quantity = affordable_quantity(cash, limit, priced, bound)
+    if quantity_limit is not None:
+        quantity = min(quantity, quantity_limit)
     if quantity < 1:
         order = _order(
             repository,
@@ -130,7 +140,7 @@ def queue_entry(
         repository.commit_policy_order(order, None)
         return order
     notional = limit * quantity
-    if notional > MAX_NOTIONAL:
+    if notional > bound:
         order = _order(
             repository,
             proposal,
@@ -166,10 +176,12 @@ def queue_entry(
         "evaluated_bars": [],
         "stop_loss": str(proposal.stop_loss),
         "take_profit": str(proposal.take_profit),
+        "notional_cap": str(bound),
     }
     sized = proposal.model_copy(update={"quantity": quantity})
     order = _order(repository, sized, placed_at or as_of, instrument, status=OrderStatus.OPEN, limit=limit, metadata=metadata, quantity=quantity)
-    if repository.commit_policy_order(order, reserve):
+    committed = repository.commit_policy_order(order, reserve) if daily_limit is None else repository.commit_policy_order(order, reserve, daily_limit=daily_limit)
+    if committed:
         return order
     existing = repository.order_for_proposal(proposal.proposal_id)
     if existing is not None:
@@ -300,7 +312,7 @@ def _fill_buy(repository, order, bar: Candle, price: Decimal, starting_cash: Dec
     fees = delivery_buy(notional, schedule).total
     debit = notional + fees
     reserved = Decimal(str(order.metadata["reserved_amount"]))
-    if price > Decimal(str(order.limit_price)) or notional > MAX_NOTIONAL or debit > reserved:
+    if price > Decimal(str(order.limit_price)) or notional > order_notional_cap(Decimal(str(order.metadata.get("notional_cap") or MAX_NOTIONAL))) or debit > reserved:
         return False
     if debit > repository.cash_balance(starting_cash):
         return False

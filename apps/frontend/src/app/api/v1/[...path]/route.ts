@@ -1,4 +1,5 @@
-import { allowRead, allowWrite } from "@/lib/proxy-policy";
+import { allowOperatorWrite, allowPublicWrite, allowRead, allowWrite } from "@/lib/proxy-policy";
+import { tokenFromCookieHeader, validToken } from "@/lib/operator-session";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,28 @@ async function forward(response: Response): Promise<Response> {
 
 type Context = { params: Promise<{ path: string[] }> };
 
+// A signed-in operator's writes must come from this site's own pages.
+function sameOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin) return true; // same-origin fetches from older browsers may omit it; the cookie is SameSite=Strict
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
+// Ten public backtest previews per address per ten minutes, so visitors cannot tie up the server.
+const previews = new Map<string, number[]>();
+function rateLimited(request: Request, now = Date.now()): boolean {
+  const who = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  const recent = (previews.get(who) ?? []).filter((stamp) => now - stamp < 10 * 60 * 1000);
+  if (recent.length >= 10) return true;
+  previews.set(who, [...recent, now]);
+  return false;
+}
+
 export async function GET(request: Request, context: Context): Promise<Response> {
   const { path } = await context.params;
   const pathname = `/api/v1/${path.join("/")}`;
@@ -42,8 +65,15 @@ export async function GET(request: Request, context: Context): Promise<Response>
 export async function POST(request: Request, context: Context): Promise<Response> {
   const { path } = await context.params;
   const pathname = `/api/v1/${path.join("/")}`;
-  if (!allowWrite(pathname, process.env.FRONTEND_ALLOW_POST_PATHS)) {
-    return Response.json({ detail: "write_blocked_by_public_proxy" }, { status: 403 });
+  const listed = allowWrite(pathname, process.env.FRONTEND_ALLOW_POST_PATHS);
+  const operator = allowOperatorWrite(pathname) && validToken(tokenFromCookieHeader(request.headers.get("cookie"))) && sameOrigin(request);
+  const visitor = allowPublicWrite(pathname);
+  if (!listed && !operator && !visitor) {
+    const detail = allowOperatorWrite(pathname) ? "operator_login_required" : "write_blocked_by_public_proxy";
+    return Response.json({ detail }, { status: 403 });
+  }
+  if (visitor && !operator && rateLimited(request)) {
+    return Response.json({ detail: "too_many_backtests_try_again_shortly" }, { status: 429 });
   }
   const url = new URL(request.url);
   try {
@@ -52,7 +82,7 @@ export async function POST(request: Request, context: Context): Promise<Response
         method: "POST",
         headers: headers(request.headers.get("Content-Type")),
         body: await request.text(),
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(pathname.includes("/backtest") ? 60000 : 15000),
       }),
     );
   } catch {

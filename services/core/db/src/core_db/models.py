@@ -355,3 +355,26 @@ class DailyEquityRow(Base):
     trading_day: Mapped[str] = mapped_column(String(10), nullable=False)
     written_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class UserSettingRow(Base):
+    """One JSON document per settings key (e.g. "risk"), edited from the Settings page."""
+
+    __tablename__ = "user_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_by: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+class UserStrategyRow(Base):
+    """A user-built rule strategy (indicators, conditions, exits), as JSON."""
+
+    __tablename__ = "user_strategies"
+
+    strategy_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

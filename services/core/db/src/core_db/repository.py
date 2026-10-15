@@ -51,6 +51,8 @@ from core_db.models import (
     SignalRejectionRow,
     SystemEventRow,
     TradeProposalRow,
+    UserSettingRow,
+    UserStrategyRow,
     UniverseMembershipRow,
 )
 from core_db.paper_sessions import (
@@ -491,6 +493,17 @@ class CoreRepository:
                 out.setdefault(symbol, []).append((as_utc(end), float(close)))
         return out
 
+    def ohlcv(self, symbol: str, timeframe: Timeframe | str, start: datetime, end: datetime) -> list[tuple[datetime, float, float, float, float, float]]:
+        """(end, open, high, low, close, volume) for bars ending in [start, end], oldest first, without building Candles."""
+        value = timeframe.value if isinstance(timeframe, Timeframe) else str(timeframe)
+        with self._session_factory() as session:
+            rows = session.execute(
+                select(CandleRow.end, CandleRow.open, CandleRow.high, CandleRow.low, CandleRow.close, CandleRow.volume)
+                .where(CandleRow.symbol == symbol, CandleRow.timeframe == value, CandleRow.end >= start, CandleRow.end <= end)
+                .order_by(CandleRow.end)
+            )
+            return [(as_utc(e), float(o), float(h), float(l), float(c), float(v)) for e, o, h, l, c, v in rows]
+
     def proposal_support_since(self, start: datetime) -> list[tuple[list[str], bool]]:
         """For each proposal since start: its supporting signal ids and whether risk approved it."""
         with self._session_factory() as session:
@@ -587,6 +600,55 @@ class CoreRepository:
         with self._session_factory() as session:
             row = session.get(BrokerSessionRow, broker)
             return None if row is None else as_utc(row.issued_at)
+
+    def get_setting(self, key: str) -> dict | None:
+        with self._session_factory() as session:
+            row = session.get(UserSettingRow, key)
+            if row is None:
+                return None
+            return {"payload": dict(row.payload), "updated_at": as_utc(row.updated_at).isoformat(), "updated_by": row.updated_by}
+
+    def save_setting(self, key: str, payload: dict, *, updated_by: str, now: datetime) -> None:
+        with self._session_factory() as session:
+            row = session.get(UserSettingRow, key)
+            if row is None:
+                session.add(UserSettingRow(key=key, payload=payload, updated_at=as_utc(now), updated_by=updated_by))
+            else:
+                row.payload, row.updated_at, row.updated_by = payload, as_utc(now), updated_by
+            session.commit()
+
+    def save_strategy(self, strategy_id: str, name: str, payload: dict, now: datetime) -> None:
+        with self._session_factory() as session:
+            row = session.get(UserStrategyRow, strategy_id)
+            if row is None:
+                session.add(UserStrategyRow(strategy_id=strategy_id, name=name, payload=payload, created_at=as_utc(now), updated_at=as_utc(now)))
+            else:
+                row.name, row.payload, row.updated_at = name, payload, as_utc(now)
+            session.commit()
+
+    def list_strategies(self) -> list[dict]:
+        with self._session_factory() as session:
+            rows = session.scalars(select(UserStrategyRow).order_by(UserStrategyRow.updated_at.desc()))
+            return [
+                {"strategy_id": row.strategy_id, "name": row.name, "definition": dict(row.payload), "updated_at": as_utc(row.updated_at).isoformat()}
+                for row in rows
+            ]
+
+    def get_strategy(self, strategy_id: str) -> dict | None:
+        with self._session_factory() as session:
+            row = session.get(UserStrategyRow, strategy_id)
+            if row is None:
+                return None
+            return {"strategy_id": row.strategy_id, "name": row.name, "definition": dict(row.payload), "updated_at": as_utc(row.updated_at).isoformat()}
+
+    def delete_strategy(self, strategy_id: str) -> bool:
+        with self._session_factory() as session:
+            row = session.get(UserStrategyRow, strategy_id)
+            if row is None:
+                return False
+            session.delete(row)
+            session.commit()
+            return True
 
     def daily_equity_exists(self, session_id: str, trading_day: str) -> bool:
         with self._session_factory() as session:
@@ -788,7 +850,7 @@ class CoreRepository:
             row.payload = order.model_dump(mode="json")
             session.commit()
 
-    def commit_policy_order(self, order: Order, reserve: Decimal | None) -> bool:
+    def commit_policy_order(self, order: Order, reserve: Decimal | None, *, daily_limit: int = DAILY_ENTRY_LIMIT) -> bool:
         """Insert one order and, for a BUY hold, its cash reservation in one transaction.
 
         A new CNC entry is counted under its IST calendar date before the insert.
@@ -804,7 +866,7 @@ class CoreRepository:
                 _lock_entry_day(session, _ist_day(order.created_at))
             if session.scalar(select(OrderRow).where(OrderRow.proposal_id == order.proposal_id)) is not None:
                 return False
-            if counted and _entry_count(session, _ist_day(order.created_at)) >= DAILY_ENTRY_LIMIT:
+            if counted and _entry_count(session, _ist_day(order.created_at)) >= daily_limit:
                 return False
             session.add(
                 OrderRow(

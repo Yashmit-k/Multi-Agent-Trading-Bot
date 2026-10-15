@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { TradingMode } from "@/contracts/generated/vocab";
+import { OperatorChip } from "@/components/operator/OperatorGate";
 
 function useIstClock(): string {
   const [now, setNow] = useState("");
@@ -74,6 +75,7 @@ export function ModeBanner({
         >
           Kill switch: {killSwitch}
         </span>
+        <OperatorChip />
         {clock ? <span className="hidden tabular-nums text-[#64748B] sm:inline">{clock} IST</span> : null}
       </div>
     </header>
