@@ -124,8 +124,9 @@ def run_paper_cycle(
                 capped = True
                 break
             candle = repository.latest_candle(instrument.symbol, timeframe)
-            if candle is None or repository.held_quantity(instrument.symbol) > 0:
+            if candle is None:
                 continue
+            # Held stocks are still scored so a bearish turn can exit them; they only skip new BUYs below.
             if require_fresh and not _candle_is_fresh(candle.end, timeframe, moment):
                 continue
             as_of = candle.end.astimezone(timezone.utc)
@@ -139,8 +140,13 @@ def run_paper_cycle(
                 if proposal is None:
                     continue
                 # Long-only book: a bearish view on a stock we do not hold is not an order to propose.
-                if proposal.side == Side.SELL and repository.held_quantity(instrument.symbol) <= 0:
+                held = repository.held_quantity(instrument.symbol)
+                if proposal.side == Side.SELL and held <= 0:
                     continue
+                if proposal.side == Side.BUY and held > 0:
+                    continue  # one position per stock: no adding to an existing holding
+                if proposal.side == Side.SELL:
+                    proposal = proposal.model_copy(update={"quantity": held})  # a signal exit sells the whole holding
                 proposal = _sized(proposal, repository.available_cash(starting_cash), costs)
                 proposal = proposal.model_copy(update={"metadata": {**proposal.metadata, "stops_monitored": True, "same_bar_exit": "stop_first", "decided_at": moment.isoformat()}})
                 if repository.insert_proposal(proposal):
@@ -165,6 +171,10 @@ def run_paper_cycle(
             if decision is None or decision.status != RiskStatus.APPROVED:
                 continue
             if repository.order_for_proposal(proposal.proposal_id) is not None:
+                continue
+            if proposal.side == Side.SELL:
+                # Agents turned bearish on a held stock: sell at the next bar's open, like a stop or target exit.
+                _queue(repository, proposal, as_of, reason="signal", fill_at="next_open")
                 continue
             before = {item.order_id for item in repository.list_orders()}
             queue_entry(repository, proposal, as_of, entry_window=extension, placed_at=moment)

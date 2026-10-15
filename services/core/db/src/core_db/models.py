@@ -342,3 +342,16 @@ class BrokerSessionRow(Base):
     broker: Mapped[str] = mapped_column(String(32), primary_key=True)
     access_token: Mapped[str] = mapped_column(String(256), nullable=False)
     issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class DailyEquityRow(Base):
+    """One end-of-day book per paper session and IST trading day, written after the cash close."""
+
+    __tablename__ = "daily_equity"
+    __table_args__ = (UniqueConstraint("session_id", "trading_day", name="uq_daily_equity_session_day"),)
+
+    daily_id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    trading_day: Mapped[str] = mapped_column(String(10), nullable=False)
+    written_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)

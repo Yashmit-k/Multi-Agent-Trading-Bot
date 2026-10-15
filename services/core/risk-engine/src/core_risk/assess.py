@@ -35,7 +35,9 @@ def assess(
         _check("mode_is_paper", mode == TradingMode.PAPER, f"mode {mode.value} is not PAPER"),
         _check("universe_member", in_universe, f"{proposal.symbol} is outside the universe at as_of"),
         _check("sufficient_cash", proposal.side != Side.BUY or notional <= cash, "buy notional exceeds cash"),
-        _check("notional_cap", notional <= bound, f"order notional exceeds {bound}"),
+        # The per-order cap limits new exposure. A SELL closes a holding, which may have grown past the cap
+        # (a +4% target on a full-size buy is over Rs 20,000), and must never be blocked by it.
+        _check("notional_cap", proposal.side != Side.BUY or notional <= bound, f"order notional exceeds {bound}"),
         _check(
             "no_short",
             proposal.side != Side.SELL or proposal.quantity <= held_quantity,

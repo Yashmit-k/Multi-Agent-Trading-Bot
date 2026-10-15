@@ -327,6 +327,11 @@ def create_app(
             )
         return rows
 
+    @app.get("/api/v1/journal")
+    def journal(_: Annotated[None, Depends(require_user)], limit: int = 50) -> dict[str, object]:
+        """Every entry in the active session as one trade: agent votes, fusion, risk, order, fill, exit, P&L."""
+        return {"trades": _journal(repository, max(1, min(limit, 200))), "live_enabled": False}
+
     @app.get("/api/v1/decisions/{proposal_id}")
     def decision(proposal_id: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
         proposal = repository.get_proposal(proposal_id)
@@ -424,9 +429,9 @@ def create_app(
         return _paper_body(repository, resolved)
 
     @app.get("/api/v1/paper/daily-performance")
-    def paper_daily_performance(_: Annotated[None, Depends(require_user)]) -> dict[str, str]:
-        """No daily equity series exists. Closed positions are removed, so open-position P&L is not the book."""
-        return {"status": "unavailable", "reason": "no_daily_equity_history"}
+    def paper_daily_performance(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        """Stored end-of-day books for the active session, plus today's provisional book while it trades."""
+        return _daily_performance(repository, datetime.now(timezone.utc))
 
     @app.get("/api/v1/worker/heartbeat")
     def worker_heartbeat(_: Annotated[None, Depends(require_user)]) -> dict[str, str]:
@@ -1263,6 +1268,111 @@ def _restore_broker_token(repository: CoreRepository, kite_client: Any | None, s
     state.credentials_rejected = False
     logger.info("broker_token_restored broker=zerodha")
     return token
+
+
+def _daily_performance(repository: CoreRepository, now: datetime) -> dict[str, object]:
+    from core_paper.daily import book_for_day
+
+    book = repository.active_paper_session()
+    if book is None or book.starting_cash is None:
+        return {"status": "unavailable", "reason": "no_daily_equity_history"}
+    rows = repository.list_daily_equity(book.session_id)
+    today = now.astimezone(_IST).date()
+    if not any(row["trading_day"] == today.isoformat() for row in rows):
+        live = book_for_day(repository, book.starting_cash, today, as_of=now)
+        if live is not None:
+            live["start_of_day_equity"] = rows[-1]["equity"] if rows else str(book.starting_cash)
+            live["day_pnl"] = str(Decimal(live["equity"]) - Decimal(live["start_of_day_equity"]))
+            live["written_at"] = None
+            rows = [*rows, live]
+    if not rows:
+        return {"status": "unavailable", "reason": "no_daily_equity_history"}
+    days = []
+    previous_realized = previous_unrealized = Decimal("0")
+    for row in rows:
+        realized, unrealized = Decimal(row["realized_pnl"]), Decimal(row["unrealized_pnl"])
+        days.append({
+            "session_id": book.session_id,
+            "calendar_date_ist": row["trading_day"],
+            "snapshot_as_of": row["as_of"],
+            "complete": bool(row.get("complete")) and row.get("written_at") is not None,
+            "pnl_basis": "net_equity",
+            "net_pnl_inr": float(Decimal(row["day_pnl"])),
+            "start_of_day_equity_inr": float(Decimal(row["start_of_day_equity"])),
+            "equity_inr": float(Decimal(row["equity"])),
+            "realized_pnl_inr": float(realized - previous_realized),
+            "unrealized_change_inr": float(unrealized - previous_unrealized),
+            "fees_inr": float(Decimal(row["fees_today"])),
+            "has_activity": row["fills_today"] > 0,
+            "trading_calendar_state": "open",
+            "source_updated_at": row.get("written_at") or row["as_of"],
+            "closed_trades": row["closed_trades_today"],
+            "open_positions": row["open_positions"],
+        })
+        previous_realized, previous_unrealized = realized, unrealized
+    return {"status": "available", "session_id": book.session_id, "pnl_basis": "net_equity", "days": days}
+
+
+def _journal(repository: CoreRepository, limit: int) -> list[dict[str, object]]:
+    orders = repository.list_orders()
+    executions = {item.order_id: item for item in repository.list_executions()}
+    entries = sorted(
+        (order for order in orders if order.side.value == "BUY" and order.metadata.get("reason") == "entry"),
+        key=lambda item: item.created_at,
+        reverse=True,
+    )[:limit]
+    sells = sorted((order for order in orders if order.side.value == "SELL"), key=lambda item: item.created_at)
+    trades = []
+    for order in entries:
+        proposal = repository.get_proposal(order.proposal_id)
+        risk = repository.risk_for_proposal(order.proposal_id)
+        votes = []
+        for signal_id in (proposal.supporting_signal_ids if proposal else []):
+            payload = repository.get_signal_payload(signal_id)
+            if payload:
+                votes.append({key: payload.get(key) for key in ("agent_name", "horizon", "signal", "confidence", "reason_codes", "timestamp")})
+        fill = executions.get(order.order_id)
+        exit_order = exit_fill = None
+        if fill is not None:
+            for candidate in sells:
+                done = executions.get(candidate.order_id)
+                if candidate.symbol == order.symbol and done is not None and done.executed_at >= fill.executed_at:
+                    exit_order, exit_fill = candidate, done
+                    break
+        pnl = None
+        mark = None
+        if fill is not None and exit_fill is not None:
+            pnl = (exit_fill.price - fill.price) * fill.quantity - fill.fees - exit_fill.fees
+            status = "closed"
+        elif fill is not None:
+            bar = repository.latest_candle(order.symbol, Timeframe.M5)
+            mark = None if bar is None else bar.close
+            pnl = None if mark is None else (mark - fill.price) * fill.quantity - fill.fees
+            status = "open"
+        else:
+            status = order.status.value.lower()
+        trades.append({
+            "symbol": order.symbol,
+            "status": status,
+            "horizon": None if proposal is None else proposal.horizon.value,
+            "decided_at": None if proposal is None else proposal.metadata.get("decided_at"),
+            "decision_bar": None if proposal is None else proposal.timestamp.isoformat(),
+            "fused_signal": None if proposal is None else proposal.aggregated_signal,
+            "fused_confidence": None if proposal is None else proposal.aggregated_confidence,
+            "stop_loss": None if proposal is None else str(proposal.stop_loss),
+            "take_profit": None if proposal is None else str(proposal.take_profit),
+            "votes": votes,
+            "risk": None if risk is None else {"status": risk.status.value, "checks": [check.model_dump(mode="json") for check in risk.checks]},
+            "order": {"order_id": order.order_id, "quantity": order.quantity, "limit_price": None if order.limit_price is None else str(order.limit_price),
+                      "placed_at": order.created_at.isoformat(), "status": order.status.value,
+                      "note": order.metadata.get("cancel_reason") or order.metadata.get("terminal_reason")},
+            "entry_fill": None if fill is None else {"price": str(fill.price), "quantity": fill.quantity, "fees": str(fill.fees), "at": fill.executed_at.isoformat()},
+            "exit": None if exit_fill is None else {"price": str(exit_fill.price), "fees": str(exit_fill.fees), "at": exit_fill.executed_at.isoformat(),
+                                                   "reason": exit_order.metadata.get("reason") if exit_order else None},
+            "mark": None if mark is None else str(mark),
+            "pnl": None if pnl is None else str(pnl),
+        })
+    return trades
 
 
 def _cors_origins() -> list[str]:
