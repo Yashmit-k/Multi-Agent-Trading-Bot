@@ -541,6 +541,11 @@ class CoreRepository:
                 return None
             return row.access_token
 
+    def broker_token_issued_at(self, broker: str) -> datetime | None:
+        with self._session_factory() as session:
+            row = session.get(BrokerSessionRow, broker)
+            return None if row is None else as_utc(row.issued_at)
+
     def daily_equity_exists(self, session_id: str, trading_day: str) -> bool:
         with self._session_factory() as session:
             return session.get(DailyEquityRow, f"{session_id}:{trading_day}") is not None

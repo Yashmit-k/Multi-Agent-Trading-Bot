@@ -140,7 +140,8 @@ def test_login_routes_keep_the_access_token_in_memory() -> None:
     denied = client.get("/api/v1/zerodha/status")
     assert denied.status_code == 401
     status = client.get("/api/v1/zerodha/status", headers=HEADERS)
-    assert status.json() == {"configured": True, "authenticated": False, "live_enabled": False}
+    assert {key: status.json()[key] for key in ("configured", "authenticated", "live_enabled")} == {"configured": True, "authenticated": False, "live_enabled": False}
+    assert status.json()["expires_at"] is None
     connect = client.get("/api/v1/zerodha/connect", headers=HEADERS)
     assert connect.status_code == 200
     assert connect.json()["login_url"].startswith("https://kite.zerodha.com/")

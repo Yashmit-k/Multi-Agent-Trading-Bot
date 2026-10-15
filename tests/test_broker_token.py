@@ -58,3 +58,15 @@ def test_no_kite_client_means_no_restore(repository: CoreRepository) -> None:
     repository.save_broker_token("zerodha", "tok-today", datetime.now(timezone.utc))
     app = create_app(_settings(), repository, MemoryEventPublisher())
     assert app.state.zerodha_access_token is None
+
+
+def test_token_times_and_expiry_status(repository: CoreRepository) -> None:
+    from core_api.app import _token_times
+
+    issued = datetime(2026, 10, 15, 3, 40, tzinfo=timezone.utc)  # 09:10 IST
+    repository.save_broker_token("zerodha", "tok", issued)
+    early = _token_times(repository, datetime(2026, 10, 15, 6, 0, tzinfo=timezone.utc))
+    assert early["expires_at"] == "2026-10-16T00:30:00+00:00"  # 06:00 IST next day
+    assert 18 < early["hours_left"] < 19
+    late = _token_times(repository, datetime(2026, 10, 16, 1, 0, tzinfo=timezone.utc))
+    assert late["hours_left"] < 0

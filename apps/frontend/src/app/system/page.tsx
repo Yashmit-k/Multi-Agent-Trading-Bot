@@ -7,7 +7,12 @@ import { istTime } from "@/lib/format";
 export const metadata = { title: "System · StockX" };
 export const dynamic = "force-dynamic";
 
-type Check = { component: string; status: "ok" | "warn" | "down" | "idle"; detail: string; agents?: Record<string, number | null> };
+function formatIst(value?: string | null): string {
+  if (!value) return "—";
+  return new Date(value).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }) + " IST";
+}
+
+type Check = { component: string; status: "ok" | "warn" | "down" | "idle"; detail: string; agents?: Record<string, number | null>; issued_at?: string | null; expires_at?: string | null };
 type Health = { as_of: string; live_enabled: boolean; checks: Check[] };
 
 const TONE = { ok: "up", warn: "warn", down: "down", idle: "muted" } as const;
@@ -57,6 +62,11 @@ export default async function SystemPage() {
           {health.checks.map((item) => (
             <Card key={item.component} title={item.component} right={<Badge tone={TONE[item.status]}>{LABEL[item.status]}</Badge>}>
               <p className="text-sm">{item.detail}</p>
+              {item.expires_at ? (
+                <p className="mt-2 text-xs text-[#94A3B8]">
+                  Logged in {formatIst(item.issued_at)} · token expires {formatIst(item.expires_at)}
+                </p>
+              ) : null}
               {item.agents ? (
                 <ul className="mt-2 grid grid-cols-2 gap-1 text-xs text-[#94A3B8]">
                   {Object.entries(item.agents).map(([name, age]) => (
