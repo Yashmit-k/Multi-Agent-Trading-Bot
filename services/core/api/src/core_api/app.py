@@ -171,7 +171,9 @@ def create_app(
         if latest is None:
             raise HTTPException(status_code=404, detail="no_features")
         moment = as_of or latest.end
-        bars = repository.candles_until(symbol, parsed, moment)
+        # Intraday: the latest 400 bars cover every indicator, instead of all ~51k 5m bars per symbol.
+        # Daily features keep their full history so swing signals are computed exactly as before.
+        bars = repository.candles_until(symbol, parsed, moment, last=None if parsed == Timeframe.D1 else FEATURE_HISTORY_BARS)
         built = build_feature_set(symbol, parsed, bars, moment)
         if built is None:
             raise HTTPException(status_code=404, detail="no_features")
@@ -1226,6 +1228,7 @@ def _not_ready(path: str):
     return endpoint
 
 
+FEATURE_HISTORY_BARS = 400
 _IST = ZoneInfo("Asia/Kolkata")
 
 

@@ -140,6 +140,25 @@ services:
     ports:
       - "8102:8080"
 
+  # Same five quant agents on completed 5-minute bars (INTRADAY horizon), refreshed every bar.
+  quant-intraday:
+    build:
+      context: .
+      dockerfile: services/quant/Dockerfile
+    env_file: .env
+    environment:
+      QUANT_TRADING_MODE: PAPER
+      QUANT_DATA_SOURCE: fixtures
+      QUANT_SYMBOLS: *nifty50
+      QUANT_HORIZON: INTRADAY
+      QUANT_TIMEFRAME: 5m
+      QUANT_EVAL_INTERVAL_SECONDS: "300"
+      CORE_API_URL: http://core-api:8000
+    depends_on:
+      core-api:
+        condition: service_healthy
+    restart: unless-stopped
+
   frontend:
     build:
       context: .
