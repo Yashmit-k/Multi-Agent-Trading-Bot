@@ -33,6 +33,7 @@ describe("source label", () => {
     const { sourceLabel } = await import("@/lib/signal-provenance");
     expect(sourceLabel("fundamental", { metadata: { insufficient_data: true } })).toContain("no input data");
     expect(sourceLabel("momentum", { metadata: {} })).toContain("deterministic");
+    expect(sourceLabel("valuation", { metadata: {} })).toContain("not used in trades");
     expect(sourceLabel("news", { metadata: { llm: [{ model: "openai/gpt-oss-20b" }] } })).toBe("LLM openai/gpt-oss-20b");
   });
 });
