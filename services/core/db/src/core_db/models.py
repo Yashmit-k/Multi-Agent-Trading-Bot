@@ -126,7 +126,8 @@ class SystemEventRow(Base):
     __tablename__ = "system_events"
     __table_args__ = (Index("ix_system_events_recorded_at", "recorded_at"),)
 
-    event_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    # Envelope ids are "<event type>:<id>"; quant signal ids alone are 64 hex characters.
+    event_id: Mapped[str] = mapped_column(String(200), primary_key=True)
     event_type: Mapped[str] = mapped_column(String(64), nullable=False)
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)

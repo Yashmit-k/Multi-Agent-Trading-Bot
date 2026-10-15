@@ -31,7 +31,11 @@ def record_message(repository: CoreRepository, channel: str, data: bytes | str, 
     body = envelope.model_dump(mode="json")
     body["channel"] = channel
     stamp = now or datetime.now(timezone.utc)
-    stored = repository.insert_system_event(envelope.event_id, envelope.event_type.value, stamp, body)
+    try:
+        stored = repository.insert_system_event(envelope.event_id, envelope.event_type.value, stamp, body)
+    except Exception as exc:  # one bad row must not stop the recorder
+        logger.error("trace_store_failed channel=%s event_id=%s error=%s", channel, envelope.event_id[:80], type(exc).__name__)
+        return False
     if stored:
         logger.info(
             "trace_recorded channel=%s event_type=%s source=%s correlation_id=%s",
