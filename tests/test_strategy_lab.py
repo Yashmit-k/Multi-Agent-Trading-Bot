@@ -104,5 +104,8 @@ def test_api_save_backtest_and_scan(repository: CoreRepository) -> None:
     assert all(item.get("kind") != "strategy_lab" for item in client.get("/api/v1/backtests", headers=auth).json())
     scan = client.get(f"/api/v1/strategies/{saved['strategy_id']}/scan", headers=auth)
     assert scan.status_code == 200 and scan.json()["scanned"] == 1
+    preview = client.post("/api/v1/strategies/preview/backtest", json={"start": "2025-03-01", "end": "2025-07-01", "definition": definition}, headers=auth)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["metrics"]["trades"] == body["metrics"]["trades"]
     bad = client.post("/api/v1/strategies", json={"definition": {"name": "x", "entry": []}}, headers=auth)
     assert bad.status_code == 422

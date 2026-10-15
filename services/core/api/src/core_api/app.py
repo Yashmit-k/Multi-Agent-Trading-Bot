@@ -762,6 +762,13 @@ def create_app(
         end: str
         definition: dict[str, Any] | None = None
 
+    # Declared before the {strategy_id} routes so "preview" is not read as a strategy id.
+    @app.post("/api/v1/strategies/preview/backtest")
+    def preview_backtest(body: RunBody, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        if body.definition is None:
+            raise HTTPException(status_code=422, detail="definition_required")
+        return _run(_definition(body.definition), body.start, body.end)
+
     @app.post("/api/v1/strategies/{strategy_id}/backtest")
     def backtest_user_strategy(strategy_id: str, body: RunBody, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
         found = repository.get_strategy(strategy_id)
@@ -772,12 +779,6 @@ def create_app(
         report |= {"strategy_id": strategy_id, "created_at": datetime.now(timezone.utc).isoformat()}
         repository.insert_backtest(backtest_id, f"live-db:{strategy_id}", report)
         return report | {"backtest_id": backtest_id}
-
-    @app.post("/api/v1/strategies/preview/backtest")
-    def preview_backtest(body: RunBody, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
-        if body.definition is None:
-            raise HTTPException(status_code=422, detail="definition_required")
-        return _run(_definition(body.definition), body.start, body.end)
 
     @app.get("/api/v1/strategies/{strategy_id}/scan")
     def scan_user_strategy(strategy_id: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
