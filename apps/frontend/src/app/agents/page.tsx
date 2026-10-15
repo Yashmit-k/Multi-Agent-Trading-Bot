@@ -2,6 +2,7 @@ export const metadata = { title: "Agents · StockX" };
 import { fetchApi } from "@/lib/api";
 import { ErrorState } from "@/components/States";
 import { PageFrame } from "@/components/shell/PageFrame";
+import { Badge, Card, Table, Td } from "@/components/ui";
 import { excludedAgents, provenance, sourceLabel } from "@/lib/signal-provenance";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,71 @@ type SignalRow = {
   reason_codes?: string[];
   metadata?: Record<string, unknown>;
 };
+
+type ScoreRow = {
+  agent: string;
+  horizon: string;
+  published: number;
+  scored: number;
+  directional: number;
+  neutral: number;
+  hit_rate: number | null;
+  hit_rate_95: [number, number] | null;
+  mean_signed_return_bps: number | null;
+  information_coefficient: number | null;
+  beats_coin_flip: boolean;
+  proposals_supported: number;
+  approved_supported: number;
+  in_fusion: boolean;
+};
+type Scorecard = { as_of: string; window_days: number; agents: ScoreRow[] };
+
+const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
+
+function Verdict({ row }: { row: ScoreRow }) {
+  if (row.directional < 30) return <Badge>too few ({row.directional})</Badge>;
+  if (row.beats_coin_flip) return <Badge tone="up">beats coin flip</Badge>;
+  if (row.hit_rate_95 && row.hit_rate_95[1] < 0.5) return <Badge tone="down">worse than coin flip</Badge>;
+  return <Badge tone="warn">not distinguishable</Badge>;
+}
+
+function ScorecardTable({ card }: { card: Scorecard }) {
+  return (
+    <Card title={`Live scorecard · last ${card.window_days} days`}>
+      <p className="mb-2 text-xs text-[#94A3B8]">
+        Did the direction of each agent's live signals match what the stock did next? Intraday signals are checked against the price 60 minutes later; swing signals against
+        the close of the next session. Repeated views on the same bar or session count once, and scores under ±0.05 count as neutral. A hit rate only means something when its
+        95% interval clears 50%, and with days, not years, of live data most agents will not get there. Moves within one market day are correlated, so even the interval is
+        optimistic.
+      </p>
+      <Table head={["Agent", "Horizon", "Scored", "Hit rate", "95% interval", "Avg signed move", "IC", "Proposals backed", "Approved", "Verdict"]} minWidth={900}>
+        {card.agents.map((row) => (
+          <tr key={`${row.agent}-${row.horizon}`} className="border-t border-[#1E2631]">
+            <Td>
+              {row.agent}
+              {row.in_fusion ? null : <span className="ml-1 text-[10px] text-[#F59E0B]">excluded</span>}
+            </Td>
+            <Td>{row.horizon}</Td>
+            <Td>
+              {row.directional}
+              <span className="text-[#64748B]"> +{row.neutral} neutral</span>
+            </Td>
+            <Td>{row.hit_rate === null ? "—" : pct(row.hit_rate)}</Td>
+            <Td>{row.hit_rate_95 ? `${pct(row.hit_rate_95[0])} – ${pct(row.hit_rate_95[1])}` : "—"}</Td>
+            <Td>{row.mean_signed_return_bps === null ? "—" : `${row.mean_signed_return_bps.toFixed(1)} bp`}</Td>
+            <Td>{row.information_coefficient === null ? "—" : row.information_coefficient.toFixed(3)}</Td>
+            <Td>{row.proposals_supported}</Td>
+            <Td>{row.approved_supported}</Td>
+            <Td>
+              <Verdict row={row} />
+            </Td>
+          </tr>
+        ))}
+      </Table>
+      <p className="mt-2 text-[10px] text-[#64748B]">Computed {new Date(card.as_of).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST, refreshed every 10 minutes.</p>
+    </Card>
+  );
+}
 
 const KIND: Record<string, string> = {
   technical: "Quant · deterministic rules",
@@ -55,13 +121,15 @@ export default async function AgentsPage() {
     const agents = await fetchApi<AgentRow[]>("/api/v1/agents");
     const signals = await fetchApi<SignalRow[]>("/api/v1/signals/latest").catch(() => [] as SignalRow[]);
     const latest = latestByAgent(signals);
+    const card = await fetchApi<Scorecard>("/api/v1/agents/scorecard").catch(() => null);
     const excluded = excludedAgents(process.env.FUSION_EXCLUDED_AGENTS);
     return (
       <PageFrame
         title="Agents"
         description="Every agent returns the same shape: a score from -1 to +1, a confidence from 0 to 1, and its reasons. No agent places an order."
       >
-        <div className="grid gap-3 md:grid-cols-2">
+        {card ? <ScorecardTable card={card} /> : <p className="text-xs text-[#94A3B8]">Scorecard unavailable.</p>}
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
           {agents.map((agent) => {
             const last = latest.get(agent.agent_name);
             return (

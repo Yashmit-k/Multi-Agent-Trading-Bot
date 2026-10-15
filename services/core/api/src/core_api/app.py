@@ -256,6 +256,17 @@ def create_app(
         latest = {item["agent_name"]: item for item in repository.latest_signal_per_agent()}
         return [_agent_row(name, enabled, latest.get(name)) for name, enabled in _AGENT_ROWS]
 
+    @app.get("/api/v1/agents/scorecard")
+    def agent_scorecard(_: Annotated[None, Depends(require_user)], days: int = 10) -> dict[str, object]:
+        days = max(1, min(days, 30))
+        now = datetime.now(timezone.utc)
+        cached = getattr(app.state, "scorecard_cache", {}).get(days)
+        if cached and (now - cached[0]) < timedelta(minutes=10):
+            return cached[1]
+        result = _scorecard(repository, now, days)
+        app.state.scorecard_cache = {**getattr(app.state, "scorecard_cache", {}), days: (now, result)}
+        return result
+
     @app.get("/api/v1/agents/{agent_name}/health")
     def agent_health(agent_name: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
         known = {name: enabled for name, enabled in _AGENT_ROWS}
@@ -1384,6 +1395,43 @@ def _journal(repository: CoreRepository, limit: int) -> list[dict[str, object]]:
             "pnl": None if pnl is None else str(pnl),
         })
     return trades
+
+
+def _scorecard(repository: CoreRepository, now: datetime, days: int) -> dict[str, object]:
+    from core_api import scorecard as sc
+
+    start = sc.window_start(now, days)
+    points = []
+    for signal_id, agent, horizon, symbol, stamp, signal, confidence in repository.signal_points_since(start):
+        try:
+            moment = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        points.append(sc.SignalPoint(signal_id, agent, horizon, symbol, moment, float(signal), float(confidence)))
+    closes = {}
+    for symbol in sorted({point.symbol for point in points}):
+        bars = repository.stored_candles(symbol, Timeframe.M5, start=start - timedelta(days=1))
+        closes[symbol] = sc.Closes([(bar.end, float(bar.close)) for bar in bars])
+    owner = {point.signal_id: point.agent for point in points}
+    supported: dict[str, int] = {}
+    approved: dict[str, int] = {}
+    for ids, ok in repository.proposal_support_since(start):
+        for agent in {owner[item] for item in ids if item in owner}:
+            supported[agent] = supported.get(agent, 0) + 1
+            if ok:
+                approved[agent] = approved.get(agent, 0) + 1
+    excluded = {item.strip().lower() for item in os.environ.get("FUSION_EXCLUDED_AGENTS", "").split(",") if item.strip()}
+    return {
+        "as_of": now.isoformat(),
+        "window_days": days,
+        "method": {
+            "intraday": "sign of signal vs 5m close 60 min later, same session",
+            "swing": "sign of signal vs close at the end of the next trading session",
+            "dedupe": "one sample per agent, horizon, symbol and entry bar (intraday) or session (swing)",
+            "neutral_below": sc.NEUTRAL,
+        },
+        "agents": sc.score(points, closes, now, supported, approved, excluded),
+    }
 
 
 def _token_times(repository: CoreRepository, now: datetime) -> dict[str, object]:
