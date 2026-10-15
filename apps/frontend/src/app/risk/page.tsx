@@ -25,6 +25,10 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ["Short selling", "Rejected — a SELL may not exceed shares held"],
   ["Brackets", "Stop −2 %, target +4 %; if both hit in one bar, the stop wins"],
   ["Universe", "NIFTY 50 members on the decision date"],
+  ["Open positions", "At most 10 names held or queued at once"],
+  ["Sector", "At most 2 names per NIFTY sector (Bank, IT, Auto, FMCG, …)"],
+  ["Exposure", "At most 30% of starting cash deployed (held at cost plus queued buys)"],
+  ["Per stock", "At most ₹40,000 in any one stock"],
 ];
 
 export default async function RiskPage() {

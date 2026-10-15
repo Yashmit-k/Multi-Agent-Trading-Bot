@@ -29,6 +29,7 @@ from core_paper.limits import PRODUCT_CNC, SELL_POLICY_VERSION
 from core_paper.charges import ZERODHA_EQUITY_RI
 from core_paper.trading_calendar import paper_test_entry_window
 from core_risk import assess
+from core_risk.portfolio import PortfolioContext
 
 HORIZON_TIMEFRAME: dict[Horizon, Timeframe] = {
     Horizon.INTRADAY: Timeframe.M5,
@@ -80,6 +81,7 @@ def run_paper_cycle(
     require_universe_fresh: bool = False,
     broker_authenticated: bool = True,
     allow_test_extension: bool = False,
+    portfolio_limits: bool = True,
 ) -> int:
     if max_new_orders is not None and max_new_orders < 0:
         raise ValueError("max_new_orders must be zero or positive")
@@ -150,6 +152,7 @@ def run_paper_cycle(
                     cash=repository.available_cash(starting_cash),
                     held_quantity=repository.held_quantity(proposal.symbol),
                     timestamp=as_of,
+                    portfolio=portfolio_context(repository, starting_cash, moment) if portfolio_limits else None,
                 )
                 if repository.insert_risk_decision(decision):
                     event_type = EventType.RISK_APPROVED if decision.status == RiskStatus.APPROVED else EventType.RISK_REJECTED
@@ -171,6 +174,22 @@ def run_paper_cycle(
         logger.info("new_order_cap cap=%s created=%s", max_new_orders, created_orders)
     _settle_open_orders(repository, publisher, costs, starting_cash, now=moment)
     return written
+
+
+_PENDING = {OrderStatus.CREATED, OrderStatus.VALIDATED, OrderStatus.RISK_APPROVED, OrderStatus.SUBMITTED, OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED}
+
+
+def portfolio_context(repository: CoreRepository, starting_cash: Decimal, moment: datetime) -> PortfolioContext:
+    """The active book for portfolio risk checks: held shares at cost plus BUYs queued but not filled."""
+    exposure: dict[str, Decimal] = {}
+    for position in repository.list_positions():
+        if position.quantity > 0:
+            exposure[position.symbol] = exposure.get(position.symbol, Decimal("0")) + position.average_price * position.quantity
+    for order in repository.list_orders():
+        if order.side == Side.BUY and order.status in _PENDING:
+            price = order.limit_price or Decimal(str(order.metadata.get("reference_price") or "0"))
+            exposure[order.symbol] = exposure.get(order.symbol, Decimal("0")) + price * order.quantity
+    return PortfolioContext(starting_cash=starting_cash, exposure=exposure, entries_today=repository.daily_entry_count(moment))
 
 
 class CycleRefused(RuntimeError):
