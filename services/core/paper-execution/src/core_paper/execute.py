@@ -282,7 +282,9 @@ def _settle_one(repository, order: Order, *, starting_cash: Decimal, now: dateti
         return
     limit = Decimal(str(order.limit_price))
     bars = {bar.start.astimezone(timezone.utc): bar for bar in repository.stored_candles(order.symbol, Timeframe.M5)}
-    for start in expected_bar_starts(window, activation):
+    # Only bars that start after the order existed: an order placed at 10:09 cannot fill on the 09:25 bar.
+    first_moment = max(activation.astimezone(timezone.utc), order.created_at.astimezone(timezone.utc))
+    for start in expected_bar_starts(window, first_moment):
         key = start.astimezone(timezone.utc).isoformat()
         if repository.bar_already_checked(order.order_id, key):
             continue

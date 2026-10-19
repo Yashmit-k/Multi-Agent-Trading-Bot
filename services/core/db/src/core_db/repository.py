@@ -1,7 +1,7 @@
 """Repository used by every other core service."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
@@ -432,17 +432,22 @@ class CoreRepository:
             row = session.get(AgentSignalRow, signal_id)
             return dict(row.payload) if row else None
 
-    def latest_signal_per_agent(self) -> list[dict]:
-        """Newest stored signal for each agent that has published at least once."""
+    def latest_signal_per_agent(self, within: timedelta = timedelta(days=14)) -> list[dict]:
+        """Newest stored signal for each agent that published within `within` (default 14 days).
+
+        The window keeps the group-by on the recorded_at index instead of scanning every signal ever stored.
+        """
         agent = AgentSignalRow.payload["agent_name"].as_string()
+        since = datetime.now(timezone.utc) - within
         with self._session_factory() as session:
             newest = (
                 select(agent.label("agent"), func.max(AgentSignalRow.recorded_at).label("recorded_at"))
+                .where(AgentSignalRow.recorded_at >= since)
                 .group_by(agent)
                 .subquery()
             )
             rows = session.scalars(
-                select(AgentSignalRow).join(
+                select(AgentSignalRow).where(AgentSignalRow.recorded_at >= since).join(
                     newest,
                     (AgentSignalRow.payload["agent_name"].as_string() == newest.c.agent)
                     & (AgentSignalRow.recorded_at == newest.c.recorded_at),

@@ -43,17 +43,21 @@ while True:
     if mode != TradingMode.PAPER:
         logger.error("paper_worker_refused mode=%s", mode.value)
     elif cash_session_open(now):
-        run_once(repository, now)
-        authenticated = broker_allows_entries(api_base, api_token)
-        run_scheduled_cycle(
-            repository,
-            publisher,
-            mode=TradingMode.PAPER,
-            schedule=schedule,
-            now=now,
-            broker_authenticated=authenticated,
-            weights=weights,
-        )
+        # One failing cycle must not kill the worker: log it, skip this cycle, and try again next interval.
+        try:
+            run_once(repository, now)
+            authenticated = broker_allows_entries(api_base, api_token)
+            run_scheduled_cycle(
+                repository,
+                publisher,
+                mode=TradingMode.PAPER,
+                schedule=schedule,
+                now=now,
+                broker_authenticated=authenticated,
+                weights=weights,
+            )
+        except Exception:
+            logger.exception("paper_cycle_failed")
     try:
         # End-of-day book, once per trading day after the close (no-op at other times).
         write_daily_if_due(repository, now)

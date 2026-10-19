@@ -499,3 +499,21 @@ class _Publisher:
 
 def _sink() -> _Publisher:
     return _Publisher()
+
+
+def test_an_order_placed_mid_morning_never_fills_on_an_earlier_bar(repository: CoreRepository) -> None:
+    # 16 Oct 2026 bug: a swing order placed at 10:09 IST filled on the 09:25 bar, at a price from before it existed.
+    _arm(repository, Decimal("442"))
+    early = datetime(2026, 10, 13, 3, 50, tzinfo=UTC)  # 09:20 IST bar, touches the limit
+    repository.upsert_candles([_bar(early, open_=Decimal("440"), low=Decimal("439"))])
+    placed = datetime(2026, 10, 13, 4, 39, 12, tzinfo=UTC)  # 10:09:12 IST
+    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=placed, enforce_entry_window=False)
+    order = repository.list_orders()[0]
+    assert order.created_at == placed
+    assert repository.list_executions() == []
+    later = datetime(2026, 10, 13, 4, 40, tzinfo=UTC)
+    repository.upsert_candles([_bar(later, open_=Decimal("443"), low=Decimal("442.5"))])
+    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=later + timedelta(minutes=5), enforce_entry_window=False)
+    filled = repository.list_orders()[0]
+    assert filled.status == OrderStatus.FILLED and filled.updated_at >= filled.created_at
+    assert repository.list_executions()[0].price == Decimal("443")

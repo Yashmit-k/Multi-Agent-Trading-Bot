@@ -13,13 +13,13 @@ const AGENTS = ["technical", "momentum", "mean_reversion", "volume", "regime", "
 export default async function SignalsPage({ searchParams }: { searchParams: Promise<{ agent?: string; symbol?: string; horizon?: string }> }) {
   const { agent = "", symbol = "", horizon = "" } = await searchParams;
   try {
-    const rows = await loadSignals({ limit: 300, agent: agent || undefined, symbol: symbol.trim().toUpperCase() || undefined });
+    const rows = await loadSignals({ limit: 150, agent: agent || undefined, symbol: symbol.trim().toUpperCase() || undefined });
     const shown = horizon ? rows.filter((row) => row.horizon === horizon) : rows;
     const excluded = excludedAgents(process.env.FUSION_EXCLUDED_AGENTS);
     return (
       <PageFrame
         title="Signals"
-        description="The 300 most recent agent opinions, newest first. Intraday and swing horizons are fused separately."
+        description="The 150 most recent agent opinions (filter by agent or stock to see older ones), newest first. Intraday and swing horizons are fused separately."
       >
         <form className="flex flex-wrap gap-2 text-sm" action="/signals">
           <select name="agent" defaultValue={agent} className="rounded border border-[#26303C] bg-[#0F141B] px-2 py-1.5">
