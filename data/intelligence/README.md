@@ -1,5 +1,13 @@
 # Real fundamentals for the Fundamental, Valuation, and Earnings agents
 
+**Automatic (default on the server):** `deploy/fetch_fundamentals.sh` runs nightly from cron and appends
+Yahoo Finance figures (unofficial feed, via `yfinance`) for all NIFTY 50 stocks to `fundamentals.csv`:
+trailing-twelve-month EPS, trailing P/E, the median P/E of the stock's sector peers, year-on-year quarterly
+profit and revenue growth, net margin, ROE and debt-to-equity. Yahoo gives no announcement time, so every
+row is stamped with the fetch time (`available_at`): honest for live paper trading, but these rows cannot be
+used to backtest the past. Quarters older than 200 days are skipped. A changed value is added as a dated
+revision; nothing already in the file is rewritten. Manual rows in the format below can be mixed in.
+
 Put the file here as `fundamentals.csv`. The intelligence service reads it every cycle (idempotent: rows are keyed by `source_id`). If the file is absent, those agents produce "insufficient data" and stay excluded from fusion.
 
 **The numbers in `fundamentals.template.csv` are placeholders showing the format, not real figures.** Do not copy them.
@@ -9,7 +17,7 @@ Put the file here as `fundamentals.csv`. The intelligence service reads it every
 | Column | Meaning |
 |---|---|
 | `symbol` | NSE symbol as used in this repo (e.g. `INFY`, `M&M`, `BAJAJ-AUTO`) |
-| `metric` | one of `eps`, `revenue_growth`, `profit_growth`, `margin`, `roe`, `roce`, `debt`, `cash_flow` |
+| `metric` | one of `eps` (trailing 12 months), `revenue_growth`, `profit_growth`, `margin`, `roe`, `roce`, `debt`, `cash_flow`, `debt_to_equity`, `pe_at_fetch`, `peer_median_pe` |
 | `value` | a number; growth, margins, and returns as fractions (`0.074` = 7.4%), `eps` in rupees |
 | `unit` | `INR` or `ratio` |
 | `period` | e.g. `2026Q2` or `FY2026` |

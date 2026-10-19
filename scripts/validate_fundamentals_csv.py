@@ -17,7 +17,7 @@ NIFTY50 = set(
     "JSWSTEEL KOTAKBANK LT M&M MARUTI NESTLEIND NTPC ONGC POWERGRID RELIANCE SBILIFE SBIN SHRIRAMFIN SUNPHARMA TATACONSUM TMPV "
     "TATASTEEL TCS TECHM TITAN TRENT ULTRACEMCO WIPRO".split()
 )
-METRICS = {"eps", "revenue_growth", "profit_growth", "margin", "roe", "roce", "debt", "cash_flow"}
+METRICS = {"eps", "revenue_growth", "profit_growth", "margin", "roe", "roce", "debt", "cash_flow", "debt_to_equity", "pe_at_fetch", "peer_median_pe"}
 COLUMNS = ["symbol", "metric", "value", "unit", "period", "announced_at", "available_at", "source", "source_id"]
 
 
@@ -26,6 +26,7 @@ def validate(path: Path) -> list[str]:
     seen: set[str] = set()
     eps_periods: dict[str, set[str]] = defaultdict(set)
     any_metric: set[str] = set()
+    profit_growth: set[str] = set()
     with path.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
         if reader.fieldnames != COLUMNS:
@@ -56,10 +57,13 @@ def validate(path: Path) -> list[str]:
             any_metric.add(symbol)
             if metric == "eps":
                 eps_periods[symbol].add(row["period"].strip())
+            if metric == "profit_growth":
+                profit_growth.add(symbol)
     print(f"rows: {len(seen)}")
     print(f"Fundamental agent coverage: {len(any_metric)}/50 symbols")
     print(f"Valuation agent coverage (has eps): {len(eps_periods)}/50 symbols")
-    print(f"Earnings agent coverage (eps for 2+ periods): {sum(1 for p in eps_periods.values() if len(p) >= 2)}/50 symbols")
+    earnings = profit_growth | {symbol for symbol, periods in eps_periods.items() if len(periods) >= 2}
+    print(f"Earnings agent coverage (YoY profit growth, or eps for 2+ periods): {len(earnings)}/50 symbols")
     return errors
 
 

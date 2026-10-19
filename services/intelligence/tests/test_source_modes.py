@@ -128,13 +128,17 @@ def test_csv_row_reaches_the_fundamental_agent() -> None:
     store = MemoryFundamentalStore()
     assert load_csv_text(store, _CSV) == 1
     assert load_csv_text(store, _CSV) == 0
+    # EPS alone is not scorable; a ratio metric makes the agent produce a scored signal.
+    roe = "symbol,metric,value,unit,period,announced_at,available_at,source,source_id\nRELIANCE,roe,0.18,ratio,FY2024,2024-04-20T10:00:00+00:00,2024-04-20T12:00:00+00:00,csv,rel-roe-1\n"
+    assert load_csv_text(store, roe) == 1
     signal = FundamentalAgent(ReplayClock(FIXTURE_AS_OF), _router()).evaluate(
         "RELIANCE",
         FIXTURE_AS_OF,
         make_context(MemoryNewsStore(), store),
     )
-    assert signal.features["metric_eps"] == "20"
-    assert len(store.points_for("RELIANCE", datetime(2024, 8, 1, tzinfo=timezone.utc))) == 1
+    assert signal.features["metric_eps"] == "20" and signal.features["metric_roe"] == "0.18"
+    assert signal.signal > 0  # ROE 18% is above the 12% midpoint
+    assert len(store.points_for("RELIANCE", datetime(2024, 8, 1, tzinfo=timezone.utc))) == 2
 
 
 def test_csv_live_requires_a_path(monkeypatch) -> None:
