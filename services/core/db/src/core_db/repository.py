@@ -432,32 +432,21 @@ class CoreRepository:
             row = session.get(AgentSignalRow, signal_id)
             return dict(row.payload) if row else None
 
-    def latest_signal_per_agent(self, within: timedelta = timedelta(days=14)) -> list[dict]:
-        """Newest stored signal for each agent that published within `within` (default 14 days).
+    def latest_signal_per_agent(self) -> list[dict]:
+        """Newest stored signal for each agent: one indexed lookup per agent name.
 
-        The window keeps the group-by on the recorded_at index instead of scanning every signal ever stored.
+        Uses ix_agent_signals_agent_recorded (migration 0013) on Postgres, instead of a group-by over every signal.
         """
+        from contracts.enums import AgentName
+
         agent = AgentSignalRow.payload["agent_name"].as_string()
-        since = datetime.now(timezone.utc) - within
+        latest: list[dict] = []
         with self._session_factory() as session:
-            newest = (
-                select(agent.label("agent"), func.max(AgentSignalRow.recorded_at).label("recorded_at"))
-                .where(AgentSignalRow.recorded_at >= since)
-                .group_by(agent)
-                .subquery()
-            )
-            rows = session.scalars(
-                select(AgentSignalRow).where(AgentSignalRow.recorded_at >= since).join(
-                    newest,
-                    (AgentSignalRow.payload["agent_name"].as_string() == newest.c.agent)
-                    & (AgentSignalRow.recorded_at == newest.c.recorded_at),
-                )
-            )
-            latest: dict[str, dict] = {}
-            for row in rows:
-                payload = dict(row.payload)
-                latest.setdefault(str(payload.get("agent_name")), payload)
-            return [latest[name] for name in sorted(latest)]
+            for name in sorted(item.value for item in AgentName):
+                row = session.scalars(select(AgentSignalRow).where(agent == name).order_by(AgentSignalRow.recorded_at.desc()).limit(1)).first()
+                if row is not None:
+                    latest.append(dict(row.payload))
+        return latest
 
     def recent_signal_payloads(self, limit: int = 500, symbol: str | None = None, agent_name: str | None = None) -> list[dict]:
         """Newest signals first, bounded, so the dashboard never pulls the whole table."""
