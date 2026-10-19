@@ -65,6 +65,8 @@ services:
       FUSION_EXCLUDED_AGENTS: ${FUSION_EXCLUDED_AGENTS:-fundamental,valuation,earnings,ml}
       # New entries 09:20 to this time IST (code default 10:30, max 15:15). Exits run all session.
       PAPER_ENTRY_END: ${PAPER_ENTRY_END:-15:15}
+    # Once started explicitly, come back after a crash or VM reboot.
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy

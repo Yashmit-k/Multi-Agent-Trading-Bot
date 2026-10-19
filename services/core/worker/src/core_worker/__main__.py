@@ -14,6 +14,7 @@ from core_paper.trading_calendar import cash_session_open
 from core_worker.heartbeat import publish_heartbeat
 from core_worker.loop import run_once
 from core_paper.daily import write_daily_if_due
+from core_worker.notify import Notifier, health_problems_from_api, maybe_notify
 from core_worker.paper_schedule import broker_allows_entries, excluded_agent_weights, run_scheduled_cycle
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,9 @@ weights = excluded_agent_weights(os.environ.get("FUSION_EXCLUDED_AGENTS", ""))
 logger.info("fusion_excluded_agents agents=%s", os.environ.get("FUSION_EXCLUDED_AGENTS", ""))
 failed_cycles = 0
 last_error: str | None = None
+notifier = Notifier.from_env()
+site_url = os.environ.get("PUBLIC_SITE_URL", "")
+logger.info("notifications configured=%s", notifier.configured)
 while True:
     now = datetime.now(timezone.utc)
     publish_heartbeat(api_base, api_token, now, interval_seconds=interval, failed_cycles=failed_cycles, last_error=last_error)
@@ -68,4 +72,10 @@ while True:
         write_daily_if_due(repository, now)
     except Exception:
         logger.exception("daily_equity_write_failed")
+    try:
+        # Morning Zerodha reminder and end-of-day summary (no-op unless Telegram or a webhook is configured).
+        for key in maybe_notify(repository, notifier, now, site=site_url, health_problems=health_problems_from_api(api_base, api_token)):
+            logger.info("notification_sent kind=%s", key)
+    except Exception:
+        logger.exception("notification_failed")
     time.sleep(interval)

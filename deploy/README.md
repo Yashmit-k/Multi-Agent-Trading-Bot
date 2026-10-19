@@ -75,10 +75,56 @@ Then open `http://127.0.0.1:8000/api/v1/zerodha/connect` with your Core token, f
 
 ## Gotchas learned on the live deploy
 
-- **Don't edit `.env` or run `up` without `--no-deps` once you've logged in to Zerodha.** Either one recreates core-api, and the Kite token lives only in core-api's memory. To update a single service, use `docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build --no-deps <service>`.
+- **Prefer `--no-deps` when updating one service.** `docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build --no-deps <service>` leaves the others running. The Zerodha login is stored in Postgres (`broker_sessions`), so restarting core-api no longer logs you out.
 - **Migrations are manual.** After pulling a new revision, run `docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml run --rm --no-deps -w /app/services/core/db core-api alembic upgrade head`.
 - **Attach an Elastic IP before relying on the URL.** Without one, a stop/start changes the public IP, and with it the sslip.io hostname and `DOMAIN`.
 - **A free Groq LLM needs pacing.** Keep the compose defaults `LLM_MIN_INTERVAL_SECONDS=2.5` and `LLM_REASONING_EFFORT=low` for `openai/gpt-oss-20b`.
+
+## Notifications (Telegram)
+
+1. In Telegram, message **@BotFather**, send `/newbot`, and copy the bot token.
+2. Send any message to your new bot, then open `https://api.telegram.org/bot<token>/getUpdates` and copy `"chat":{"id": ...}`.
+3. On the VM, add to `~/Multi-Agent-Trading-Bot/.env`:
+   ```
+   TELEGRAM_BOT_TOKEN=<token>
+   TELEGRAM_CHAT_ID=<chat id>
+   PUBLIC_SITE_URL=https://<your DOMAIN>
+   ```
+4. Restart the worker: `docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml --profile worker up -d --no-deps core-worker`.
+
+You then get:
+- a Zerodha login reminder at 08:30 IST, and again at 09:10, on trading days when you are not logged in;
+- an end-of-day paper summary after 15:35 IST;
+- from `deploy/healthcheck.sh` (cron, every 5 minutes in market hours), an alert when any component is down, including "paper trading is on but the worker is silent", re-sent at most every 30 minutes, plus a "recovered" message.
+
+`ALERT_WEBHOOK_URL` (Slack or Discord incoming webhook) works instead of, or as well as, Telegram.
+
+## Moving to another AWS region (e.g. Sydney → Mumbai)
+
+The server's distance adds about a second to every page from India. `ap-south-1` (Mumbai) removes most of that. The public URL changes with the new IP, so update it anywhere you submitted it.
+
+1. **Prepare (Sydney).**
+   - Stop the worker: `docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml --profile worker stop core-worker`.
+   - Take a backup: `deploy/backup.sh`. Copy it to your laptop: `scp -i key.pem ubuntu@<sydney-ip>:~/backups/core-*.dump .`
+2. **Copy the machine.**
+   - EC2 console → Instances → select the instance → *Actions → Image and templates → Create image* (name `stockx-sydney`). Wait until the AMI is *Available*.
+   - AMIs → select it → *Actions → Copy AMI* → destination region **Asia Pacific (Mumbai)**. Wait until it is *Available* in Mumbai.
+3. **Launch in Mumbai.** Switch the console region to Mumbai.
+   - Key pairs are per region. Import your existing key: run `ssh-keygen -y -f ~/Downloads/trading-bot-keypair.pem > trading-bot.pub` on your laptop, then *Key pairs → Actions → Import key pair*.
+   - *AMIs → stockx-sydney → Launch instance from AMI*: t3.small, that key pair, a security group allowing TCP 22, 80 and 443.
+   - *Elastic IPs → Allocate* and associate the new address with the instance.
+4. **Point it at the new address.** SSH in with the new IP.
+   - In `~/Multi-Agent-Trading-Bot/.env`, set `DOMAIN=<new-ip-with-dashes>.sslip.io` and `PUBLIC_SITE_URL=https://<that>`.
+   - Run `docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d` (Caddy gets a new certificate in under a minute).
+   - Start the worker as usual.
+   - `crontab -l` should still list `backup.sh` and `healthcheck.sh`. The health check reads `DOMAIN` from `.env`, so it follows the move.
+5. **Verify.** Run `deploy/smoke.sh https://<new domain>`. Log in to Zerodha through the tunnel to the new IP. The Kite redirect URL stays `http://127.0.0.1:8000/...` and needs no change.
+6. **Clean up Sydney** once Mumbai has run for a day:
+   - Terminate the Sydney instance.
+   - Release its Elastic IP: unattached Elastic IPs are billed.
+   - Deregister the AMIs and delete their snapshots in both regions.
+
+Alternative: launch a fresh Ubuntu instance in Mumbai and follow sections 2–5 of this guide. Copy `.env` across, and restore the backup with `pg_restore -U core -d core --clean core-*.dump` inside the postgres container.
 
 ## 7. Smoke test
 

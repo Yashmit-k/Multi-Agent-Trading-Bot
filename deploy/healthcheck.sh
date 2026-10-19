@@ -1,12 +1,32 @@
 #!/usr/bin/env bash
-# Uptime/health alert. Run from cron every 5 minutes during market hours:
+# Uptime/health alert, run from cron every 5 minutes in market hours (EC2 clock is UTC):
 #   */5 3-10 * * 1-5  ~/Multi-Agent-Trading-Bot/deploy/healthcheck.sh >> ~/backups/health.log 2>&1
-# Alerts (optional) go to ALERT_WEBHOOK_URL as JSON {"text": ...} (Slack/Discord-compatible).
-# Only components whose status is "down" alert, plus an unreachable site; "warn" is logged.
+# Alerts on any "down" component, an unreachable site, or live_enabled=true. Sends to Telegram
+# (TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID) and/or ALERT_WEBHOOK_URL, read from the repo's .env.
+# The same problem is re-sent at most every 30 minutes, and a "recovered" message follows once it clears.
 set -uo pipefail
-URL="${HEALTH_URL:-https://13-238-176-73.sslip.io/api/v1/system/health}"
-WEBHOOK="${ALERT_WEBHOOK_URL:-}"
-[ -f "$HOME/.trading-bot-alert" ] && . "$HOME/.trading-bot-alert"
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+read_env() { grep -E "^$1=" "$REPO/.env" 2>/dev/null | tail -1 | cut -d= -f2- ; }
+URL="${HEALTH_URL:-https://$(read_env DOMAIN)/api/v1/system/health}"
+STATE="${HEALTH_STATE:-$HOME/backups/health.state}"
+TG_TOKEN="${TELEGRAM_BOT_TOKEN:-$(read_env TELEGRAM_BOT_TOKEN)}"
+TG_CHAT="${TELEGRAM_CHAT_ID:-$(read_env TELEGRAM_CHAT_ID)}"
+WEBHOOK="${ALERT_WEBHOOK_URL:-$(read_env ALERT_WEBHOOK_URL)}"
+stamp() { date "+%Y-%m-%dT%H:%M:%S%z"; }
+
+send() {
+  local text="$1"
+  if [ -n "$TG_TOKEN" ] && [ -n "$TG_CHAT" ]; then
+    curl -fsS --max-time 10 -H 'Content-Type: application/json' \
+      -d "$(python3 -c 'import json,sys; print(json.dumps({"chat_id": sys.argv[1], "text": sys.argv[2]}))' "$TG_CHAT" "$text")" \
+      "https://api.telegram.org/bot$TG_TOKEN/sendMessage" >/dev/null || echo "$(stamp) telegram send failed"
+  fi
+  if [ -n "$WEBHOOK" ]; then
+    curl -fsS --max-time 10 -H 'Content-Type: application/json' \
+      -d "$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1], "content": sys.argv[1]}))' "$text")" "$WEBHOOK" >/dev/null || echo "$(stamp) webhook send failed"
+  fi
+}
+
 body="$(curl -fsS --max-time 20 "$URL")"
 if [ $? -ne 0 ] || [ -z "$body" ]; then
   message="StockX: health endpoint unreachable ($URL)"
@@ -17,15 +37,25 @@ data = json.load(sys.stdin)
 if data.get("live_enabled"):
     print("StockX: live_enabled is TRUE"); sys.exit()
 bad = [c["component"] + ": " + c["detail"] for c in data.get("checks", []) if c.get("status") == "down"]
-warn = [c["component"] for c in data.get("checks", []) if c.get("status") == "warn"]
-if bad: print("StockX down: " + "; ".join(bad))
-elif warn: print("WARN " + ", ".join(warn), file=sys.stderr)
+if bad:
+    print("StockX down: " + "; ".join(bad))
 ')"
 fi
+
+now=$(date +%s)
+last_message=""; last_sent=0
+[ -f "$STATE" ] && { last_message="$(sed -n 1p "$STATE")"; last_sent="$(sed -n 2p "$STATE")"; }
 if [ -n "$message" ]; then
-  echo "$(date "+%Y-%m-%dT%H:%M:%S%z") $message"
-  [ -n "$WEBHOOK" ] && curl -fsS --max-time 10 -H 'Content-Type: application/json' -d "$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1], "content": sys.argv[1]}))' "$message")" "$WEBHOOK" >/dev/null
+  echo "$(stamp) $message"
+  if [ "$message" != "$last_message" ] || [ $((now - ${last_sent:-0})) -ge 1800 ]; then
+    send "$message"
+    printf '%s\n%s\n' "$message" "$now" > "$STATE"
+  fi
 else
-  echo "$(date "+%Y-%m-%dT%H:%M:%S%z") ok"
+  echo "$(stamp) ok"
+  if [ -n "$last_message" ]; then
+    send "StockX recovered: all components healthy again."
+    rm -f "$STATE"
+  fi
 fi
 exit 0
