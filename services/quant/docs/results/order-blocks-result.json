@@ -1,0 +1,85 @@
+{
+  "protocol": "services/quant/docs/order-blocks-protocol.md",
+  "period": {
+    "first": "2024-04-01",
+    "last": "2026-10-05",
+    "sessions": 616
+  },
+  "books": {
+    "A_daily_zone_15m_entry": {
+      "mtf_refined": {
+        "trades": 137,
+        "win_rate": 0.24087591240875914,
+        "mean_net_r": -1.1885340551321102,
+        "mean_net_return_pct": -0.42926230801016013,
+        "total_net_pnl": -11275.160541312263,
+        "profit_factor": 0.28270298190233834,
+        "max_drawdown_rupees": 11587.862019712284,
+        "exit_reasons": {
+          "stop": 103,
+          "target": 34
+        },
+        "session_pnl_lower_bound": -24.690774158820552,
+        "first_half": -5727.51398068739,
+        "second_half": -5547.646560624873,
+        "profitable": false
+      },
+      "htf_only_baseline": {
+        "trades": 472,
+        "win_rate": 0.3241525423728814,
+        "mean_net_r": -0.31429922966237156,
+        "mean_net_return_pct": -0.65297757415249,
+        "total_net_pnl": -58557.913312299315,
+        "profit_factor": 0.6056125862788884,
+        "max_drawdown_rupees": 58557.913312299315,
+        "exit_reasons": {
+          "stop": 295,
+          "target": 121,
+          "time": 56
+        },
+        "session_pnl_lower_bound": -146.59093634746733,
+        "first_half": -41135.75710801213,
+        "second_half": -17422.156204287177,
+        "profitable": false
+      }
+    },
+    "B_1h_zone_5m_entry": {
+      "mtf_refined": {
+        "trades": 541,
+        "win_rate": 0.24029574861367836,
+        "mean_net_r": -0.9379230429044269,
+        "mean_net_return_pct": -0.2110220805161182,
+        "total_net_pnl": -21322.973670187344,
+        "profit_factor": 0.27436846967908235,
+        "max_drawdown_rupees": 21353.99633670994,
+        "exit_reasons": {
+          "stop": 358,
+          "target": 108,
+          "time": 75
+        },
+        "session_pnl_lower_bound": -39.62471216907952,
+        "first_half": -9555.323332233242,
+        "second_half": -11767.650337954103,
+        "profitable": false
+      },
+      "htf_only_baseline": {
+        "trades": 2990,
+        "win_rate": 0.31705685618729096,
+        "mean_net_r": -0.3863601264021632,
+        "mean_net_return_pct": -0.2140621987951891,
+        "total_net_pnl": -119834.25678570247,
+        "profit_factor": 0.47951476668494625,
+        "max_drawdown_rupees": 120036.49677438961,
+        "exit_reasons": {
+          "stop": 1351,
+          "time": 1270,
+          "target": 369
+        },
+        "session_pnl_lower_bound": -220.86432331517094,
+        "first_half": -57930.907244421,
+        "second_half": -61903.34954128148,
+        "profitable": false
+      }
+    }
+  }
+}
