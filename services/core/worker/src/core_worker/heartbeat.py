@@ -33,6 +33,8 @@ def publish_heartbeat(
     *,
     interval_seconds: int = DEFAULT_WORKER_INTERVAL_SECONDS,
     urlopen=urllib.request.urlopen,
+    failed_cycles: int = 0,
+    last_error: str | None = None,
 ) -> bool:
     """Tell Core API this pass is alive. A missing API does not stop the worker."""
     if not base_url or not token:
@@ -41,6 +43,8 @@ def publish_heartbeat(
         {
             "heartbeat_at": _aware(moment).isoformat(),
             "interval_seconds": interval_seconds,
+            "failed_cycles": failed_cycles,
+            "last_error": None if last_error is None else last_error[:300],
         }
     ).encode()
     request = urllib.request.Request(

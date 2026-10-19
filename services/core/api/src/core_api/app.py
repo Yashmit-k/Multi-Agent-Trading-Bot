@@ -95,6 +95,9 @@ def create_app(
     app.state.kite_pace = app.state.historical_gate.pace
     app.state.worker_heartbeat_at = None
     app.state.worker_heartbeat_interval_seconds = DEFAULT_WORKER_INTERVAL_SECONDS
+    app.state.worker_failed_cycles = 0
+    app.state.worker_last_error = None
+    app.state.started_at = datetime.now(timezone.utc)
 
     def require_user(credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]) -> None:
         if credentials is None or credentials.credentials != resolved.core_api_token:
@@ -462,11 +465,15 @@ def create_app(
     class HeartbeatBody(BaseModel):
         heartbeat_at: datetime
         interval_seconds: int = DEFAULT_WORKER_INTERVAL_SECONDS
+        failed_cycles: int = 0
+        last_error: str | None = None
 
     @app.post("/api/v1/worker/heartbeat")
     def record_worker_heartbeat(body: HeartbeatBody, _: Annotated[None, Depends(require_user)]) -> dict[str, str]:
         app.state.worker_heartbeat_at = body.heartbeat_at
         app.state.worker_heartbeat_interval_seconds = body.interval_seconds
+        app.state.worker_failed_cycles = body.failed_cycles
+        app.state.worker_last_error = body.last_error
         return heartbeat_view(body.heartbeat_at, body.heartbeat_at, body.interval_seconds)
 
     @app.post("/api/v1/paper/start")
@@ -1418,12 +1425,8 @@ def _health_checks(app: FastAPI, repository: CoreRepository, settings: Settings,
         checks.append(_check("Trace recorder", "warn", "no bus messages recorded yet"))
     else:
         checks.append(_check("Trace recorder", "ok", f"newest recorded message {_age_minutes(events[0]['recorded_at'], now)} min ago"))
-    beat = heartbeat_view(app.state.worker_heartbeat_at, now, int(app.state.worker_heartbeat_interval_seconds))
     running = repository.paper_running()
-    if beat["status"] == "available":
-        checks.append(_check("Paper worker (orchestrator)", "ok", f"heartbeat at {beat['heartbeat_at']}"))
-    else:
-        checks.append(_check("Paper worker (orchestrator)", "idle", "stopped: starts only on explicit authorization"))
+    checks.append(_worker_check(app, running, now))
     book = repository.active_paper_session()
     checks.append(
         _check(
@@ -1683,6 +1686,39 @@ def _scorecard(repository: CoreRepository, now: datetime, days: int) -> dict[str
         },
         "agents": sc.score(points, closes, now, supported, approved, excluded),
     }
+
+
+WORKER_STALE_AFTER = timedelta(minutes=3)
+WORKER_FAILURES_DOWN = 3
+
+
+def _worker_check(app: FastAPI, running: bool, now: datetime) -> dict[str, object]:
+    """Down when paper trading is on in market hours and the worker is silent, or its cycles keep failing."""
+    from core_paper.trading_calendar import cash_session_open
+
+    beat_at = app.state.worker_heartbeat_at
+    interval = timedelta(seconds=int(app.state.worker_heartbeat_interval_seconds))
+    stale_after = max(WORKER_STALE_AFTER, 3 * interval)
+    name = "Paper worker (orchestrator)"
+    failures = int(getattr(app.state, "worker_failed_cycles", 0) or 0)
+    error = getattr(app.state, "worker_last_error", None)
+    if beat_at is not None and now - beat_at.astimezone(timezone.utc) <= stale_after:
+        if failures >= WORKER_FAILURES_DOWN:
+            return _check(name, "down", f"{failures} paper cycles in a row failed: {error}", failed_cycles=failures)
+        if failures:
+            return _check(name, "warn", f"last paper cycle failed ({error}); retrying", failed_cycles=failures)
+        return _check(name, "ok", f"heartbeat at {beat_at.astimezone(timezone.utc).isoformat()}")
+    silent = "no heartbeat yet" if beat_at is None else f"no heartbeat for {_age_minutes(beat_at, now)} min"
+    warming_up = now - app.state.started_at < stale_after
+    try:
+        market_open = cash_session_open(now)
+    except Exception:  # noqa: BLE001 - outside calendar coverage: treat as closed
+        market_open = False
+    if running and market_open and not warming_up:
+        return _check(name, "down", f"paper trading is on and the market is open, but the worker is silent ({silent}). Restart core-worker.")
+    if running:
+        return _check(name, "warn" if market_open else "idle", f"worker not running ({silent}); paper trading is on" + ("" if market_open else ", market closed"))
+    return _check(name, "idle", "stopped: starts only on explicit authorization")
 
 
 def _token_times(repository: CoreRepository, now: datetime) -> dict[str, object]:

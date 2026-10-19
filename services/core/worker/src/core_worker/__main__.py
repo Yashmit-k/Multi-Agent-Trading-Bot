@@ -37,9 +37,11 @@ api_base = os.environ.get("CORE_API_URL", "http://core-api:8000")
 api_token = os.environ.get("CORE_API_TOKEN", "")
 weights = excluded_agent_weights(os.environ.get("FUSION_EXCLUDED_AGENTS", ""))
 logger.info("fusion_excluded_agents agents=%s", os.environ.get("FUSION_EXCLUDED_AGENTS", ""))
+failed_cycles = 0
+last_error: str | None = None
 while True:
     now = datetime.now(timezone.utc)
-    publish_heartbeat(api_base, api_token, now, interval_seconds=interval)
+    publish_heartbeat(api_base, api_token, now, interval_seconds=interval, failed_cycles=failed_cycles, last_error=last_error)
     if mode != TradingMode.PAPER:
         logger.error("paper_worker_refused mode=%s", mode.value)
     elif cash_session_open(now):
@@ -56,8 +58,11 @@ while True:
                 broker_authenticated=authenticated,
                 weights=weights,
             )
-        except Exception:
-            logger.exception("paper_cycle_failed")
+            failed_cycles, last_error = 0, None
+        except Exception as exc:
+            failed_cycles += 1
+            last_error = f"{type(exc).__name__}: {exc}"
+            logger.exception("paper_cycle_failed consecutive=%s", failed_cycles)
     try:
         # End-of-day book, once per trading day after the close (no-op at other times).
         write_daily_if_due(repository, now)

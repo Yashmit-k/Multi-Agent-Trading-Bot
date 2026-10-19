@@ -37,7 +37,7 @@ def test_health_lists_each_component(repository: CoreRepository) -> None:
         assert name in names
     statuses = {item["component"]: item["status"] for item in body["checks"]}
     assert statuses["Core API"] == "ok"
-    assert statuses["Paper worker (orchestrator)"] == "idle"
+    assert statuses["Paper worker (orchestrator)"] in ("idle", "warn")  # no worker yet; "warn" during market hours (just started)
     assert statuses["Intelligence service"] == "down"
 
 
