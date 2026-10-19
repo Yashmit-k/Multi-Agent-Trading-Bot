@@ -148,6 +148,8 @@ def run_paper_cycle(
                     continue
                 if proposal.side == Side.BUY and held > 0:
                     continue  # one position per stock: no adding to an existing holding
+                if proposal.side == Side.BUY and horizon == Horizon.INTRADAY and not settings.intraday_auto_entries:
+                    continue  # intraday entries are off (Settings); intraday exits of holdings still run
                 if proposal.side == Side.SELL:
                     proposal = proposal.model_copy(update={"quantity": held})  # a signal exit sells the whole holding
                 proposal = _with_brackets(_sized(proposal, repository.available_cash(starting_cash), costs, settings.max_order_notional), settings)

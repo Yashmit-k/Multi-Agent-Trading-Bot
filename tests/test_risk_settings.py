@@ -63,3 +63,30 @@ def test_user_brackets_and_cap_reach_the_order(repository: CoreRepository) -> No
     reference = Decimal(order.metadata["reference_price"])
     assert Decimal(order.metadata["stop_loss"]) < reference * Decimal("0.96")
     assert Decimal(order.metadata["take_profit"]) > reference * Decimal("1.08")
+
+
+def _intraday_ready(repository: CoreRepository) -> None:
+    from contracts.enums import Exchange, Horizon, Timeframe
+    from contracts.schemas.market import Candle
+
+    _ready(repository)
+    bar_end = DECISION
+    repository.upsert_candles([Candle(symbol="TCS", exchange=Exchange.NSE, timeframe=Timeframe.M5, open=Decimal("400"), high=Decimal("401"), low=Decimal("399"), close=Decimal("400"), volume=10, start=bar_end - timedelta(minutes=5), end=bar_end)])
+    _store(repository, _signal(signal_id="sig-tcs-intraday", symbol="TCS", horizon=Horizon.INTRADAY, timestamp=DECISION, valid_until=DECISION + timedelta(hours=2)))
+
+
+def _horizons(repository: CoreRepository) -> set[str]:
+    return {repository.get_proposal(order.proposal_id).horizon.value for order in repository.list_orders() if order.symbol == "TCS"}  # type: ignore[union-attr]
+
+
+def test_intraday_entries_are_off_by_default(repository: CoreRepository) -> None:
+    _intraday_ready(repository)
+    _cycle(repository)
+    assert _horizons(repository) == {"SWING"}
+
+
+def test_intraday_entries_when_enabled(repository: CoreRepository) -> None:
+    _intraday_ready(repository)
+    repository.save_setting("risk", {"intraday_auto_entries": True}, updated_by="test", now=DECISION)
+    _cycle(repository)
+    assert "INTRADAY" in _horizons(repository)

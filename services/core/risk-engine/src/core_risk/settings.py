@@ -24,6 +24,9 @@ class RiskSettings:
     stop_loss_pct: Decimal = Decimal("2")
     take_profit_pct: Decimal = Decimal("4")
     auto_entries: bool = True  # False: agents may still exit holdings, but only manual orders open new ones
+    # Intraday (5-minute) agent entries. Off by default since the exit-rules study (2026-10-15): the fused
+    # 5-minute signal flips within minutes and each round trip loses about 0.4% to charges.
+    intraday_auto_entries: bool = False
 
     def as_json(self) -> dict[str, object]:
         return {key: (str(value) if isinstance(value, Decimal) else value) for key, value in asdict(self).items()}
@@ -89,4 +92,7 @@ def describe_bounds() -> list[dict[str, object]]:
     return [
         {"key": key, "label": label, "min": str(low), "max": str(high), "default": str(getattr(DEFAULTS, key))}
         for key, (low, high, label) in BOUNDS.items()
-    ] + [{"key": "auto_entries", "label": "Agents may open new positions", "min": None, "max": None, "default": "true"}]
+    ] + [
+        {"key": "auto_entries", "label": "Agents may open new positions", "min": None, "max": None, "default": "true"},
+        {"key": "intraday_auto_entries", "label": "Agents may open intraday (5-minute) positions", "min": None, "max": None, "default": "false"},
+    ]

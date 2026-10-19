@@ -17,6 +17,7 @@ const HINT: Record<string, string> = {
   stop_loss_pct: "Exit if price falls this % below entry.",
   take_profit_pct: "Exit if price rises this % above entry.",
   auto_entries: "Off: agents can still exit holdings, but only you open new positions.",
+  intraday_auto_entries: "Off by default: the exit-rules study found 5-minute entries lose about 0.4% a trade to charges. Swing entries and your manual orders are unaffected.",
 };
 
 export function RiskSettingsForm({ initial }: { initial: RiskSettingsView }) {
@@ -56,15 +57,15 @@ export function RiskSettingsForm({ initial }: { initial: RiskSettingsView }) {
             {view.bounds.map((bound) => (
               <label key={bound.key} className="block rounded border border-[#26303C] bg-[#0F141B] p-3 text-sm">
                 <span className="font-medium">{bound.label}</span>
-                {bound.key === "auto_entries" ? (
+                {bound.min === null ? (
                   <span className="mt-2 flex items-center gap-2">
                     <input
                       type="checkbox"
                       disabled={!operator}
-                      checked={Boolean(draft.auto_entries)}
-                      onChange={(event) => setDraft({ ...draft, auto_entries: event.target.checked })}
+                      checked={Boolean(draft[bound.key])}
+                      onChange={(event) => setDraft({ ...draft, [bound.key]: event.target.checked })}
                     />
-                    <span className="text-xs text-[#94A3B8]">{draft.auto_entries ? "on" : "off"}</span>
+                    <span className="text-xs text-[#94A3B8]">{draft[bound.key] ? "on" : "off"}</span>
                   </span>
                 ) : (
                   <input
@@ -91,7 +92,7 @@ export function RiskSettingsForm({ initial }: { initial: RiskSettingsView }) {
             <button
               type="button"
               disabled={!operator || pending}
-              onClick={() => void save(Object.fromEntries(view.bounds.map((bound) => [bound.key, bound.key === "auto_entries" ? true : bound.default])))}
+              onClick={() => void save(Object.fromEntries(view.bounds.map((bound) => [bound.key, bound.min === null ? bound.default === "true" : bound.default])))}
               className="rounded border border-[#26303C] px-3 py-1.5 text-sm disabled:opacity-50"
             >
               Reset to defaults
