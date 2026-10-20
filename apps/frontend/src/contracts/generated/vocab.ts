@@ -2,6 +2,7 @@
 export const SCHEMA_VERSION = "1.0" as const;
 export const EVENT_TYPES = [
   "agent.heartbeat",
+  "agent.request",
   "agent.signal",
   "decision.created",
   "feature.updated",
@@ -16,6 +17,9 @@ export const EVENT_TYPES = [
   "order.updated",
   "portfolio.updated",
   "position.updated",
+  "review.completed",
+  "review.requested",
+  "review.step",
   "risk.approved",
   "risk.rejected",
   "system.alert"
@@ -43,6 +47,7 @@ export const HORIZONS = ["INTRADAY", "SWING", "LONG_TERM"] as const;
 export const FUNDAMENTAL_AGENTS = ["fundamental", "valuation", "earnings"] as const;
 export const DISCRIMINATOR_MAPPING = {
   "agent.heartbeat": "#/$defs/AgentHeartbeatEnvelope",
+  "agent.request": "#/$defs/AgentRequestEnvelope",
   "agent.signal": "#/$defs/AgentSignalEnvelope",
   "decision.created": "#/$defs/DecisionCreatedEnvelope",
   "feature.updated": "#/$defs/FeatureUpdatedEnvelope",
@@ -57,6 +62,9 @@ export const DISCRIMINATOR_MAPPING = {
   "order.updated": "#/$defs/OrderUpdatedEnvelope",
   "portfolio.updated": "#/$defs/PortfolioUpdatedEnvelope",
   "position.updated": "#/$defs/PositionUpdatedEnvelope",
+  "review.completed": "#/$defs/ReviewCompletedEnvelope",
+  "review.requested": "#/$defs/ReviewRequestedEnvelope",
+  "review.step": "#/$defs/ReviewStepEnvelope",
   "risk.approved": "#/$defs/RiskApprovedEnvelope",
   "risk.rejected": "#/$defs/RiskRejectedEnvelope",
   "system.alert": "#/$defs/SystemAlertEnvelope"

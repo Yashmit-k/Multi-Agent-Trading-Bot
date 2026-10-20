@@ -1,0 +1,92 @@
+{
+  "$defs": {
+    "ReviewStepKind": {
+      "enum": [
+        "plan",
+        "tool_call",
+        "tool_result",
+        "agent_reply",
+        "critique",
+        "replan",
+        "llm_error"
+      ],
+      "title": "ReviewStepKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One step of the manager's reasoning: a plan, a tool call and its result, a critique, a replan.",
+  "properties": {
+    "actor": {
+      "minLength": 1,
+      "title": "Actor",
+      "type": "string"
+    },
+    "arguments": {
+      "additionalProperties": true,
+      "title": "Arguments",
+      "type": "object"
+    },
+    "kind": {
+      "$ref": "#/$defs/ReviewStepKind"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "purpose": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Purpose"
+    },
+    "review_id": {
+      "minLength": 1,
+      "title": "Review Id",
+      "type": "string"
+    },
+    "step": {
+      "minimum": 0,
+      "title": "Step",
+      "type": "integer"
+    },
+    "summary": {
+      "default": "",
+      "title": "Summary",
+      "type": "string"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "tool": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tool"
+    }
+  },
+  "required": [
+    "review_id",
+    "step",
+    "kind",
+    "actor",
+    "timestamp"
+  ],
+  "title": "ReviewStep",
+  "type": "object"
+}

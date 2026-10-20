@@ -28,6 +28,10 @@ class EventType(StrEnum):
     PORTFOLIO_UPDATED = "portfolio.updated"
     SYSTEM_ALERT = "system.alert"
     AGENT_HEARTBEAT = "agent.heartbeat"
+    AGENT_REQUEST = "agent.request"
+    REVIEW_REQUESTED = "review.requested"
+    REVIEW_STEP = "review.step"
+    REVIEW_COMPLETED = "review.completed"
 
 
 class RedisChannel(StrEnum):
@@ -40,6 +44,7 @@ class RedisChannel(StrEnum):
     ORDER_EVENTS = "order.events"
     PORTFOLIO_EVENTS = "portfolio.events"
     SYSTEM_EVENTS = "system.events"
+    REVIEW_EVENTS = "review.events"
 
 
 # fundamental.updated is reference data. The channel list has no
@@ -63,6 +68,10 @@ CHANNEL_FOR_EVENT: dict[EventType, RedisChannel] = {
     EventType.PORTFOLIO_UPDATED: RedisChannel.PORTFOLIO_EVENTS,
     EventType.SYSTEM_ALERT: RedisChannel.SYSTEM_EVENTS,
     EventType.AGENT_HEARTBEAT: RedisChannel.AGENT_EVENTS,
+    EventType.AGENT_REQUEST: RedisChannel.AGENT_EVENTS,
+    EventType.REVIEW_REQUESTED: RedisChannel.REVIEW_EVENTS,
+    EventType.REVIEW_STEP: RedisChannel.REVIEW_EVENTS,
+    EventType.REVIEW_COMPLETED: RedisChannel.REVIEW_EVENTS,
 }
 
 if set(CHANNEL_FOR_EVENT) != set(EventType):

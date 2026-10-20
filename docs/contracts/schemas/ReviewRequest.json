@@ -1,0 +1,126 @@
+{
+  "$defs": {
+    "Horizon": {
+      "enum": [
+        "INTRADAY",
+        "SWING",
+        "LONG_TERM"
+      ],
+      "title": "Horizon",
+      "type": "string"
+    },
+    "ReviewKind": {
+      "enum": [
+        "pipeline",
+        "ad_hoc"
+      ],
+      "title": "ReviewKind",
+      "type": "string"
+    },
+    "Side": {
+      "enum": [
+        "BUY",
+        "SELL"
+      ],
+      "title": "Side",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A proposal waiting for the portfolio manager. Published on review.events as review.requested.",
+  "properties": {
+    "aggregated_confidence": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Aggregated Confidence",
+      "type": "number"
+    },
+    "aggregated_signal": {
+      "maximum": 1,
+      "minimum": -1,
+      "title": "Aggregated Signal",
+      "type": "number"
+    },
+    "entry_price": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0.0,
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        }
+      ],
+      "title": "Entry Price"
+    },
+    "horizon": {
+      "$ref": "#/$defs/Horizon"
+    },
+    "kind": {
+      "$ref": "#/$defs/ReviewKind"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "proposal_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Proposal Id"
+    },
+    "quantity": {
+      "exclusiveMinimum": 0,
+      "title": "Quantity",
+      "type": "integer"
+    },
+    "requested_at": {
+      "format": "date-time",
+      "title": "Requested At",
+      "type": "string"
+    },
+    "requested_by": {
+      "minLength": 1,
+      "title": "Requested By",
+      "type": "string"
+    },
+    "review_id": {
+      "minLength": 1,
+      "title": "Review Id",
+      "type": "string"
+    },
+    "side": {
+      "$ref": "#/$defs/Side"
+    },
+    "symbol": {
+      "minLength": 1,
+      "title": "Symbol",
+      "type": "string"
+    }
+  },
+  "required": [
+    "review_id",
+    "kind",
+    "symbol",
+    "horizon",
+    "side",
+    "quantity",
+    "entry_price",
+    "aggregated_signal",
+    "aggregated_confidence",
+    "requested_at",
+    "requested_by",
+    "metadata"
+  ],
+  "title": "ReviewRequest",
+  "type": "object"
+}

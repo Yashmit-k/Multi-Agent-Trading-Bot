@@ -1,0 +1,68 @@
+{
+  "$defs": {
+    "AgentName": {
+      "enum": [
+        "technical",
+        "momentum",
+        "mean_reversion",
+        "volume",
+        "regime",
+        "ml",
+        "news",
+        "fundamental",
+        "valuation",
+        "earnings"
+      ],
+      "title": "AgentName",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The manager asks another agent to look again. Published on agent.events as agent.request.",
+  "properties": {
+    "from_agent": {
+      "const": "portfolio_manager",
+      "default": "portfolio_manager",
+      "title": "From Agent",
+      "type": "string"
+    },
+    "question": {
+      "minLength": 1,
+      "title": "Question",
+      "type": "string"
+    },
+    "request_id": {
+      "minLength": 1,
+      "title": "Request Id",
+      "type": "string"
+    },
+    "review_id": {
+      "minLength": 1,
+      "title": "Review Id",
+      "type": "string"
+    },
+    "symbol": {
+      "minLength": 1,
+      "title": "Symbol",
+      "type": "string"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "to_agent": {
+      "$ref": "#/$defs/AgentName"
+    }
+  },
+  "required": [
+    "request_id",
+    "review_id",
+    "to_agent",
+    "symbol",
+    "question",
+    "timestamp"
+  ],
+  "title": "AgentRequest",
+  "type": "object"
+}

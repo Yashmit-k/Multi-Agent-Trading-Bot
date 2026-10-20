@@ -14,6 +14,7 @@ from contracts.schemas.news_signal import NewsSignal
 from contracts.schemas.order import Order
 from contracts.schemas.portfolio import PortfolioSnapshot
 from contracts.schemas.position import Position
+from contracts.schemas.review import AgentRequest, ProposalReview, ReviewRequest, ReviewStep
 from contracts.schemas.risk_decision import RiskCheck, RiskDecision
 from contracts.schemas.submission import SubmissionResult
 from contracts.schemas.system import AgentHeartbeat, SystemAlert
@@ -21,6 +22,7 @@ from contracts.schemas.trade_proposal import TradeProposal
 
 EXPORT_MODELS: dict[str, type[BaseModel]] = {
     "AgentHeartbeat": AgentHeartbeat,
+    "AgentRequest": AgentRequest,
     "AgentSignal": AgentSignal,
     "Candle": Candle,
     "ContractCatalog": ContractCatalog,
@@ -33,7 +35,10 @@ EXPORT_MODELS: dict[str, type[BaseModel]] = {
     "Order": Order,
     "PortfolioSnapshot": PortfolioSnapshot,
     "Position": Position,
+    "ProposalReview": ProposalReview,
     "Quote": Quote,
+    "ReviewRequest": ReviewRequest,
+    "ReviewStep": ReviewStep,
     "RiskCheck": RiskCheck,
     "RiskDecision": RiskDecision,
     "SubmissionResult": SubmissionResult,
