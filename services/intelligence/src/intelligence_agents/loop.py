@@ -67,10 +67,11 @@ def run_cycle(settings: IntelligenceSettings, runner, health: RunnerHealth, rout
     produced = runner.run(list(settings.symbols), as_of)
     health.last_run_at = datetime.now(timezone.utc).isoformat()
     health.signals_emitted_last_run = len(produced)
-    health.prompt_tokens = router._tracker.prompt_tokens
-    health.completion_tokens = router._tracker.completion_tokens
+    routers = [router, *([runner.context_router] if getattr(runner, "context_router", router) is not router else [])]
+    health.prompt_tokens = sum(item._tracker.prompt_tokens for item in routers)
+    health.completion_tokens = sum(item._tracker.completion_tokens for item in routers)
     snapshot = router.health_snapshot()
-    health.fallbacks = int(snapshot["fallback_count"])
+    health.fallbacks = sum(int(item.health_snapshot()["fallback_count"]) for item in routers)
     health.last_generation = snapshot["last_generation"]  # type: ignore[assignment]
     health.last_failure_type = snapshot["last_failure_type"]  # type: ignore[assignment]
     health.llm_provider = str(snapshot["provider"])

@@ -123,6 +123,10 @@ services:
       LLM_REASSESS_MODEL: ${LLM_REASSESS_MODEL:-gemini-3-flash-preview}
       # Tried in order when the main model fails or its free daily quota is used up (each model has its own).
       LLM_FALLBACK_MODELS: ${LLM_FALLBACK_MODELS:-gemini-3.6-flash,gemini-3-flash-preview}
+      # Fundamental, valuation and earnings get their own model and quota, so they never use up the News agent's
+      # (gemini-3.1-flash-lite: 500 requests a day on the free tier). 3.5-flash-lite rejects reasoning "none".
+      LLM_CONTEXT_MODEL: ${LLM_CONTEXT_MODEL:-gemini-3.5-flash-lite}
+      LLM_CONTEXT_REASONING_EFFORT: ${LLM_CONTEXT_REASONING_EFFORT:-low}
     depends_on:
       core-api:
         condition: service_healthy

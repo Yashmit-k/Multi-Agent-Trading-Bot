@@ -82,3 +82,33 @@ def test_a_rate_limited_model_is_paused_for_the_providers_retry_delay_only() -> 
     clock["now"] += timedelta(seconds=15)
     chain.complete(REQUEST, tier="tier1")
     assert first.calls == 2
+
+
+def test_context_agents_get_their_own_model_and_never_the_news_model() -> None:
+    from intelligence_agents.runtime import make_runner
+    from intelligence_agents.settings import IntelligenceSettings
+
+    base = IntelligenceSettings.from_env()
+    fields = {name: getattr(base, name) for name in base.__dataclass_fields__}
+    settings = type(base)(**{**fields, "llm_api_key": "k", "llm_base_url": "https://example.test/v1", "llm_tier1_model": "news-lite",
+                             "llm_context_model": "context-lite", "llm_context_reasoning_effort": "low",
+                             "llm_fallback_models": ("news-lite", "backup-a"), "store": "memory"})
+    runner, router = make_runner(settings)
+    by_name = {type(agent).__name__: agent for agent in runner.agents}
+    assert by_name["NewsAgent"]._router is router
+    context = by_name["FundamentalAgent"]._router
+    assert context is runner.context_router is by_name["ValuationAgent"]._router is by_name["EarningsAgent"]._router
+    assert context is not router
+    chain = context._tier1._primary
+    assert [provider.model for provider in chain._providers] == ["context-lite", "backup-a"]  # never falls back to news-lite
+    assert chain._providers[0]._reasoning_effort == "low"
+
+
+def test_without_a_context_model_all_agents_share_one_router() -> None:
+    from intelligence_agents.runtime import make_runner
+    from intelligence_agents.settings import IntelligenceSettings
+
+    base = IntelligenceSettings.from_env()
+    fields = {name: getattr(base, name) for name in base.__dataclass_fields__}
+    runner, router = make_runner(type(base)(**{**fields, "store": "memory"}))
+    assert all(agent._router is router for agent in runner.agents)
