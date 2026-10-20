@@ -18,6 +18,7 @@ from defusedxml import ElementTree
 from intelligence_agents.clock import Clock
 from intelligence_agents.news.aliases import build_matcher, map_symbols
 from intelligence_agents.news.store import NewsStore
+from intelligence_agents.news.quality import is_boilerplate
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,8 @@ class RssPuller:
             link = _text(item, "link") or f"{feed_url}#{index}"
             description = _text(item, "description") or title
             pub = _parse_date(_text(item, "pubDate"), retrieved_at)
+            if is_boilerplate(title):
+                continue  # auto-generated price pages are not news
             symbols = self._map_symbols(f"{title} {description}")
             if not symbols:
                 self._store.record_empty_symbol_drop(title)

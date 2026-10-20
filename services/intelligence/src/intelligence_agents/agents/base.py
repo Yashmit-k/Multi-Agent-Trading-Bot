@@ -13,7 +13,7 @@ from intelligence_agents.agents.confidence import INSUFFICIENT_CONFIDENCE, cap_a
 from intelligence_agents.clock import Clock
 from intelligence_agents.signal_id import make_signal_id
 
-AGENT_VERSION = "1.0.0"
+AGENT_VERSION = "1.1.0"
 DEFAULT_HORIZON = Horizon.SWING
 
 VALIDITY = {

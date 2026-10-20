@@ -64,10 +64,20 @@ def _clamp(value: float) -> float:
 
 
 def fundamental_score(latest: dict) -> tuple[float, dict[str, float]]:
-    """Mean of the available parts, each in [-1, 1]:
-    YoY profit growth (+25% saturates), YoY revenue growth (+15%), ROE around 12% (+/-12 points),
-    and debt-to-equity (0 -> +1, 1.0 -> 0, 2.0+ -> -1; absent for banks, which then skip it)."""
+    """Mean of the available parts, each in [-1, 1].
+
+    Preferred: each stock's percentile rank against the rest of the NIFTY 50 (rank_* metrics from the
+    nightly fetch), mapped to 2 x rank - 1, so the agent says which stocks are *relatively* strong instead of
+    calling most large caps a buy. Fallback when ranks are missing: fixed thresholds on
+    YoY profit growth (+25% saturates), YoY revenue growth (+15%), ROE around 12%, and debt-to-equity.
+    """
     parts: dict[str, float] = {}
+    for metric in ("profit_growth", "revenue_growth", "roe", "debt_to_equity"):
+        rank = latest.get(f"rank_{metric}")
+        if rank is not None:
+            parts[metric] = _clamp(2 * float(rank) - 1)
+    if parts:
+        return _clamp(sum(parts.values()) / len(parts)), parts
     if "profit_growth" in latest:
         parts["profit_growth"] = _clamp(float(latest["profit_growth"]) / 0.25)
     if "revenue_growth" in latest:

@@ -83,3 +83,16 @@ def test_fundamental_score_parts_and_bounds() -> None:
     weak, _ = fundamental_score({"profit_growth": Decimal("-0.5"), "roe": Decimal("0.0")})
     assert weak == -1.0
     assert fundamental_score({"eps": Decimal("10")}) == (0.0, {})
+
+
+def test_percentile_ranks_are_relative_and_lower_debt_ranks_higher() -> None:
+    from intelligence_agents.fundamentals.yahoo import percentile_ranks
+
+    snaps = [snapshot_from_info(f"S{i}", _info(earningsQuarterlyGrowth=0.05 * i, debtToEquity=10.0 * i)) for i in range(6)]
+    ranks = percentile_ranks(snaps)
+    assert ranks["S5"]["rank_profit_growth"] == 1.0 and ranks["S0"]["rank_profit_growth"] == 0.0
+    assert ranks["S0"]["rank_debt_to_equity"] == 1.0  # least debt is best
+    score, parts = fundamental_score({f"rank_{k}": Decimal(str(v[0])) for k, v in {"profit_growth": [1.0], "roe": [0.0]}.items()})
+    assert parts == {"profit_growth": 1.0, "roe": -1.0} and score == 0.0
+    rows = rows_for(snaps[3], 20.0, NOW, NOW.date(), ranks["S3"])
+    assert {row["metric"] for row in rows} >= {"rank_profit_growth", "rank_debt_to_equity"}

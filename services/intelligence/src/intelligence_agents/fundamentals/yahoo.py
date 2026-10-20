@@ -104,7 +104,24 @@ def peer_medians(snapshots: Iterable[Snapshot]) -> dict[str, float]:
     return out
 
 
-def rows_for(snapshot: Snapshot, peer_pe: float | None, fetched_at: datetime, today: date) -> list[dict[str, str]]:
+RANKED = (("profit_growth", True), ("revenue_growth", True), ("roe", True), ("debt_to_equity", False))
+
+
+def percentile_ranks(snapshots: Iterable[Snapshot]) -> dict[str, dict[str, float]]:
+    """symbol -> {rank_<metric>: 0..1}, 1 = best of the NIFTY 50 on that metric (lower debt is better)."""
+    items = list(snapshots)
+    out: dict[str, dict[str, float]] = {item.symbol: {} for item in items}
+    for metric, higher_is_better in RANKED:
+        present = [(item.symbol, getattr(item, metric)) for item in items if getattr(item, metric) is not None]
+        if len(present) < 5:
+            continue
+        ordered = sorted(present, key=lambda pair: pair[1], reverse=not higher_is_better)  # worst first
+        for position, (symbol, _) in enumerate(ordered):
+            out[symbol][f"rank_{metric}"] = position / (len(ordered) - 1)
+    return out
+
+
+def rows_for(snapshot: Snapshot, peer_pe: float | None, fetched_at: datetime, today: date, ranks: dict[str, float] | None = None) -> list[dict[str, str]]:
     if snapshot.quarter_end is None or (today - snapshot.quarter_end).days > MAX_QUARTER_AGE_DAYS:
         return []  # stale or undated: better no row than an old one presented as current
     period = quarter_label(snapshot.quarter_end)
@@ -118,7 +135,7 @@ def rows_for(snapshot: Snapshot, peer_pe: float | None, fetched_at: datetime, to
         ("margin", snapshot.margin, "ratio", period),
         ("roe", snapshot.roe, "ratio", period),
         ("debt_to_equity", snapshot.debt_to_equity, "ratio", period),
-    ]
+    ] + [(name, value, "ratio", today.isoformat()) for name, value in sorted((ranks or {}).items())]
     rows = []
     for metric, value, unit, label in values:
         if value is None:
@@ -212,8 +229,9 @@ def run(symbols: list[str], out: Path, *, now: datetime | None = None, factory: 
     moment = now or datetime.now(timezone.utc)
     snapshots = fetch_snapshots(symbols, pause=pause, factory=factory)
     medians = peer_medians(snapshots)
+    ranks = percentile_ranks(snapshots)
     today = moment.astimezone(timezone.utc).date()
-    fresh = [row for item in snapshots for row in rows_for(item, medians.get(item.symbol), moment, today)]
+    fresh = [row for item in snapshots for row in rows_for(item, medians.get(item.symbol), moment, today, ranks.get(item.symbol))]
     merged, added = merge(read_csv(out), fresh)
     if added:
         write_csv(out, merged)
