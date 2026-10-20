@@ -35,6 +35,8 @@ services:
       SEED_HISTORY_DAYS: ${SEED_HISTORY_DAYS:-100}
       MARKET_DATA_COLLECTOR: "true"
       MARKET_DATA_POLL_SECONDS: "20"
+      # Same list the worker fuses with, so the Agents scorecard reports in_fusion correctly.
+      FUSION_EXCLUDED_AGENTS: ${FUSION_EXCLUDED_AGENTS:-fundamental,valuation,earnings,ml}
     depends_on:
       postgres:
         condition: service_healthy
