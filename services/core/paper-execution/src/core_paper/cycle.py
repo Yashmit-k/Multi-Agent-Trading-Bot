@@ -125,7 +125,7 @@ def run_paper_cycle(
     capped = False
     applied = _applied_strategy(repository)
     extension = paper_test_entry_window(moment) if allow_test_extension and mode == TradingMode.PAPER else None
-    for instrument in repository.list_instruments():
+    for instrument in _strongest_first(repository, repository.list_instruments(), moment, weights):
         if capped:
             break
         for horizon, timeframe in HORIZON_TIMEFRAME.items():
@@ -148,10 +148,16 @@ def run_paper_cycle(
                 proposal = build_proposal(aggregate, candle, as_of, session_id=book.session_id)
                 if proposal is None:
                     continue
+                if proposal.side == Side.BUY and (
+                    Decimal(str(proposal.aggregated_signal)) < settings.min_entry_signal or Decimal(str(proposal.aggregated_confidence)) < settings.min_entry_confidence
+                ):
+                    continue  # fewer, stronger entries: a weak BUY is not worth its charges (exits keep the lower bar)
                 # Long-only book: a bearish view on a stock we do not hold is not an order to propose.
                 held = repository.held_quantity(instrument.symbol)
                 if proposal.side == Side.SELL and held <= 0:
                     continue
+                if proposal.side == Side.SELL and horizon != holding_horizon(repository, instrument.symbol):
+                    continue  # a swing holding is not sold by a 5-minute flicker, nor an intraday one by the daily view
                 if proposal.side == Side.BUY and held > 0:
                     continue  # one position per stock: no adding to an existing holding
                 if proposal.side == Side.BUY and applied and settings.strategy_mode != "alongside":
@@ -613,6 +619,33 @@ def _timeframe_for_symbol(repository: CoreRepository, symbol: str) -> Timeframe:
         if repository.latest_candle(symbol, timeframe) is not None:
             return timeframe
     return Timeframe.D1
+
+
+def holding_horizon(repository: CoreRepository, symbol: str) -> Horizon:
+    """The horizon the open holding was bought for. Manual and unknown buys count as SWING (CNC delivery)."""
+    executed = {item.order_id for item in repository.list_executions() if item.symbol == symbol}
+    buys = [order for order in repository.list_orders() if order.symbol == symbol and order.side == Side.BUY and order.order_id in executed]
+    if not buys:
+        return Horizon.SWING
+    newest = max(buys, key=lambda order: order.created_at)
+    proposal = repository.get_proposal(newest.proposal_id) if newest.metadata.get("reason") == "entry" else None
+    return proposal.horizon if proposal is not None else Horizon.SWING
+
+
+def _strongest_first(repository: CoreRepository, instruments, moment: datetime, weights) -> list:  # type: ignore[no-untyped-def]
+    """Visit the stocks with the strongest fused BUY view first, so a daily cap keeps the best entries, not
+    the first ones alphabetically. Exits are unaffected: every stock is still visited."""
+    def strength(instrument) -> float:  # type: ignore[no-untyped-def]
+        best = 0.0
+        signals = repository.signals_for(instrument.symbol)
+        for horizon in HORIZON_TIMEFRAME:
+            aggregate = fuse(signals, horizon=horizon, as_of=moment, weights=weights)
+            if aggregate is not None:
+                best = max(best, aggregate.aggregated_signal * aggregate.aggregated_confidence)
+        return best
+
+    scored = [(strength(item), item.symbol, item) for item in instruments]
+    return [item for _, _, item in sorted(scored, key=lambda row: (-row[0], row[1]))]
 
 
 def _entry_execution(repository: CoreRepository, symbol: str):

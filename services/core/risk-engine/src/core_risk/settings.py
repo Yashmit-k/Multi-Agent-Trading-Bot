@@ -21,6 +21,9 @@ class RiskSettings:
     max_per_sector: int = 2
     max_exposure_fraction: Decimal = Decimal("0.30")
     max_per_stock: Decimal = Decimal("40000")
+    # Agent BUYs need at least this fused signal and confidence (exits keep the decision engine's 0.2 / 0.3).
+    min_entry_signal: Decimal = Decimal("0.35")
+    min_entry_confidence: Decimal = Decimal("0.4")
     stop_loss_pct: Decimal = Decimal("2")
     take_profit_pct: Decimal = Decimal("4")
     # Trade-level checks on every new BUY (core_risk.trade).
@@ -54,6 +57,8 @@ BOUNDS: dict[str, tuple[Decimal, Decimal, str]] = {
     "max_per_sector": (Decimal("1"), Decimal("50"), "Positions per sector"),
     "max_exposure_fraction": (Decimal("0.01"), Decimal("1"), "Total exposure (fraction of starting cash)"),
     "max_per_stock": (Decimal("1000"), Decimal("500000"), "Money in one stock (Rs)"),
+    "min_entry_signal": (Decimal("0.2"), Decimal("1"), "Minimum fused signal for an agent buy"),
+    "min_entry_confidence": (Decimal("0.3"), Decimal("1"), "Minimum fused confidence for an agent buy"),
     "stop_loss_pct": (Decimal("0.5"), Decimal("20"), "Stop loss (%)"),
     "take_profit_pct": (Decimal("0.5"), Decimal("50"), "Take profit (%)"),
     "max_daily_loss_pct": (Decimal("0.1"), Decimal("20"), "Daily loss limit (% of starting cash)"),

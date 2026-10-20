@@ -14,6 +14,8 @@ const HINT: Record<string, string> = {
   max_per_sector: "Stocks from one NIFTY sector at once.",
   max_exposure_fraction: "Money invested as a fraction of starting cash, e.g. 0.30 = 30%.",
   max_per_stock: "Money in any one stock, including queued buys.",
+  min_entry_signal: "Agent buys need at least this fused signal (−1 to +1). Higher means fewer, stronger trades. Exits keep 0.2.",
+  min_entry_confidence: "Agent buys need at least this fused confidence (0 to 1).",
   stop_loss_pct: "Exit if price falls this % below entry.",
   take_profit_pct: "Exit if price rises this % above entry.",
   max_daily_loss_pct: "No new buys once the book is down this much today (from the previous close), as % of starting cash.",
