@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from intelligence_agents.manager.llm import ManagerLLMError, ToolCallingLLM
-from intelligence_agents.manager.tools import TOOL_SPECS, CoreClient, IntelligenceClient, StepLog, Toolbox, clip
+from intelligence_agents.manager.tools import RECHECKABLE, TOOL_SPECS, CoreClient, IntelligenceClient, StepLog, Toolbox, clip
 
 logger = logging.getLogger(__name__)
 
@@ -199,6 +199,10 @@ class PortfolioManager:
         critique = str(args.get("critique", "")).strip()
         if len(critique) < 30:
             return "the critique must explain the decisive evidence in 2-4 sentences."
+        rows = (toolbox.last_opinions or {}).get("agents") or []
+        shaky = [row["agent"] for row in rows if row.get("llm_fallback") and (row.get("fusion_weight") or 0) > 0 and row["agent"] in RECHECKABLE]
+        if shaky and "ask_agent_to_recheck" not in toolbox.called:
+            return f"{', '.join(shaky)} carries fusion weight but rests on fallback heuristics, not the model; ask it to re-check (ask_agent_to_recheck) before deciding."
         conflicts = [str(item) for item in args.get("conflicts") or [] if str(item).strip()]
         disagreeing = (toolbox.last_opinions or {}).get("agents_disagreeing_with_fusion") or []
         missing = [agent for agent in disagreeing if not any(agent in item for item in conflicts)]

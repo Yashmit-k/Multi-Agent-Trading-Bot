@@ -160,3 +160,23 @@ def test_transient_errors_are_retried_once() -> None:
     manager, core, _ = _manager(llm)
     assert manager.review(REVIEW)["reviewer"] == "gemini-main"
     assert any(step.get("kind") == "llm_error" and "retrying" in step["summary"] for step in core.steps)
+
+
+def test_a_weighted_opinion_from_fallback_heuristics_must_be_rechecked_first(monkeypatch) -> None:
+    shaky = {**OPINIONS, "agents": [{"agent": "news", "score": 0.4, "confidence": 0.5, "fusion_weight": 0.5, "llm_fallback": True}], "agents_disagreeing_with_fusion": []}
+    final = {"verdict": "APPROVE", "size_fraction": 1, "conflicts": [], "critique": "The news agent re-checked with the model and still sees a positive story.", "purpose": "done"}
+    llm = ScriptedLLM(
+        "gemini-main",
+        [
+            ("", [_call("get_agent_opinions", {"symbol": "INFY", "horizon": "SWING", "purpose": "start"}, "c1")]),
+            ("", [_call("submit_verdict", final, "c2")]),
+            ("", [_call("ask_agent_to_recheck", {"agent": "news", "symbol": "INFY", "question": "Re-score with the model", "purpose": "fallback"}, "c3")]),
+            ("", [_call("submit_verdict", final, "c4")]),
+        ],
+    )
+    manager, core, intel = _manager(llm)
+    monkeypatch.setattr(core, "tool", lambda name, **params: shaky if name == "opinions" else {"ok": True})
+    body = manager.review(REVIEW)
+    assert body["verdict"] == "APPROVE"
+    assert any(step.get("kind") == "critique" and "fallback" in step["summary"] for step in core.steps)
+    assert intel.reassessed
