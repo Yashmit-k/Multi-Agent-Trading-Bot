@@ -42,3 +42,15 @@ def test_stop_and_top1() -> None:
     assert both["trades"] == 2 and both["exits"].get("stop") == 1
     top = sel.simulate(panel, signal, confidence, _period(), 0.6, None, "top1")
     assert top["trades"] == 1 and top["exits"] == {"stop": 1}  # only the strongest stock (S0)
+
+
+def test_target_exit_from_the_bar_after_fill() -> None:
+    panel = _panel()
+    panel.high[8, 0] = 101.5  # +1.45% after a 100.05 entry: hits a 1% target
+    signal = np.zeros(panel.close.shape)
+    confidence = np.ones(panel.close.shape)
+    signal[3, 0] = 0.9
+    out = sel.simulate(panel, signal, confidence, _period(), 0.6, None, "all", stop_pct=0.02, target_pct=0.01)
+    assert out["exits"] == {"target": 1} and out["net_per_trade"] > 0
+    default = sel.simulate(panel, signal, confidence, _period(), 0.6, None, "all")
+    assert default["exits"] == {"square_off": 1}  # the original study's behaviour is unchanged

@@ -34,7 +34,18 @@ SLIP = 0.0005
 NOTIONAL = 20000.0
 
 
-def simulate(panel: at.Panel, signal: np.ndarray, confidence: np.ndarray, period: tuple[date, date], threshold: float, hold: int | None, selection: str) -> dict[str, object]:
+def simulate(
+    panel: at.Panel,
+    signal: np.ndarray,
+    confidence: np.ndarray,
+    period: tuple[date, date],
+    threshold: float,
+    hold: int | None,
+    selection: str,
+    *,
+    stop_pct: float = STOP,
+    target_pct: float | None = None,
+) -> dict[str, object]:
     from core_api.strategy_lab import leg_charges
 
     rows = np.where(at._period_mask(panel, period))[0]
@@ -66,7 +77,8 @@ def simulate(panel: at.Panel, signal: np.ndarray, confidence: np.ndarray, period
             qty = int(NOTIONAL // entry)
             if qty < 1:
                 continue
-            stop = entry * (1 - STOP)
+            stop = entry * (1 - stop_pct)
+            target = None if target_pct is None else entry * (1 + target_pct)
             exit_price, reason, last = None, "square_off", nxt
             held = 0
             m = nxt
@@ -81,6 +93,9 @@ def simulate(panel: at.Panel, signal: np.ndarray, confidence: np.ndarray, period
                 held += 1
                 if panel.low[q, j] <= stop:
                     exit_price, reason = (stop if m == nxt else min(float(panel.open[q, j]), stop)), "stop"
+                    break
+                if target is not None and m != nxt and panel.high[q, j] >= target:
+                    exit_price, reason = max(float(panel.open[q, j]), target), "target"
                     break
                 if hold is not None and held >= hold:
                     exit_price, reason = float(panel.close[q, j]), "hold"
