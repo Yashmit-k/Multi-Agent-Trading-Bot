@@ -4,8 +4,9 @@ Definitions, indicators and rule evaluation live in core_paper.strategy_engine, 
 backtested here is evaluated exactly the same way when applied to live paper trading.
 
 Simulation rules:
-- no look-ahead: rules are evaluated at a bar's close; a market entry fills at the next bar's open, a
-  limit entry (price read at the signal bar) on the first later bar that trades through it;
+- no look-ahead: rules are evaluated at a bar's close; entries use the live paper fill rule: a limit at
+  the signal close + 0.25% (or the strategy's own lower level), filled at the open if the bar opens
+  through it, else at the limit, during the 09:20-15:15 IST entry window;
 - one position per symbol; exits are checked bar by bar: the stop first (on the fill bar too, as the
   path inside a bar is unknown), then targets (from the bar after the fill), then the trailing stop
   (from the best price of earlier bars), the time limit, the 15:15 square-off and the exit rule
@@ -13,7 +14,7 @@ Simulation rules:
 - after the first target the stop can move to breakeven; if that same bar also trades back to entry,
   the rest exits at breakeven;
 - Zerodha charges on every leg: delivery (CNC), or intraday (MIS) for square-off strategies; plus
-  slippage on every fill;
+  slippage on every exit (live paper fills have none: it is kept as a cushion);
 - portfolio pass: trades are taken in entry order while a position slot and the cash are free.
 Results are in-sample: a rule tuned on this data will look better here than it will trade.
 """
@@ -49,6 +50,9 @@ from core_paper.strategy_engine import (  # noqa: F401 - re-exported for the API
 )
 
 SQUARE_OFF = time(15, 15)
+ENTRY_START = time(9, 20)
+ENTRY_END = time(15, 15)
+LIVE_LIMIT_PREMIUM = 0.0025
 MAX_INTRADAY_SYMBOLS = 10
 MAX_INTRADAY_DAYS = 400
 MAX_TRADES_LISTED = 1500
@@ -89,7 +93,10 @@ def leg_charges(buy_notional: float, sell_notional: float, product: str) -> floa
     exchange = (buy_notional + sell_notional) * float(book.transaction_rate)
     sebi = (buy_notional + sell_notional) * float(book.sebi_inr_per_crore) / 1e7
     stamp = buy_notional * float(book.intraday_stamp_rate)
-    return brokerage + stt + exchange + sebi + stamp + float(book.gst_rate) * (brokerage + exchange + sebi)
+    # The paper engine re-prices same-day CNC round trips at intraday rates and, by its documented conservative
+    # choice (docs/paper-execution-policy.md), still charges one DP fee on the sell. Match it here.
+    dp = float(book.dp_inr_per_scrip) if sell_notional > 0 else 0.0
+    return brokerage + stt + exchange + sebi + stamp + float(book.gst_rate) * (brokerage + exchange + sebi) + dp
 
 
 # --- simulation -----------------------------------------------------------------------------------
@@ -155,7 +162,6 @@ def simulate_symbol(symbol: str, context: Context, strategy: StrategyDefinition,
     exits = evaluate(context, strategy.exit)
     long = strategy.direction == "long"
     sign = 1.0 if long else -1.0
-    slip = strategy.slippage_bps / 10_000
     clocks = [moment.astimezone(IST) for moment in bars.end]
     starts = [moment.astimezone(IST) for moment in bars.start]
     days = bars.sessions()
@@ -170,21 +176,36 @@ def simulate_symbol(symbol: str, context: Context, strategy: StrategyDefinition,
             continue
         signal = i
         fill, raw = None, math.nan
-        if strategy.entry_order.type == "market":
-            candidates = [signal + 1]
+        # Live paper fill rule (core_paper.execute.queue_entry): a limit at the signal close +/- 0.25%, or at the
+        # strategy's own level when that is better; it fills at the open if the bar opens through it, else at the
+        # limit; it works during the entry window (09:20-15:15 IST, same session for intraday bars that close before
+        # 15:15, otherwise the next session) and, for limit-type entries, at most valid_bars bars.
+        reference = float(bars.close[signal])
+        standard = reference * (1 + sign * LIVE_LIMIT_PREMIUM)
+        level = float(limit_series[signal]) if limit_series is not None else math.nan
+        if strategy.entry_order.type == "limit":
+            if math.isnan(level):
+                i = signal + 1
+                continue
+            limit = min(standard, level) if long else max(standard, level)
+            reference = level
         else:
-            candidates = list(range(signal + 1, min(n, signal + 1 + strategy.entry_order.valid_bars)))
-        limit = float(limit_series[signal]) if limit_series is not None else math.nan
-        for k in candidates:
-            if strategy.square_off_intraday and days[k] != days[signal]:
-                break  # intraday orders do not carry over to the next session
-            if latest_entry is not None and intraday and starts[k].time() >= latest_entry:
-                break
-            if strategy.entry_order.type == "market":
-                fill, raw = k, float(bars.open[k])
-                break
-            if math.isnan(limit):
-                break
+            limit = standard
+        if intraday:
+            window_day = days[signal] if clocks[signal].time() < ENTRY_END else None
+        else:
+            window_day = None
+        horizon_end = n if strategy.entry_order.type == "market" else min(n, signal + 1 + strategy.entry_order.valid_bars)
+        for k in range(signal + 1, horizon_end):
+            if intraday:
+                if window_day is None:
+                    window_day = days[k]  # signal after 15:15: the next session's window
+                if days[k] != window_day or clocks[k].time() > ENTRY_END:
+                    break
+                if starts[k].time() < ENTRY_START or (latest_entry is not None and starts[k].time() >= latest_entry):
+                    continue
+            elif k > signal + 1:
+                break  # daily bars: the next session only
             touched = bars.low[k] <= limit if long else bars.high[k] >= limit
             if touched:
                 fill, raw = k, (min(float(bars.open[k]), limit) if long else max(float(bars.open[k]), limit))
@@ -192,16 +213,16 @@ def simulate_symbol(symbol: str, context: Context, strategy: StrategyDefinition,
         if fill is None:
             i = signal + 1
             continue
-        entry = raw * (1 + sign * slip)
-        stop = stop_price(strategy, context, signal, entry)
+        entry = raw  # no slippage on a limit fill, as live; exits keep the slippage setting
+        stop = stop_price(strategy, context, signal, reference)
         if stop is not None and (math.isnan(stop) or (stop >= entry if long else stop <= entry)):
             i = signal + 1  # stop undefined or on the wrong side: no trade
             continue
-        quantity = _quantity(strategy, entry, stop)
+        quantity = _quantity(strategy, reference, stop)
         if quantity < 1:
             i = signal + 1
             continue
-        targets = target_prices(strategy, context, signal, entry, stop)
+        targets = target_prices(strategy, context, signal, reference, stop)
         trade = _manage(symbol, bars, strategy, fill, entry, stop, targets, quantity, exits, clocks, days)
         trades.append(trade)
         exit_index = next(k for k in range(fill, n) if bars.end[k] == trade.exit_at)
@@ -447,7 +468,7 @@ def run_strategy(strategy: StrategyDefinition, request: BacktestRequest, load_ba
     notes = [
         "In-sample: this is the data the rule was written against. Expect live results to be worse.",
         "Rules use each bar's close; entries fill on later bars, and higher-timeframe values come from completed bars only.",
-        f"Charges: Zerodha {'intraday (MIS)' if strategy.product == 'MIS' else 'delivery (CNC)'} on every leg, plus {strategy.slippage_bps:g} bp slippage per fill.",
+        f"Charges: Zerodha {'intraday rates (same-day square-off), plus one DP fee per sell as the paper engine charges' if strategy.product == 'MIS' else 'delivery (CNC)'} on every leg, plus {strategy.slippage_bps:g} bp slippage on each exit.",
     ]
     if strategy.direction == "short":
         notes.append("Short side is a research backtest: the paper engine trades long only.")

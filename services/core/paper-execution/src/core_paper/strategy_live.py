@@ -202,6 +202,12 @@ def strategy_entries(repository: CoreRepository, publisher, *, starting_cash: De
                 "strategy_name": definition.name,
                 "timeframe": definition.timeframe,
                 "signal_bar_end": bar_end.isoformat(),
+                # Intraday limit entries live at most valid_bars bars, as in the Strategy-lab backtest.
+                "entry_valid_until": (
+                    (bar_end + timedelta(minutes=TIMEFRAME_MINUTES[definition.timeframe] * definition.entry_order.valid_bars)).isoformat()
+                    if definition.entry_order.type == "limit" and definition.timeframe in INTRADAY
+                    else None
+                ),
                 "decided_at": moment.isoformat(),
                 "stops_monitored": True,
                 "same_bar_exit": "stop_first",
@@ -407,3 +413,28 @@ def _queue_exit(repository, publisher, position, quantity: int, price: Decimal, 
         kind = _order_event(order)
         _publish(publisher, kind, f"{kind.value}:{order.order_id}", moment, proposal_id, order)
     return order is not None
+
+
+def expire_strategy_orders(repository: CoreRepository, now: datetime) -> int:
+    """Cancel open strategy limit entries past their valid_bars window (entry_valid_until)."""
+    from core_paper.operator import OperatorRejected, cancel_order
+
+    book = repository.active_paper_session()
+    if book is None:
+        return 0
+    cancelled = 0
+    for order in repository.list_orders():
+        if order.side != Side.BUY or order.status != OrderStatus.OPEN:
+            continue
+        proposal = repository.get_proposal(order.proposal_id)
+        if proposal is None or proposal.metadata.get("source") != SOURCE:
+            continue
+        until = proposal.metadata.get("entry_valid_until")
+        if not until or datetime.fromisoformat(str(until)) > now.astimezone(timezone.utc):
+            continue
+        try:
+            cancel_order(repository, session_id=book.session_id, order_id=order.order_id, operator_id="strategy", reason="limit_valid_bars_expired", expected_status="OPEN", now=now)
+            cancelled += 1
+        except OperatorRejected:
+            continue
+    return cancelled

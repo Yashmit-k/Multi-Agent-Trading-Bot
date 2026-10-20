@@ -467,9 +467,10 @@ def _is_strategy_position(repository: CoreRepository, symbol: str) -> bool:
 
 
 def _manage_strategy_exits(repository, publisher, schedule, starting_cash, mode: TradingMode, moment: datetime) -> None:
-    from core_paper.strategy_live import manage_strategy_positions
+    from core_paper.strategy_live import expire_strategy_orders, manage_strategy_positions
 
     try:
+        expire_strategy_orders(repository, moment)
         manage_strategy_positions(repository, publisher, schedule, starting_cash, mode, moment)
     except Exception:
         logger.exception("strategy_exits_failed")

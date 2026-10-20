@@ -120,3 +120,31 @@ def test_applied_strategy_replaces_agent_entries_and_manages_its_exits(repositor
     final = sells[-1]
     assert Decimal(str(final.metadata["level_price"])) == Decimal("400")  # breakeven, not the original 380 stop
     assert all(order.status != OrderStatus.REJECTED for order in repository.list_orders())
+
+
+def test_intraday_limit_entries_expire_after_valid_bars(repository: CoreRepository) -> None:
+    from contracts.enums import Exchange, Timeframe
+    from contracts.schemas.market import Candle
+    from core_paper.strategy_live import expire_strategy_orders
+
+    client = _ready(repository)
+    bars = []
+    for k in range(40):  # 5-minute history ending at the 09:20 bar of the next session
+        end = SESSION - timedelta(minutes=5 * (39 - k))
+        bars.append(Candle(symbol="TCS", exchange=Exchange.NSE, timeframe=Timeframe.M5, open=Decimal("400"), high=Decimal("401"), low=Decimal("399"), close=Decimal("400"), volume=100, start=end - timedelta(minutes=5), end=end))
+    repository.upsert_candles(bars)
+    intraday = {
+        **STRATEGY,
+        "timeframe": "5m",
+        "entry": {"items": [{"left": {"indicator": "close"}, "op": ">", "right": {"value": 300}}]},
+        "entry_order": {"type": "limit", "price": {"indicator": "close", "scale": 0.99}, "valid_bars": 2},
+        "square_off_intraday": True,
+    }
+    saved = client.post("/api/v1/strategies", json={"definition": intraday}, headers=AUTH).json()
+    assert client.post(f"/api/v1/strategies/{saved['strategy_id']}/apply", json={"confirm": True}, headers=AUTH).status_code == 200
+    _cycle(repository, SESSION + timedelta(minutes=1))
+    [order] = [item for item in repository.list_orders() if item.symbol == "TCS"]
+    assert order.status == OrderStatus.OPEN and order.limit_price == Decimal("396.00")  # 1% below the close: a retest
+    assert expire_strategy_orders(repository, SESSION + timedelta(minutes=9)) == 0  # still within 2 bars
+    assert expire_strategy_orders(repository, SESSION + timedelta(minutes=11)) == 1
+    assert repository.list_orders()[0].status == OrderStatus.CANCELLED

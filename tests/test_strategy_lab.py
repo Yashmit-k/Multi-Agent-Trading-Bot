@@ -42,11 +42,17 @@ def _run(bars: Bars, strategy: StrategyDefinition):  # type: ignore[no-untyped-d
     return simulate_symbol("T", Context(bars=bars, timeframe=strategy.timeframe, higher={}, cache={}), strategy, 0)
 
 
-def test_market_entry_fills_next_open_and_target_exits() -> None:
-    bars = _bars([99, 100, 102, 104, 108], [99.5, 100.5, 103, 105, 113], [98.5, 99.5, 101, 103, 107], [99, 100, 102, 104, 110])
+def test_market_entry_uses_the_live_limit_rule_and_target_exits() -> None:
+    # Signal at bar 1 (close 100): limit 100.25. Bar 2 opens at 100.1, below the limit: fills at the open.
+    bars = _bars([99, 100, 100.1, 104, 108], [99.5, 100.5, 101, 105, 111], [98.5, 99.5, 99.8, 103, 107], [99, 100, 100.5, 104, 110])
     [trade] = _run(bars, _flag_strategy())
-    assert trade.entry_at == bars.end[2] and trade.entry_price == 102.0  # signal at bar 1 close, fill at bar 2 open
-    assert trade.reason == "target" and trade.exit_price == pytest.approx(102 * 1.10)
+    assert trade.entry_at == bars.end[2] and trade.entry_price == pytest.approx(100.1)
+    assert trade.reason == "target" and trade.exit_price == pytest.approx(110.0)  # +10% from the 100 reference
+
+
+def test_a_gap_above_the_live_limit_does_not_fill() -> None:
+    bars = _bars([99, 100, 102, 104], [99.5, 100.5, 103, 105], [98.5, 99.5, 101, 103], [99, 100, 102, 104])
+    assert _run(bars, _flag_strategy()) == []  # opened 1.75% above the signal close: the +0.25% limit never trades
 
 
 def test_stop_first_on_ambiguous_bar_and_gap_through() -> None:
