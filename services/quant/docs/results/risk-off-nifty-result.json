@@ -1,0 +1,58 @@
+{
+  "protocol": "services/quant/docs/risk-off-nifty-protocol.md",
+  "variants": {
+    "A": {
+      "in_sample": {
+        "trades": 72,
+        "win_rate": 0.5555555555555556,
+        "mean_net_bp": 7.169684563096742,
+        "total_net_rupees": 5162.172885429654,
+        "mean_low_bp": -8.442288351401713
+      },
+      "test": {
+        "trades": 51,
+        "win_rate": 0.5098039215686274,
+        "mean_net_bp": -7.986053825627365,
+        "total_net_rupees": -4072.8874510699557,
+        "mean_low_bp": -34.440606637078226
+      },
+      "test_stock_like_costs": {
+        "trades": 51,
+        "win_rate": 0.43137254901960786,
+        "mean_net_bp": -27.881990738525285,
+        "total_net_rupees": -14219.815276647896,
+        "mean_low_bp": -54.31035230107046
+      },
+      "works": false
+    },
+    "B": {
+      "in_sample": {
+        "trades": 72,
+        "win_rate": 0.4722222222222222,
+        "mean_net_bp": -3.346028852181963,
+        "total_net_rupees": -2409.1407735710136,
+        "mean_low_bp": -16.440474477470126
+      },
+      "test": {
+        "trades": 51,
+        "win_rate": 0.5098039215686274,
+        "mean_net_bp": -7.240151713021153,
+        "total_net_rupees": -3692.477373640788,
+        "mean_low_bp": -24.990379790460924
+      },
+      "test_stock_like_costs": {
+        "trades": 51,
+        "win_rate": 0.35294117647058826,
+        "mean_net_bp": -27.136827104018845,
+        "total_net_rupees": -13839.781823049612,
+        "mean_low_bp": -44.86948162256982
+      },
+      "works": false
+    }
+  },
+  "comparison": {
+    "buy_and_hold_test_pct": -13.73336061545405,
+    "non_risk_off_next_day_bp": -10.542918365659816,
+    "risk_off_share_test": 0.2786885245901639
+  }
+}
