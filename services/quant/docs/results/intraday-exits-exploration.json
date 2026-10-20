@@ -1,0 +1,434 @@
+{
+  "protocol": "services/quant/docs/intraday-exits-exploration-protocol.md",
+  "exploratory": true,
+  "entry": {
+    "threshold": 0.8,
+    "hold": null,
+    "selection": "top1"
+  },
+  "grid": [
+    {
+      "stop": 0.01,
+      "target": null,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.371739907109682,
+        "net_per_trade": -35.27464931071866,
+        "total_net": -197467.48684140304,
+        "mean_session_net": -643.2165695159708,
+        "session_low90": -742.0504531739097,
+        "first_half": -95209.02810447678,
+        "second_half": -102258.45873692627,
+        "exits": {
+          "square_off": 4151,
+          "stop": 1447
+        }
+      }
+    },
+    {
+      "stop": 0.01,
+      "target": 0.005,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.49231868524473027,
+        "net_per_trade": -41.27632612250964,
+        "total_net": -231064.87363380895,
+        "mean_session_net": -752.6543115107785,
+        "session_low90": -810.5488255223296,
+        "first_half": -120536.65531937171,
+        "second_half": -110528.21831443725,
+        "exits": {
+          "square_off": 1871,
+          "stop": 1254,
+          "target": 2473
+        }
+      }
+    },
+    {
+      "stop": 0.01,
+      "target": 0.01,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.39514112182922473,
+        "net_per_trade": -39.158376197811656,
+        "total_net": -219208.58995534966,
+        "mean_session_net": -714.0344949685657,
+        "session_low90": -793.5172431926916,
+        "first_half": -110554.1491327073,
+        "second_half": -108654.44082264235,
+        "exits": {
+          "square_off": 3031,
+          "stop": 1410,
+          "target": 1157
+        }
+      }
+    },
+    {
+      "stop": 0.01,
+      "target": 0.015,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.37638442300821723,
+        "net_per_trade": -37.5156901742678,
+        "total_net": -210012.83359555114,
+        "mean_session_net": -684.0808911907203,
+        "session_low90": -771.1976911380251,
+        "first_half": -102355.03588936468,
+        "second_half": -107657.79770618647,
+        "exits": {
+          "square_off": 3594,
+          "stop": 1439,
+          "target": 565
+        }
+      }
+    },
+    {
+      "stop": 0.01,
+      "target": 0.02,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.37263308324401573,
+        "net_per_trade": -36.68267759589131,
+        "total_net": -205349.62918179954,
+        "mean_session_net": -668.891300266448,
+        "session_low90": -762.3571516011856,
+        "first_half": -101154.00391923235,
+        "second_half": -104195.62526256719,
+        "exits": {
+          "square_off": 3881,
+          "stop": 1443,
+          "target": 274
+        }
+      }
+    },
+    {
+      "stop": 0.015,
+      "target": null,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.38763844230082173,
+        "net_per_trade": -35.23791031082838,
+        "total_net": -197261.82192001733,
+        "mean_session_net": -642.5466512052683,
+        "session_low90": -757.0499900774172,
+        "first_half": -94762.07282698136,
+        "second_half": -102499.74909303598,
+        "exits": {
+          "square_off": 4932,
+          "stop": 666
+        }
+      }
+    },
+    {
+      "stop": 0.015,
+      "target": 0.005,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.5117899249732047,
+        "net_per_trade": -40.85770107931394,
+        "total_net": -228721.41064199945,
+        "mean_session_net": -745.0208815700307,
+        "session_low90": -812.2590163954376,
+        "first_half": -119803.95313158855,
+        "second_half": -108917.45751041088,
+        "exits": {
+          "square_off": 2472,
+          "stop": 559,
+          "target": 2567
+        }
+      }
+    },
+    {
+      "stop": 0.015,
+      "target": 0.01,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.41246873883529833,
+        "net_per_trade": -39.07057974802987,
+        "total_net": -218717.1054294712,
+        "mean_session_net": -712.4335681741733,
+        "session_low90": -802.7148633383836,
+        "first_half": -110210.38961277805,
+        "second_half": -108506.71581669315,
+        "exits": {
+          "square_off": 3752,
+          "stop": 642,
+          "target": 1204
+        }
+      }
+    },
+    {
+      "stop": 0.015,
+      "target": 0.015,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.39299749910682386,
+        "net_per_trade": -37.717340108908964,
+        "total_net": -211141.66992967238,
+        "mean_session_net": -687.7578825070761,
+        "session_low90": -789.6611918490984,
+        "first_half": -102681.95852348897,
+        "second_half": -108459.71140618343,
+        "exits": {
+          "square_off": 4356,
+          "stop": 657,
+          "target": 585
+        }
+      }
+    },
+    {
+      "stop": 0.015,
+      "target": 0.02,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.3888888888888889,
+        "net_per_trade": -36.86254770816038,
+        "total_net": -206356.5420702818,
+        "mean_session_net": -672.1711468087356,
+        "session_low90": -778.9552617145473,
+        "first_half": -101046.75847176142,
+        "second_half": -105309.78359852039,
+        "exits": {
+          "square_off": 4648,
+          "stop": 661,
+          "target": 289
+        }
+      }
+    },
+    {
+      "stop": 0.02,
+      "target": null,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.39067524115755625,
+        "net_per_trade": -35.59289910289117,
+        "total_net": -199249.04917798477,
+        "mean_session_net": -649.0197041628169,
+        "session_low90": -768.3740680720404,
+        "first_half": -96343.93218609596,
+        "second_half": -102905.11699188882,
+        "exits": {
+          "square_off": 5280,
+          "stop": 318
+        }
+      }
+    },
+    {
+      "stop": 0.02,
+      "target": 0.005,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.5148267238299392,
+        "net_per_trade": -41.17171939778926,
+        "total_net": -230479.2851888243,
+        "mean_session_net": -750.7468572925872,
+        "session_low90": -823.3922868606446,
+        "first_half": -120296.62777281656,
+        "second_half": -110182.65741600769,
+        "exits": {
+          "square_off": 2751,
+          "stop": 264,
+          "target": 2583
+        }
+      }
+    },
+    {
+      "stop": 0.02,
+      "target": 0.01,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.41586280814576637,
+        "net_per_trade": -39.27586637001421,
+        "total_net": -219866.29993933954,
+        "mean_session_net": -716.1768727665782,
+        "session_low90": -814.6860938549127,
+        "first_half": -110291.09003039473,
+        "second_half": -109575.20990894479,
+        "exits": {
+          "square_off": 4079,
+          "stop": 305,
+          "target": 1214
+        }
+      }
+    },
+    {
+      "stop": 0.02,
+      "target": 0.015,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.39621293319042517,
+        "net_per_trade": -37.913426994566564,
+        "total_net": -212239.3643155836,
+        "mean_session_net": -691.3334342527153,
+        "session_low90": -799.9753626276998,
+        "first_half": -103024.95876420969,
+        "second_half": -109214.4055513739,
+        "exits": {
+          "square_off": 4699,
+          "stop": 309,
+          "target": 590
+        }
+      }
+    },
+    {
+      "stop": 0.02,
+      "target": 0.02,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.3919256877456234,
+        "net_per_trade": -37.227351134958724,
+        "total_net": -208398.71165349896,
+        "mean_session_net": -678.8231649951106,
+        "session_low90": -792.4777141787582,
+        "first_half": -102213.04087610969,
+        "second_half": -106185.67077738926,
+        "exits": {
+          "square_off": 4994,
+          "stop": 313,
+          "target": 291
+        }
+      }
+    },
+    {
+      "stop": 0.03,
+      "target": null,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.3928188638799571,
+        "net_per_trade": -34.62990879474065,
+        "total_net": -193858.22943295812,
+        "mean_session_net": -631.460030726248,
+        "session_low90": -757.8231361935158,
+        "first_half": -95170.39076953699,
+        "second_half": -98687.83866342112,
+        "exits": {
+          "square_off": 5514,
+          "stop": 84
+        }
+      }
+    },
+    {
+      "stop": 0.03,
+      "target": 0.005,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.5175062522329403,
+        "net_per_trade": -39.94294372334145,
+        "total_net": -223600.59896326542,
+        "mean_session_net": -728.3407132353923,
+        "session_low90": -806.1546622647753,
+        "first_half": -117810.493995898,
+        "second_half": -105790.10496736743,
+        "exits": {
+          "square_off": 2941,
+          "stop": 61,
+          "target": 2596
+        }
+      }
+    },
+    {
+      "stop": 0.03,
+      "target": 0.01,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.4181850660950339,
+        "net_per_trade": -38.24567841813738,
+        "total_net": -214099.3077847331,
+        "mean_session_net": -697.3918820349612,
+        "session_low90": -802.640649886775,
+        "first_half": -108960.42724503716,
+        "second_half": -105138.8805396959,
+        "exits": {
+          "square_off": 4301,
+          "stop": 74,
+          "target": 1223
+        }
+      }
+    },
+    {
+      "stop": 0.03,
+      "target": 0.015,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.39817792068595925,
+        "net_per_trade": -36.98034752101069,
+        "total_net": -207015.98542261784,
+        "mean_session_net": -674.319170757713,
+        "session_low90": -789.5147652671179,
+        "first_half": -101835.61995516594,
+        "second_half": -105180.36546745192,
+        "exits": {
+          "square_off": 4925,
+          "stop": 77,
+          "target": 596
+        }
+      }
+    },
+    {
+      "stop": 0.03,
+      "target": 0.02,
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.39389067524115756,
+        "net_per_trade": -36.29577473349814,
+        "total_net": -203183.7469581226,
+        "mean_session_net": -661.8363093098455,
+        "session_low90": -783.0794127120158,
+        "first_half": -101048.22482179411,
+        "second_half": -102135.52213632848,
+        "exits": {
+          "square_off": 5221,
+          "stop": 80,
+          "target": 297
+        }
+      }
+    }
+  ],
+  "best": {
+    "stop": 0.03,
+    "target": null
+  },
+  "train": {
+    "trades": 5598,
+    "win_rate": 0.3928188638799571,
+    "net_per_trade": -34.62990879474065,
+    "total_net": -193858.22943295812,
+    "mean_session_net": -631.460030726248,
+    "session_low90": -757.8231361935158,
+    "first_half": -95170.39076953699,
+    "second_half": -98687.83866342112,
+    "exits": {
+      "square_off": 5514,
+      "stop": 84
+    }
+  },
+  "validate": {
+    "trades": 2463,
+    "win_rate": 0.3447015834348356,
+    "net_per_trade": -40.85092816855142,
+    "total_net": -100615.83607914214,
+    "mean_session_net": -804.9266886331371,
+    "session_low90": -934.0758441033897,
+    "first_half": -58961.93882282094,
+    "second_half": -41653.897256321194,
+    "exits": {
+      "square_off": 2454,
+      "stop": 9
+    }
+  },
+  "already_seen_2026": {
+    "trades": 3507,
+    "win_rate": 0.36241802110065585,
+    "net_per_trade": -43.601160030154794,
+    "total_net": -152909.26822575286,
+    "mean_session_net": -831.0286316617004,
+    "session_low90": -1009.5042101222242,
+    "first_half": -55756.83766385374,
+    "second_half": -97152.43056189912,
+    "exits": {
+      "square_off": 3470,
+      "stop": 37
+    }
+  },
+  "worth_a_fresh_test": false
+}
