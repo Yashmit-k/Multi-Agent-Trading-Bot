@@ -29,6 +29,7 @@ const OPERATOR_WRITES: RegExp[] = [
   /^\/api\/v1\/strategies\/[\w-]+\/(backtest|delete|apply)$/,
   /^\/api\/v1\/strategies\/active\/stop$/,
   /^\/api\/v1\/risk\/kill-switch$/,
+  /^\/api\/v1\/reviews$/,
 ];
 
 // Writes any visitor may make: a backtest preview changes nothing (rate-limited in the route).

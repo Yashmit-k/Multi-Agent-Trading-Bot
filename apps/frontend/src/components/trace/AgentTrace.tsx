@@ -32,6 +32,7 @@ export const LANES: Array<{ key: string; label: string; kind: string }> = [
   { key: "valuation", label: "Valuation", kind: "Intelligence (LLM)" },
   { key: "earnings", label: "Earnings", kind: "Intelligence (LLM)" },
   { key: "decision.created", label: "Fusion + Decision", kind: "Core (code)" },
+  { key: "portfolio_manager", label: "Portfolio manager", kind: "Manager (LLM + tools)" },
   { key: "risk", label: "Risk engine", kind: "Core (code)" },
   { key: "order", label: "Paper execution", kind: "Core (code)" },
 ];
@@ -39,6 +40,7 @@ export const LANES: Array<{ key: string; label: string; kind: string }> = [
 export function laneOf(event: TraceEvent): string {
   if (event.event_type === "agent.signal") return event.agent ?? "unknown";
   if (event.event_type === "decision.created") return "decision.created";
+  if (event.event_type.startsWith("review.") || event.event_type === "agent.request") return "portfolio_manager";
   if (event.event_type.startsWith("risk.")) return "risk";
   return "order";
 }
@@ -46,8 +48,19 @@ export function laneOf(event: TraceEvent): string {
 export function describe(event: TraceEvent): string {
   const p = event.payload ?? {};
   switch (event.event_type) {
-    case "agent.signal":
-      return `${p.horizon ?? ""} score ${num(p.signal)} · conf ${num(p.confidence)}`;
+    case "agent.signal": {
+      const meta = (p.metadata as Record<string, unknown> | undefined) ?? {};
+      const recheck = meta.requested_by === "portfolio_manager" ? " · re-check for the portfolio manager" : "";
+      return `${p.horizon ?? ""} score ${num(p.signal)} · conf ${num(p.confidence)}${recheck}`;
+    }
+    case "review.requested":
+      return `review requested: ${p.side} ${p.quantity} @ ${p.entry_price} · fused ${num(p.aggregated_signal)} (${p.kind})`;
+    case "review.step":
+      return `${p.kind}${p.tool ? ` ${p.tool}` : ""}${p.purpose ? ` · why: ${p.purpose}` : ""}${p.summary ? ` · ${p.summary}` : ""}`;
+    case "agent.request":
+      return `asks ${p.to_agent} to re-check ${p.symbol}: ${p.question}`;
+    case "review.completed":
+      return `${p.verdict}${p.verdict === "REDUCE" ? ` to ${Math.round(Number(p.size_fraction) * 100)}%` : ""} by ${p.reviewer} · ${p.critique}`;
     case "decision.created":
       return `${p.side} ${p.quantity} @ ${p.entry_price} · fused ${num(p.aggregated_signal)} from ${(p.supporting_signal_ids as unknown[] | undefined)?.length ?? 0} signals`;
     case "risk.approved":
