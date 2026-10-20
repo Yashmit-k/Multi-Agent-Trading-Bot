@@ -36,6 +36,10 @@ CONSUMER = {
     "order.filled": "portfolio / dashboard",
     "order.rejected": "(end of chain)",
     "position.updated": "portfolio / dashboard",
+    "review.requested": "portfolio-manager agent (claims it from Core)",
+    "review.step": "trace / dashboard",
+    "agent.request": "intelligence agent (POST /reassess)",
+    "review.completed": "risk-engine portfolio_manager check (or the operator, for a question)",
 }
 
 
@@ -47,6 +51,26 @@ def fetch(api: str, token: str, limit: int, event_type: str | None) -> list[dict
     request = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
     with urllib.request.urlopen(request, timeout=30) as response:
         return json.loads(response.read())["events"]
+
+
+def _get(api: str, token: str, path: str) -> dict:
+    request = urllib.request.Request(f"{api.rstrip('/')}{path}", headers={"Authorization": f"Bearer {token}"})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        return json.loads(response.read())
+
+
+def fetch_reviews(api: str, token: str, review_ids: list[str]) -> list[dict]:
+    """Each review's whole chain, plus the signals other agents sent back in reply to its requests."""
+    events: dict[str, dict] = {}
+    signals = _get(api, token, "/api/v1/trace?event_type=agent.signal&limit=1000")["events"]
+    for review_id in review_ids:
+        review = _get(api, token, f"/api/v1/reviews/{urllib.parse.quote(review_id)}")
+        for item in _get(api, token, f"/api/v1/trace/{urllib.parse.quote(review['correlation_id'])}")["events"]:
+            events[item["event_id"]] = item
+        for item in signals:
+            if ((item.get("payload") or {}).get("metadata") or {}).get("review_id") == review_id:
+                events[item["event_id"]] = item
+    return list(events.values())
 
 
 def fetch_db(database_url: str, limit: int, event_type: str | None) -> list[dict]:
@@ -95,6 +119,15 @@ def summary(event: dict) -> str:
         )
     if kind == "position.updated":
         return f"{payload.get('symbol')} qty={payload.get('quantity')} avg={payload.get('average_price')}"
+    if kind == "review.requested":
+        return f"{payload.get('kind')} review of {payload.get('side')} {payload.get('quantity')} {payload.get('symbol')} @ {payload.get('entry_price')} fused={payload.get('aggregated_signal')}"
+    if kind == "review.step":
+        why = f" why=\"{payload.get('purpose')}\"" if payload.get("purpose") else ""
+        return f"step {payload.get('step')} {payload.get('kind')} {payload.get('tool') or ''}{why} {payload.get('summary') or ''}".strip()
+    if kind == "agent.request":
+        return f"portfolio_manager asks {payload.get('to_agent')} to re-check {payload.get('symbol')}: \"{payload.get('question')}\""
+    if kind == "review.completed":
+        return f"{payload.get('verdict')} size={payload.get('size_fraction')} reviewer={payload.get('reviewer')} conflicts={payload.get('conflicts')} critique=\"{payload.get('critique')}\""
     return kind
 
 
@@ -139,6 +172,21 @@ def write(events: list[dict], out: Path, run: str) -> tuple[Path, Path]:
             for event in chain:
                 lines.append(_row(event))
             lines.append("")
+    reviews = {cid: chain for cid, chain in chains.items() if any(e["event_type"] == "review.requested" for e in chain)}
+    if reviews:
+        replies = {((e.get("payload") or {}).get("metadata") or {}).get("request_id"): e for e in ordered if e["event_type"] == "agent.signal"}
+        lines += ["## Portfolio-manager reviews", "", "Each review: the request, every reasoning step and tool call, requests to other agents and their replies, and the verdict.", ""]
+        for cid, chain in reviews.items():
+            lines += [f"### Review chain `{cid[:24]}…`", ""]
+            for event in chain:
+                if event["event_type"] == "agent.signal":
+                    continue
+                lines.append(_row(event))
+                if event["event_type"] == "agent.request":
+                    reply = replies.get((event.get("payload") or {}).get("request_id"))
+                    if reply is not None:
+                        lines.append("  - reply " + _row(reply).removeprefix("- "))
+            lines.append("")
     lines += ["## Agent signal handoffs", "", "| time (UTC) | producer | channel | consumer | content |", "|---|---|---|---|---|"]
     for event in ordered:
         if event["event_type"] == "agent.signal":
@@ -168,6 +216,7 @@ def main() -> None:
     parser.add_argument("--run", required=True)
     parser.add_argument("--out", default="docs/submission/agent-trace")
     parser.add_argument("--database-url", default=None, help="read system_events directly instead of the API")
+    parser.add_argument("--review", action="append", default=[], help="export only these portfolio-manager reviews (repeatable)")
     args = parser.parse_args()
     if args.database_url:
         events = fetch_db(args.database_url, args.limit, args.event_type)
@@ -175,7 +224,7 @@ def main() -> None:
         token = os.environ.get("CORE_API_TOKEN", "")
         if not token:
             raise SystemExit("CORE_API_TOKEN is required")
-        events = fetch(args.api, token, args.limit, args.event_type)
+        events = fetch_reviews(args.api, token, args.review) if args.review else fetch(args.api, token, args.limit, args.event_type)
     jsonl, markdown = write(events, Path(args.out), args.run)
     print(f"wrote {len(events)} events to {jsonl} and {markdown}")
 

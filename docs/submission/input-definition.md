@@ -1,6 +1,6 @@
 # Input definition
 
-The system takes four kinds of input. Every schema is defined once in `packages/contracts` and exported as JSON Schema in [`docs/contracts/schemas/`](../contracts/schemas/). The full HTTP contract is [`docs/contracts/openapi.json`](../contracts/openapi.json). All samples below are **real rows** copied from the running system's Postgres database on 2026-10-14. They were not hand-written.
+The system takes four kinds of input. Every schema is defined once in `packages/contracts` and exported as JSON Schema in [`docs/contracts/schemas/`](../contracts/schemas/). The full HTTP contract is [`docs/contracts/openapi.json`](../contracts/openapi.json). All samples below are **real rows** copied from the running system's Postgres database (market data and news from 14 Oct 2026; agent signals and the manager question from 20 Oct 2026). They were not hand-written.
 
 ## 1. Market data — Zerodha Kite candles
 
@@ -27,7 +27,7 @@ Daily bar for the same day: `open 1073.70, high 1096.40, low 1069.45, close 1090
 
 ## 2. News — public RSS feeds
 
-Source: ET Markets (two feeds), Business Standard Markets, and Mint Markets/Companies (`NEWS_RSS_URLS` in `docker-compose.yml`). Polled every 5 minutes. Each item becomes a `NewsArticle` ([`NewsArticle.json`](../contracts/schemas/NewsArticle.json)) once it maps to at least one NIFTY 50 symbol, using company-name aliases (`services/intelligence/src/intelligence_agents/news/aliases.py`). Unmapped headlines are counted and dropped.
+Source: 16 public feeds from Economic Times, Business Standard, Mint, The Hindu BusinessLine, NDTV Profit and CNBC-TV18 (`NEWS_RSS_URLS` in `docker-compose.yml`). Polled every intelligence cycle, and again on demand when the portfolio manager asks the News agent to re-check. Each item becomes a `NewsArticle` ([`NewsArticle.json`](../contracts/schemas/NewsArticle.json)) once it maps to at least one NIFTY 50 symbol, using company-name aliases (`services/intelligence/src/intelligence_agents/news/aliases.py`). Unmapped headlines are counted and dropped.
 
 | Field | Type |
 |---|---|
@@ -66,38 +66,38 @@ Every agent, deterministic or LLM, sends the same message to `POST /api/v1/inter
 | `features` | flat map | the numbers used |
 | `metadata` | JSON object | enough to reproduce the opinion (votes, input hash, LLM model, headlines) |
 
-**Real sample — deterministic Momentum agent** (WIPRO, daily bar of 14 Oct 2026):
+**Real sample: deterministic Momentum agent** (TCS, daily bar of 19 Oct 2026, agents 1.4.0):
 
 ```json
-{"signal_id": "b5edf5284436c3be37b00d024227abb499afc37cc85dc490f37a96ad83ed227f",
- "agent_name": "momentum", "agent_version": "1.0.0", "symbol": "WIPRO", "exchange": "NSE",
- "horizon": "SWING", "signal": 0.4, "confidence": 0.4,
- "timestamp": "2026-10-14T10:00:00Z", "as_of": "2026-10-14T10:00:00Z", "valid_until": "2026-10-22T10:00:00Z",
- "reason_codes": ["momentum.feature_missing.relative_strength_nifty"],
- "features": {"macd": -1.84190429, "roc_10": 0.09254417, "return_1": 0.01360947, "momentum_10": 12.8,
-              "trend_strength_adx": 23.4899105, "volume_confirmation": 0.0},
- "metadata": {"votes": [{"name": "return_1", "value": 1, "weight": 0.35},
-                        {"name": "momentum_10", "value": 1, "weight": 0.35},
-                        {"name": "macd", "value": -1, "weight": 0.3}],
-              "timeframe": "1d", "feature_version": "1.1.0",
-              "input_hash": "195cfa42febf231177ddcc4d99841b40923e16a7443b1dd40e757c18440abfb7",
-              "source_data_timestamp": "2026-10-14T10:00:00+00:00"},
+{"signal_id": "e347b043e93839b9eca181d7b8633e8b3cb67bd472179addda7236168512fbe2",
+ "agent_name": "momentum", "agent_version": "1.4.0", "symbol": "TCS", "exchange": "NSE",
+ "horizon": "SWING", "signal": 1.0, "confidence": 1.0,
+ "timestamp": "2026-10-19T10:00:00Z", "as_of": "2026-10-19T10:00:00Z", "valid_until": "2026-10-27T10:00:00Z",
+ "reason_codes": ["momentum.evaluated"],
+ "features": {"roc_10_z": 3.35948031, "trend_strength_adx": 29.34223753, "relative_strength_nifty": 0.00948928},
+ "metadata": {"votes": [{"name": "roc_10", "value": 1, "weight": 0.45},
+                        {"name": "trend_strength", "value": 1, "weight": 0.3},
+                        {"name": "relative_strength", "value": 1, "weight": 0.25}],
+              "timeframe": "1d", "feature_version": "1.2.0", "features_missing": [],
+              "input_hash": "9d3abaea50ffe20b0b3deef32cac6ca8f904c1eb944c08e44794ea9209ec3916",
+              "source_data_timestamp": "2026-10-19T10:00:00+00:00"},
  "schema_version": "1.0"}
 ```
 
-**Real sample — News agent on a live headline** (SUNPHARMA, 14 Oct 2026). This signal came through the deterministic fallback (`model: "fixture"`), because no LLM key was configured when it was captured. With a key, `model` names the LLM, and `sentiment`/`impact` come from it.
+**Real sample: News agent scored by the LLM** (TCS, 20 Oct 2026; nine live headlines, two shown). `model` names the LLM. When the LLM fails or its quota is used up, the same agent falls back to a heuristic: `model` becomes `"fixture"`, the reason code is `fixture.heuristic`, and the portfolio manager treats that opinion as unchecked.
 
 ```json
-{"signal_id": "sig-news-04430fd5207d5e86d5e11f59", "agent_name": "news", "symbol": "SUNPHARMA",
- "horizon": "SWING", "signal": 0.0, "confidence": 0.4,
- "as_of": "2026-10-14T18:40:00Z", "valid_until": "2026-10-15T00:43:56.402624Z",
- "reason_codes": ["fixture.heuristic"],
- "features": {"article_count": 1, "mean_sentiment": 0.0},
- "metadata": {"llm": [{"tier": "tier1", "model": "fixture", "fallback": false, "sentiment": 0.0, "impact": 0.4,
-                       "confidence": 0.4, "event_type": "corporate.update", "high_impact": false}],
-              "headlines": [{"title": "Sun Pharma down 2%, stock hits over 5-month low",
-                             "source": "www.business-standard.com",
-                             "url": "https://www.business-standard.com/markets/news/sun-pharma-share-price-down-2-stock-hits-over-5-month-low-126101400575_1.html"}]}}
+{"agent_name": "news", "agent_version": "1.1.0", "symbol": "TCS", "horizon": "SWING",
+ "signal": 0.42, "as_of": "2026-10-20T12:40:00Z",
+ "features": {"price_only": false, "article_count": 9, "mean_sentiment": 0.6},
+ "metadata": {"llm": [{"tier": "tier1", "model": "gemini-3.1-flash-lite", "sentiment": 0.6, "impact": 0.7,
+                       "confidence": 0.9, "event_type": "analyst_view", "high_impact": true, "fallback": false,
+                       "reason_codes": ["analyst_view", "price_move", "operating_updates"]}],
+              "headlines": [
+   {"title": "TCS, HCL Tech, Wipro, Infosys to Tech Mahindra — experts bullish on IT shares after Accenture's shift from AI investment",
+    "source": "www.livemint.com", "published_at": "2026-10-19T07:04:21+00:00"},
+   {"title": "Dharmesh Kant sees another 5-10% upside in IT stocks; prefers TCS, HCLTech and Tech Mahindra",
+    "source": "www.cnbctv18.com", "published_at": "2026-10-19T04:15:21+00:00"}]}}
 ```
 
 ## 4. Operator controls
@@ -107,5 +107,32 @@ Every agent, deterministic or LLM, sends the same message to `POST /api/v1/inter
 | Start / stop paper trading | `POST /api/v1/paper/start`, `/paper/stop` | sets the `paper_running` flag (not reachable through the public proxy) |
 | Open a paper session | `POST /api/v1/paper/sessions` `{"starting_cash": "1000000"}` | isolated cash book |
 | Kill switch | `POST /api/v1/risk/kill-switch` `{"armed": true}` | blocks new buys and queues flatten sells |
+| Ask the portfolio manager | `POST /api/v1/reviews` `{"symbol": "RELIANCE", "horizon": "SWING"}` (operator sign-in) | a hypothetical review; nothing is traded (section 5) |
+| Manager review on/off | `POST /api/v1/settings/risk` `{"values": {"manager_review": false}}` | agent BUYs skip the manager and go straight to risk |
 | Zerodha login | `GET /api/v1/zerodha/connect` → Kite login → `/zerodha/callback?request_token=…` | daily market-data access token |
-| Environment | `.env` / compose | `TRADING_MODE=PAPER`, `FUSION_EXCLUDED_AGENTS`, `NEWS_RSS_URLS`, `LLM_*`, `PAPER_STARTING_CASH` |
+| Environment | `.env` / compose | `TRADING_MODE=PAPER`, `FUSION_EXCLUDED_AGENTS`, `NEWS_RSS_URLS`, `LLM_*`, `MANAGER_LLM_MODEL`, `MANAGER_FALLBACK_MODEL`, `LLM_REASSESS_MODEL`, `PORTFOLIO_MANAGER_REVIEW`, `PAPER_STARTING_CASH` |
+
+## 5. Portfolio-manager review request: `ReviewRequest`
+
+The portfolio manager's input ([`ReviewRequest.json`](../contracts/schemas/ReviewRequest.json)). The decision engine creates one for every agent BUY (`kind: "pipeline"`, with the `proposal_id`). An operator question creates one with `kind: "ad_hoc"`. The manager claims it from Core (`POST /api/v1/internal/reviews/claim`), and it is published as `review.requested`.
+
+| Field | Type | Notes |
+|---|---|---|
+| `review_id` | string | `rv-` + sha256 of the proposal id, or `rv-adhoc-…` |
+| `kind` | `pipeline` \| `ad_hoc` | only a pipeline verdict gates a trade |
+| `proposal_id` | string or null | links the review into the proposal's trace |
+| `symbol`, `horizon`, `side`, `quantity`, `entry_price` | | the trade under review |
+| `aggregated_signal`, `aggregated_confidence` | float | the fused view it came from |
+| `requested_at`, `requested_by` | | `decision-engine` or `operator` |
+
+**Real sample** (operator question, 20 Oct 2026):
+
+```json
+{"review_id": "rv-adhoc-da9515777d6742a59fe6958c", "kind": "ad_hoc", "proposal_id": null,
+ "symbol": "RELIANCE", "horizon": "SWING", "side": "BUY", "quantity": 16, "entry_price": "1203.0000",
+ "aggregated_signal": 0.348, "aggregated_confidence": 0.52,
+ "requested_at": "2026-10-20T13:18:45.609377Z", "requested_by": "operator",
+ "metadata": {"question": "Would you buy RELIANCE now for the swing book?", "hypothetical": true}}
+```
+
+The manager's tools are inputs too. They are read-only `GET /api/v1/internal/tools/{opinions|features|market|portfolio|track_record}` views of the blackboard, plus the intelligence service's `/news/{symbol}` and `/fundamentals/{symbol}`.

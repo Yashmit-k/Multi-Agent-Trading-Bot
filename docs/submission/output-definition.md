@@ -6,6 +6,7 @@ Samples are **real rows** from the running database. Their origin is labelled:
 - **[bootstrap paper run, 1 Oct 2026]**: the first end-to-end paper cycle, which used a one-share bootstrap sizing rule.
 - **[paper cycle, 12 Oct 2026]**: a later session.
 - **[live, 14 Oct 2026]**: captured by the trace recorder.
+- **[portfolio manager, 20 Oct 2026]**: a real review run on the deployed system (operator question, so nothing was traded).
 
 None of these are backtest results or fabricated examples. The forward paper run on market hours adds new rows of the same shape, exported to [`agent-trace/`](agent-trace/).
 
@@ -35,9 +36,70 @@ Created when the fused signal for a symbol and horizon has |signal| ≥ 0.2 and 
  "metadata": {"quantity_model": "bootstrap_one_share", "stops_monitored": false}}
 ```
 
-## 2. `RiskDecision` — Risk Engine output
+## 2. `ProposalReview`, `ReviewStep`, `AgentRequest`: Portfolio manager output
 
-Six named checks. Any failure rejects the proposal.
+For each review the manager produces a stream of `ReviewStep` messages (`review.step`), zero to two `AgentRequest` messages to other agents (`agent.request`), and one `ProposalReview` verdict (`review.completed`). Schemas: [`ProposalReview.json`](../contracts/schemas/ProposalReview.json), [`ReviewStep.json`](../contracts/schemas/ReviewStep.json), [`AgentRequest.json`](../contracts/schemas/AgentRequest.json).
+
+| `ProposalReview` field | Meaning |
+|---|---|
+| `verdict` | `APPROVE` · `REDUCE` · `VETO` · `UNAVAILABLE` (no answer within 240 s; the risk engine decides alone) |
+| `size_fraction` | 1 for APPROVE/UNAVAILABLE, 0.1–0.9 for REDUCE, 0 for VETO. The schema enforces the pairing, so a verdict cannot enlarge a trade. |
+| `conflicts` | one entry per disagreement the manager found. The code rejects a verdict that leaves out an agent disagreeing with the fused signal. |
+| `critique` | the decisive evidence, in 2–4 sentences |
+| `reviewer` | the model that answered, or `rule_fallback`, or `none` |
+| `steps`, `metadata.tools_called`, `metadata.rechecks` | what it did |
+
+`ReviewStep.kind` is one of `plan`, `tool_call` (with `tool` and `purpose`), `tool_result`, `agent_reply`, `critique` (a draft verdict the code sent back), `replan` (model switch or forced verdict), or `llm_error`.
+
+**Steps 13–14 and the request in between [portfolio manager, 20 Oct 2026]**: the manager asks the News agent to re-check RELIANCE, and the agent replies (2 of its 5 headlines shown).
+
+```json
+{"kind": "tool_call", "step": 13, "tool": "ask_agent_to_recheck", "actor": "portfolio_manager",
+ "purpose": "Re-check news sentiment for RELIANCE without fallback heuristics",
+ "arguments": {"agent": "news", "symbol": "RELIANCE", "question": "What is the true news sentiment and score for RELIANCE based on recent headlines, without relying on fallback heuristics?"},
+ "review_id": "rv-adhoc-da9515777d6742a59fe6958c", "timestamp": "2026-10-20T13:19:15.850469Z"}
+```
+
+```json
+{"request_id": "req-eee8f606481b48f8b390", "review_id": "rv-adhoc-da9515777d6742a59fe6958c",
+ "from_agent": "portfolio_manager", "to_agent": "news", "symbol": "RELIANCE",
+ "question": "What is the true news sentiment and score for RELIANCE based on recent headlines, without relying on fallback heuristics?",
+ "timestamp": "2026-10-20T13:19:15.870593Z"}
+```
+
+```json
+{"kind": "agent_reply", "step": 14, "tool": "ask_agent_to_recheck", "actor": "news",
+ "summary": "news re-checked RELIANCE: score 0.72 confidence 0.55",
+ "metadata": {"signal_id": "sig-news-db4f35d64f6d92daf15c3f98", "model": "gemini-3-flash-preview", "llm_fallback": false,
+              "score": 0.72, "confidence": 0.55, "reason_codes": ["capital_raise", "operating_updates", "analyst_view", "price_move"],
+              "headlines": ["Rubio says US to discuss Venezuelan oil production with Ambani's Reliance Industries",
+                            "Jio IPO opens tomorrow: How can investors maximise allotment chances under Rs 2,500 crore RIL shareholders quota"]},
+ "review_id": "rv-adhoc-da9515777d6742a59fe6958c", "timestamp": "2026-10-20T13:19:28.068265Z"}
+```
+
+**The verdict [portfolio manager, 20 Oct 2026]**
+
+```json
+{"review_id": "rv-adhoc-da9515777d6742a59fe6958c", "kind": "ad_hoc", "proposal_id": null, "symbol": "RELIANCE",
+ "verdict": "VETO", "size_fraction": 0.0, "reviewer": "gemini-3.5-flash", "steps": 31,
+ "conflicts": ["regime: risk-off (-1.0) vs positive fused news signal (+0.72)",
+               "momentum: strongly bearish (-1.0) on return, 10-day momentum, and MACD vs positive fused news signal (+0.72)",
+               "earnings: bearish (-0.30) due to EPS/margin pressures vs positive fused news signal (+0.72)",
+               "valuation: disagrees with fused buy signal",
+               "volume: disagrees with fused buy signal",
+               "fundamental: bearish (-0.291) relying on fallback heuristic (llm_fallback true) vs positive fused news signal"],
+ "critique": "The BUY proposal relies entirely on temporary positive news headlines (+0.72), which strongly conflicts with a severe risk-off market regime (-1.0) and negative technical momentum (-1.0 across 1-day return, 10-day momentum, and MACD). Earnings (-0.30), fundamental (-0.291), valuation, and volume agents all disagree with the bullish signal as well. Buying into a broad market downtrend with elevated VIX (+29.6% over 20 days) and opposing technical/fundamental signals carries poor risk-reward.",
+ "metadata": {"manager_version": "1.0.0", "rechecks": 1,
+              "tools_called": ["get_agent_opinions", "get_market_context", "get_price_features", "get_fundamentals", "ask_agent_to_recheck",
+                               "get_agent_opinions", "get_price_features", "get_market_context", "get_portfolio"]},
+ "timestamp": "2026-10-20T13:22:51.712033Z"}
+```
+
+How a pipeline verdict changes the trade: VETO fails the risk check `portfolio_manager`, so the decision is REJECTED with `"portfolio manager vetoed: <critique>"`. REDUCE lowers `approved_quantity` and the order quantity. The first pipeline reviews run in the 09:20–10:30 IST entry window, and their chains appear on the Agent trace and Portfolio manager pages.
+
+## 3. `RiskDecision` — Risk Engine output
+
+Six order checks always. For an agent BUY there are also portfolio checks (positions, sector, exposure, per stock, entries per day), the intraday market-regime check, and the `portfolio_manager` check when the manager reviewed it. Any failure rejects the proposal.
 
 **Approved [bootstrap paper run, 1 Oct 2026]**
 
@@ -63,7 +125,7 @@ Six named checks. Any failure rejects the proposal.
 
 In the stored history, 83 of 85 risk decisions are rejections. Risk is the stage that actually stops trades.
 
-## 3. `Order` and `Execution` — Paper Execution output
+## 4. `Order` and `Execution` — Paper Execution output
 
 **[bootstrap paper run, 1 Oct 2026]**
 
@@ -88,7 +150,7 @@ Since migration 0006, orders follow the current policy:
 - at most 6 new entries per IST day;
 - entries only from 09:20 to 10:30 IST.
 
-## 4. Portfolio — `GET /api/v1/portfolio`
+## 5. Portfolio — `GET /api/v1/portfolio`
 
 **[live, 14 Oct 2026]**: the active session before the forward run.
 
@@ -99,7 +161,7 @@ Since migration 0006, orders follow the current policy:
 
 `null` means "no fills in this session yet". It is not shown as zero P&L. `GET /api/v1/paper/daily-performance` returns `{"status": "unavailable", "reason": "no_daily_equity_history"}`. The dashboard shows that state instead of drawing an equity curve.
 
-## 5. Agent execution trace — `GET /api/v1/trace`
+## 6. Agent execution trace — `GET /api/v1/trace`
 
 Every message on the Redis buses, recorded by `core_ingestion.trace_recorder`. **[live, 14 Oct 2026]**
 
@@ -114,6 +176,7 @@ Every message on the Redis buses, recorded by `core_ingestion.trace_recorder`. *
 
 Downstream events carry the proposal id as `correlation_id`:
 - `decision.created`
+- `review.requested`, `review.step` (one per reasoning step), `agent.request`, `review.completed`
 - `risk.approved` / `risk.rejected`
 - `order.created` / `order.updated`
 - `order.filled`
@@ -121,10 +184,11 @@ Downstream events carry the proposal id as `correlation_id`:
 
 `GET /api/v1/trace/{proposal_id}` returns one trade's whole chain. `scripts/export_agent_trace.py` writes the trace as JSONL plus a readable timeline.
 
-## 6. Dashboard
+## 7. Dashboard
 
 The public URL renders the same outputs:
-- **Agent trace**: live bus messages, agent lanes, and the chain per correlation id.
+- **Portfolio manager**: every review with its plan, tool calls, critiques, agent requests and replies, verdict, and the risk decision that followed. A signed-in operator can ask it about any stock.
+- **Agent trace**: live bus messages, agent lanes (including the portfolio manager), and the chain per correlation id.
 - **Agents**: each agent's latest score, confidence, reasons, LLM model or fixture label, and headlines.
 - **Signals, Orders, Positions, Portfolio, Risk, Market.**
 

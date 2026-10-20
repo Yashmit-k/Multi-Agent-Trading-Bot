@@ -1,31 +1,35 @@
-# Project synopsis — Multi-Agent NIFTY 50 Paper Trading System
+# Project synopsis: Multi-Agent NIFTY 50 Paper Trading System (StockX)
 
-**Problem.** Retail traders in Indian equities have to read price action, news, and company fundamentals for many stocks at once. Then they have to turn those reads into trades without breaking their own risk rules. Doing this by hand is slow and inconsistent. Fully automated bots are a different problem: they are often opaque, overfit to past data, or let one model place real orders unchecked. What is missing is a system that watches all 50 NIFTY 50 stocks, collects independent specialist opinions, and turns them into auditable decisions. Every decision should pass hard risk limits, and the system should be safe to evaluate on live markets without risking money.
+**Problem.** A retail trader in Indian equities has to read price action, news and company fundamentals for many stocks at once, and then turn those reads into trades without breaking their own risk rules. By hand this is slow and inconsistent. Automated bots have the opposite problem: they are often opaque, overfit to past data, or let one model place real orders unchecked. Evidence also gets lost: when the chart says buy and the news says sell, a single model averages the two away instead of noticing the conflict. What is missing is a system that watches all 50 NIFTY 50 stocks, collects independent specialist opinions, *argues about them*, and turns them into auditable decisions inside hard risk limits, safely, without risking money.
 
-**Solution.** We built a multi-agent platform. Each specialized agent scores every NIFTY 50 stock independently and publishes the same message: a score from -1 to +1, a confidence from 0 to 1, and reason codes/metadata explaining why.
-- **Quant agents** are deterministic rules computed on live Zerodha Kite market data: Technical, Momentum, Mean Reversion, Volume, and Market Regime.
-- **Intelligence agents** use an LLM router on unstructured data: News, Fundamental, Valuation, and Earnings.
+**Solution.** StockX is a multi-agent platform running on live Zerodha market data with paper money.
+- **Nine specialist agents** score every stock independently and publish the same message: a score from −1 to +1, a confidence, and their reasons.
+  - Five are deterministic **quant agents** (technical, momentum, mean reversion, volume, market regime).
+  - Four are **LLM intelligence agents** (news from 16 live RSS feeds; fundamentals, valuation and earnings from nightly Yahoo data).
+- Code fuses the opinions per horizon and proposes a trade when the fused signal is strong enough.
+- A tenth agent, the **LLM portfolio manager**, then reviews every proposed BUY before the risk engine sees it:
+  - it plans what to check and calls tools (every agent's opinion, news, fundamentals, price features, the market regime, the paper book, and its own past reviews);
+  - it names the conflicts between agents;
+  - it can ask an intelligence agent to re-check a stock with fresh data and a second model;
+  - it approves, shrinks or vetoes the trade.
+- Plain code critiques the manager in turn: a verdict that ignores a disagreeing agent, or rests on an opinion the LLM never actually produced, is sent back for revision.
+- The risk engine still has the final say: paper mode only, the NIFTY universe, cash, ₹20,000 per order, six entries a day, sector and exposure limits.
+- Paper execution fills at the next bar with Zerodha charges.
+- Every handoff, including each reasoning step of the manager, is a typed message on a Redis bus. A trace recorder stores it, and the dashboard shows it live.
+- Live trading is hard-coded off.
 
-Agents never place orders. Code makes the decisions:
-1. Signal Fusion combines the opinions with separate intraday, swing, and long-term horizons.
-2. The Decision Engine proposes a trade only when the fused signal is strong enough.
-3. The Risk Engine approves or rejects it. Its limits: paper mode only, NIFTY universe only, enough cash, ₹20,000 per order, at most 6 new entries per day, and no short selling.
-4. Paper Execution simulates the fill at the next bar with Zerodha-style charges.
-
-Every handoff between agents is published on a Redis event bus and captured by a trace recorder. The dashboard shows the live trace, signals, orders, positions, and risk state. Every calculation uses only data that existed at that moment, so backtests cannot see the future. The system supports four modes: BACKTEST, PAPER, SHADOW, and LIVE. It runs in PAPER. LIVE is hard-coded off.
-
-**Target user.** An individual Indian retail trader or small research team who wants to forward-test a systematic, multi-signal NIFTY 50 strategy on real market data with fake money. They need to see exactly why every decision was made before they trust it with capital.
+**Target user.** An individual Indian retail trader, or a small research team, who wants to forward-test a systematic multi-signal NIFTY 50 strategy on real market data with fake money. They need to see exactly why every decision was made, including where the agents disagreed, before trusting it with capital. The Strategy Lab and the Research findings page also serve the same user when testing their own rules honestly.
 
 ## Scope relative to the approved CA2 description
 
-The architecture, the 10 named agents, the "agents give opinions, code decides" rule, the separate horizons, point-in-time data, and the staged modes are all as approved. Differences, stated honestly:
+The architecture, the specialist agents, the rule "agents give opinions, code decides", separate horizons, point-in-time data and staged modes are as approved. Changes, stated honestly:
 
 | CA2 item | Status now | Why |
 |---|---|---|
-| ML agent | Implemented, **not loaded** | A pre-registered ML stock ranker (gradient boosting on daily features) was built and scored once on unseen 2026 data. It beat an equal-weight basket by +0.21% per 5-day window, in 65% of windows, but its 90% interval includes zero and it lost money after delivery costs. It failed the acceptance gate, so it is not traded ([result](../../services/quant/docs/ml-rank-result.md)). A second study tried 45 combinations of 4 algorithms plus an ensemble, 3 holding periods, and cash-holding rules for different market conditions. The best made +6.4% a year, but White's Reality Check (p = 0.76) shows that is within luck for the best of 45 ([result](../../services/quant/docs/ml-ensemble-result.md)). Both are on the *ML research* page. |
-| News agent | **Live**: real RSS headlines from ET Markets, Business Standard, and Mint, mapped to NIFTY symbols and scored through the LLM router | Live with an OpenAI-compatible LLM key. Without a key, the router falls back to a deterministic heuristic, and each signal is labelled `fixture` in its metadata and in the UI. |
-| Fundamental, Valuation, Earnings agents | Run on fixture data and are **excluded from fusion** (weight 0) | No verified live fundamentals/earnings feed is configured. They still run and appear in the trace, but they cannot influence a trade. |
-| SHADOW / LIVE modes | Disabled | Paper validation is not complete. No strategy has yet passed the acceptance gate (`docs/strategy-acceptance.md`). |
-| Profitable strategy | Not claimed | Research results are documented, including negative ones. The live paper run collects honest forward evidence. |
-
-On the reviewers' note: only the four Intelligence agents are agentic in the LLM sense. The five Quant agents and the core pipeline stages are deterministic tools, by design. See [`design.md`](design.md#which-parts-are-agentic).
+| Agent coordination | **Added: the LLM portfolio manager** (supervisor/critic) with tools, re-check requests to other agents, critique and revision, and model failover | The first build's agents only published opinions into a fixed pipeline. The manager makes the agents reason about each other's output. It can only approve, shrink or veto, so it adds judgement without adding a way to lose money. |
+| ML agent | Implemented, **not loaded** | Three pre-registered ML studies found no robust return edge after costs ([Research findings](https://13-238-176-73.sslip.io/findings)). An agent must pass its gate before it gets a vote. |
+| Fusion weights | Set by a backtest of every agent ([agent-tuning result](../../services/quant/docs/agent-tuning-result.md)) | No quant agent kept a validated swing edge, so their swing weight is 0. Fundamental, valuation, earnings and ML have weight 0. They still run, and the portfolio manager weighs their arguments. |
+| LLM capacity | Free-tier Gemini | When the daily quota runs out, the intelligence agents fall back to a labelled heuristic (`fixture.heuristic`). The manager detects fallback-based opinions and asks for a re-check on a second model. |
+| Intraday entries | Off by default | The exit-rules and selective-intraday studies found 5-minute entries lose money to charges. Intraday exits still run. |
+| SHADOW / LIVE modes | Disabled | No strategy has passed the acceptance gate. |
+| Profitable strategy | Not claimed | 13 studies are published with their failures on the Research findings page. |
