@@ -120,7 +120,7 @@ services:
       # "none" disables Gemini thinking (fastest); "low" suits gpt-oss; "omit" leaves the field out.
       LLM_REASONING_EFFORT: ${LLM_REASONING_EFFORT:-low}
       # A re-check requested by the portfolio manager uses a second model with its own quota.
-      LLM_REASSESS_MODEL: ${LLM_REASSESS_MODEL:-gemini-3.5-flash-lite}
+      LLM_REASSESS_MODEL: ${LLM_REASSESS_MODEL:-gemini-3-flash-preview}
     depends_on:
       core-api:
         condition: service_healthy
@@ -145,8 +145,8 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
       # Its own models, so it does not share the news agents' daily quota.
-      MANAGER_LLM_MODEL: ${MANAGER_LLM_MODEL:-gemini-3.5-flash}
-      MANAGER_FALLBACK_MODEL: ${MANAGER_FALLBACK_MODEL:-gemini-3.5-flash-lite}
+      MANAGER_LLM_MODEL: ${MANAGER_LLM_MODEL:-gemini-3.5-flash-lite}
+      MANAGER_FALLBACK_MODEL: ${MANAGER_FALLBACK_MODEL:-gemini-3.5-flash}
       MANAGER_REASONING_EFFORT: ${MANAGER_REASONING_EFFORT:-low}
     depends_on:
       core-api:

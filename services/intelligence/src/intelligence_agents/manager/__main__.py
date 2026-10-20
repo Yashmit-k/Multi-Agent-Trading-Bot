@@ -24,8 +24,8 @@ def build() -> tuple[PortfolioManager, float]:
     api_key = os.environ.get("MANAGER_LLM_API_KEY") or os.environ.get("LLM_API_KEY", "")
     effort = os.environ.get("MANAGER_REASONING_EFFORT", "low")
     interval = float(os.environ.get("MANAGER_MIN_INTERVAL_SECONDS", "4"))
-    primary = ToolCallingLLM(base_url, api_key, os.environ.get("MANAGER_LLM_MODEL", "gemini-3.5-flash"), reasoning_effort=effort, min_interval_seconds=interval)
-    backup_model = os.environ.get("MANAGER_FALLBACK_MODEL", "gemini-3.5-flash-lite").strip()
+    primary = ToolCallingLLM(base_url, api_key, os.environ.get("MANAGER_LLM_MODEL", "gemini-3.5-flash-lite"), reasoning_effort=effort, min_interval_seconds=interval)
+    backup_model = os.environ.get("MANAGER_FALLBACK_MODEL", "gemini-3.5-flash").strip()
     secondary = ToolCallingLLM(base_url, api_key, backup_model, reasoning_effort=effort, min_interval_seconds=interval) if backup_model else None
     token = os.environ.get("INTERNAL_SIGNAL_TOKEN", "")
     core = CoreClient(os.environ.get("CORE_API_URL", "http://core-api:8000").rstrip("/"), token)

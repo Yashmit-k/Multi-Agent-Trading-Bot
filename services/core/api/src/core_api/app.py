@@ -1497,7 +1497,7 @@ def _health_checks(app: FastAPI, repository: CoreRepository, settings: Settings,
         checks.append(_check("Portfolio manager", "warn", "LLM reviewer has not polled since Core started"))
     else:
         age = (now - seen).total_seconds()
-        checks.append(_check("Portfolio manager", "ok" if age < 90 else "down", f"LLM reviewer polled {int(age)} s ago" if age < 90 else f"no poll for {int(age // 60)} min: BUYs wait 150 s, then the risk engine decides alone"))
+        checks.append(_check("Portfolio manager", "ok" if age < 90 else "down", f"LLM reviewer polled {int(age)} s ago" if age < 90 else f"no poll for {int(age // 60)} min: BUYs wait 240 s, then the risk engine decides alone"))
     checks.append(_worker_check(app, running, now))
     book = repository.active_paper_session()
     checks.append(

@@ -22,7 +22,7 @@ from contracts.schemas.review import ProposalReview, ReviewKind, ReviewRequest, 
 if TYPE_CHECKING:
     from core_db.repository import CoreRepository
 
-REVIEW_TIMEOUT = timedelta(seconds=150)
+REVIEW_TIMEOUT = timedelta(seconds=240)
 
 
 def review_id_for(proposal_id: str) -> str:

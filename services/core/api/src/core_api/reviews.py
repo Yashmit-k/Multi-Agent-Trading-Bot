@@ -57,6 +57,14 @@ def _short_metadata(metadata: dict) -> dict:
     return out
 
 
+def _used_fallback(metadata: dict) -> bool | None:
+    """True when an LLM agent's opinion came from the fixture heuristic instead of the model; None for rule agents."""
+    llm = metadata.get("llm")
+    if not isinstance(llm, list) or not llm:
+        return None
+    return any(isinstance(item, dict) and (item.get("fallback") or item.get("model") == "fixture") for item in llm)
+
+
 def tool_opinions(repository: CoreRepository, symbol: str, horizon: Horizon, now: datetime) -> dict[str, object]:
     signals = select_signals(repository.signals_for(symbol), horizon=horizon, as_of=now)
     weights = _weights(repository).get(horizon.value, {})
@@ -73,7 +81,7 @@ def tool_opinions(repository: CoreRepository, symbol: str, horizon: Horizon, now
                 "fusion_weight": weights.get(item.agent_name.value),
                 "age_minutes": round((now - item.timestamp.astimezone(timezone.utc)).total_seconds() / 60, 1),
                 "reason_codes": item.reason_codes[:5],
-                "llm_fallback": bool(item.metadata.get("llm_fallback") or item.metadata.get("fallback")),
+                "llm_fallback": _used_fallback(item.metadata),
                 "details": _short_metadata(item.metadata),
             }
         )
@@ -85,7 +93,7 @@ def tool_opinions(repository: CoreRepository, symbol: str, horizon: Horizon, now
         "fused_confidence": None if aggregate is None else round(aggregate.aggregated_confidence, 3),
         "agents": rows,
         "agents_disagreeing_with_fusion": disagree,
-        "note": "fusion_weight 0 means the agent is shown but does not move the fused signal",
+        "note": "fusion_weight 0 means the agent is shown but does not move the fused signal; llm_fallback true means an LLM agent fell back to a fixed heuristic",
     }
 
 
@@ -211,7 +219,8 @@ def register(app: FastAPI, repository: CoreRepository, publisher, require_user: 
         pending = [row for row in repository.list_reviews(limit=20) if row["status"] != "done" and row["kind"] == ReviewKind.AD_HOC.value]
         if len(pending) >= 3:
             raise HTTPException(status_code=429, detail="manager_busy")
-        aggregate = fuse(repository.signals_for(symbol), horizon=horizon, as_of=now, weights=None)
+        weights = _weights(repository).get(horizon.value, {})
+        aggregate = fuse(repository.signals_for(symbol), horizon=horizon, as_of=now, weights={horizon: weights} if weights else None)
         cap = load_risk_settings(repository).max_order_notional
         request = ReviewRequest(
             review_id=f"rv-adhoc-{uuid4().hex[:24]}",

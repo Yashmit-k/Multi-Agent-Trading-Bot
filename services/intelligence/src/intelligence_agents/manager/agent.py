@@ -37,7 +37,8 @@ How to work:
    produced by fallback heuristics instead of the LLM (llm_fallback true), news that contradicts price action,
    a crowded sector or a near-full daily entry budget, a risk-off market, and your own past reviews.
 3. If an intelligence agent's view is stale, fallback-based or contradicts the others, you may ask it to
-   re-check with ask_agent_to_recheck (at most twice).
+   re-check with ask_agent_to_recheck (at most twice). Do so when an agent that carries fusion weight
+   rests on fallback heuristics: the trade would otherwise rest on a rule of thumb, not the model.
 4. Finish by calling submit_verdict. APPROVE when the evidence supports the trade; REDUCE (0.1-0.9) when it
    is mixed; VETO when the evidence clearly argues against buying now. Every conflict you found must appear
    in conflicts. Agents with fusion weight 0 are shown for context: weigh their arguments, not their vote.

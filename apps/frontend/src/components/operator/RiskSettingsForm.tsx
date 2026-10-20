@@ -17,7 +17,7 @@ const HINT: Record<string, string> = {
   stop_loss_pct: "Exit if price falls this % below entry.",
   take_profit_pct: "Exit if price rises this % above entry.",
   auto_entries: "Off: agents can still exit holdings, but only you open new positions.",
-  manager_review: "On: each agent BUY waits up to 150 s for the LLM portfolio manager, which can approve, shrink or veto it (never enlarge it). Off: the risk engine decides alone.",
+  manager_review: "On: each agent BUY waits up to 240 s for the LLM portfolio manager, which can approve, shrink or veto it (never enlarge it). Off: the risk engine decides alone.",
   intraday_auto_entries: "Off by default: the exit-rules study found 5-minute entries lose about 0.4% a trade to charges. Swing entries and your manual orders are unaffected.",
 };
 
