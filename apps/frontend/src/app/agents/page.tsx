@@ -45,7 +45,16 @@ type ScoreRow = {
   approved_supported: number;
   in_fusion: boolean;
 };
-type Scorecard = { as_of: string; window_days: number; agents: ScoreRow[] };
+type WeightRow = { agent: string; horizon: string; weight: number; basis: string; graded: number; version?: string | null };
+type Scorecard = { as_of: string; window_days: number; agents: ScoreRow[]; fusion_weights?: { computed_at: string; detail: WeightRow[] } };
+
+const BASIS: Record<string, string> = {
+  better_than_coin_flip: "proven better than a coin flip",
+  unproven: "unproven (current version)",
+  worse_than_coin_flip: "proven worse: votes ignored",
+  market_filter: "market filter, not a vote",
+  excluded: "excluded from fusion",
+};
 
 const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
 
@@ -65,7 +74,7 @@ function ScorecardTable({ card }: { card: Scorecard }) {
         95% interval clears 50%, and with days, not years, of live data most agents will not get there. Moves within one market day are correlated, so even the interval is
         optimistic.
       </p>
-      <Table head={["Agent", "Horizon", "Scored", "Hit rate", "95% interval", "Avg signed move", "IC", "Proposals backed", "Approved", "Verdict"]} minWidth={900}>
+      <Table head={["Agent", "Horizon", "Scored", "Hit rate", "95% interval", "Avg signed move", "IC", "Proposals backed", "Approved", "Verdict", "Fusion weight"]} minWidth={1040}>
         {card.agents.map((row) => (
           <tr key={`${row.agent}-${row.horizon}`} className="border-t border-[#1E2631]">
             <Td>
@@ -86,10 +95,25 @@ function ScorecardTable({ card }: { card: Scorecard }) {
             <Td>
               <Verdict row={row} />
             </Td>
+            <Td className="text-xs">
+              {(() => {
+                const weight = card.fusion_weights?.detail.find((item) => item.agent === row.agent && item.horizon === row.horizon);
+                if (!weight) return <span className="text-[#64748B]">—</span>;
+                return (
+                  <span title={BASIS[weight.basis] ?? weight.basis}>
+                    <b className={weight.weight === 0 ? "text-[#EF4444]" : weight.weight >= 1 ? "text-[#22C55E]" : "text-[#E6EDF3]"}>{weight.weight.toFixed(2)}</b>{" "}
+                    <span className="text-[#64748B]">{BASIS[weight.basis] ?? weight.basis}</span>
+                  </span>
+                );
+              })()}
+            </Td>
           </tr>
         ))}
       </Table>
-      <p className="mt-2 text-[10px] text-[#64748B]">Computed {new Date(card.as_of).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST, refreshed every 10 minutes.</p>
+      <p className="mt-2 text-[10px] text-[#64748B]">
+        Computed {new Date(card.as_of).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST, refreshed every 10 minutes. Fusion weights are set hourly by the worker from each
+        agent&apos;s current version only (20 days, sample size discounted 5× because stocks move together): 0 = proven worse than a coin flip, 0.5 = unproven, 1.0–1.5 = proven better.
+      </p>
     </Card>
   );
 }

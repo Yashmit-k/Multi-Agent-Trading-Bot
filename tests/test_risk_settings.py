@@ -90,3 +90,20 @@ def test_intraday_entries_when_enabled(repository: CoreRepository) -> None:
     repository.save_setting("risk", {"intraday_auto_entries": True}, updated_by="test", now=DECISION)
     _cycle(repository)
     assert "INTRADAY" in _horizons(repository)
+
+
+def test_market_filter_blocks_agent_buys_when_risk_off(repository: CoreRepository) -> None:
+    from contracts.enums import AgentName, Horizon
+
+    _ready(repository)
+    risk_off = _signal(signal_id="sig-regime", symbol="TCS", agent_name=AgentName.REGIME, signal=-1.0, confidence=1.0, timestamp=DECISION, valid_until=DECISION + timedelta(days=2))
+    risk_off = risk_off.model_copy(update={"metadata": {**risk_off.metadata, "votes": [{"name": "risk_tilt", "value": -1, "weight": 1.0}, {"name": "index_trend", "value": -1, "weight": 1.0}, {"name": "fear_gauge", "value": -1, "weight": 1.0}]}})
+    _store(repository, risk_off)
+    from core_paper.cycle import market_risk_off
+
+    assert market_risk_off(repository, "TCS", Horizon.SWING, DECISION)
+    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION, enforce_entry_window=False, weights={Horizon.SWING: {"regime": 0.0}})
+    tcs = [p for p in repository.list_proposals() if p.symbol == "TCS"]
+    decisions = [repository.risk_for_proposal(p.proposal_id) for p in tcs]
+    assert decisions and all(d is not None and d.status.value == "REJECTED" and "risk-off" in (d.rejection_reason or "") for d in decisions)
+    assert not [o for o in repository.list_orders() if o.symbol == "TCS"]

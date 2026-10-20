@@ -14,6 +14,7 @@ from core_paper.trading_calendar import cash_session_open
 from core_worker.heartbeat import publish_heartbeat
 from core_worker.loop import run_once
 from core_paper.daily import write_daily_if_due
+from core_worker.agent_weights import current_weights
 from core_worker.notify import Notifier, health_problems_from_api, maybe_notify
 from core_worker.paper_schedule import broker_allows_entries, excluded_agent_weights, run_scheduled_cycle
 
@@ -53,6 +54,8 @@ while True:
         try:
             run_once(repository, now)
             authenticated = broker_allows_entries(api_base, api_token)
+            excluded = {item.strip().lower() for item in os.environ.get("FUSION_EXCLUDED_AGENTS", "").split(",") if item.strip()}
+            live_weights = current_weights(repository, now, excluded) or weights
             run_scheduled_cycle(
                 repository,
                 publisher,
@@ -60,7 +63,7 @@ while True:
                 schedule=schedule,
                 now=now,
                 broker_authenticated=authenticated,
-                weights=weights,
+                weights=live_weights,
             )
             failed_cycles, last_error = 0, None
         except Exception as exc:

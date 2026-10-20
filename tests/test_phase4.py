@@ -40,7 +40,8 @@ def test_confidence_uses_the_same_weights_as_the_signal() -> None:
         weights={Horizon.SWING: {"technical": 1.0, "momentum": 3.0}},
     )
     assert aggregate is not None
-    assert aggregate.aggregated_signal == 0.4
+    # Confidence-weighted mean: (1*0.8*0.5 + 3*0.4*1.0) / (1*0.8 + 3*0.4) = 1.6 / 2.0
+    assert aggregate.aggregated_signal == 0.8
     assert aggregate.aggregated_confidence == 0.5
     assert aggregate.supporting_signal_ids == ("sig-momentum", "sig-technical")
 
@@ -78,7 +79,7 @@ def test_paper_cycle_fills_once_and_ignores_late_signals(repository: CoreReposit
     assert proposal.timestamp == as_of
     assert proposal.timestamp.year == 2024
     assert proposal.supporting_signal_ids == ["sig-valid"]
-    assert proposal.aggregated_signal == 0.4
+    assert proposal.aggregated_signal == 0.5  # one agent: its own signal (confidence no longer shrinks direction)
     assert proposal.aggregated_confidence == 0.8
     assert proposal.quantity == 6
     assert proposal.entry_price == Decimal("2927.00")

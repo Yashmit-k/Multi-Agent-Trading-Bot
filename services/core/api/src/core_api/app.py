@@ -179,7 +179,9 @@ def create_app(
         # Intraday: the latest 400 bars cover every indicator, instead of all ~51k 5m bars per symbol.
         # Daily features keep their full history so swing signals are computed exactly as before.
         bars = repository.candles_until(symbol, parsed, moment, last=None if parsed == Timeframe.D1 else FEATURE_HISTORY_BARS)
-        built = build_feature_set(symbol, parsed, bars, moment)
+        index = repository.candles_until("NIFTY50", parsed, moment, last=2) if symbol != "NIFTY50" else []
+        nifty_return = float(index[-1].close / index[-2].close - 1) if len(index) == 2 and index[-2].close else None
+        built = build_feature_set(symbol, parsed, bars, moment, nifty_return=nifty_return)
         if built is None:
             raise HTTPException(status_code=404, detail="no_features")
         return built.model_dump(mode="json")
@@ -1716,35 +1718,12 @@ def _refresh_scorecard(app: FastAPI, repository: CoreRepository, days: int) -> N
 def _scorecard(repository: CoreRepository, now: datetime, days: int) -> dict[str, object]:
     from core_api import scorecard as sc
 
-    start = sc.window_start(now, days)
-    points = []
-    for signal_id, agent, horizon, symbol, stamp, signal, confidence in repository.signal_points_since(start):
-        try:
-            moment = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
-        except ValueError:
-            continue
-        points.append(sc.SignalPoint(signal_id, agent, horizon, symbol, moment, float(signal), float(confidence)))
-    closes = {symbol: sc.Closes(bars) for symbol, bars in repository.closes_since(Timeframe.M5, start - timedelta(days=1)).items()}
-    owner = {point.signal_id: point.agent for point in points}
-    supported: dict[str, int] = {}
-    approved: dict[str, int] = {}
-    for ids, ok in repository.proposal_support_since(start):
-        for agent in {owner[item] for item in ids if item in owner}:
-            supported[agent] = supported.get(agent, 0) + 1
-            if ok:
-                approved[agent] = approved.get(agent, 0) + 1
     excluded = {item.strip().lower() for item in os.environ.get("FUSION_EXCLUDED_AGENTS", "").split(",") if item.strip()}
-    return {
-        "as_of": now.isoformat(),
-        "window_days": days,
-        "method": {
-            "intraday": "sign of signal vs 5m close 60 min later, same session",
-            "swing": "sign of signal vs close at the end of the next trading session",
-            "dedupe": "one sample per agent, horizon, symbol and entry bar (intraday) or session (swing)",
-            "neutral_below": sc.NEUTRAL,
-        },
-        "agents": sc.score(points, closes, now, supported, approved, excluded),
-    }
+    report = sc.compute(repository, now, days, excluded=excluded)
+    stored = repository.get_setting("agent_weights")
+    if stored:
+        report["fusion_weights"] = stored["payload"]
+    return report
 
 
 WORKER_STALE_AFTER = timedelta(minutes=3)

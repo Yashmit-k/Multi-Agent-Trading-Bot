@@ -458,22 +458,23 @@ class CoreRepository:
                 query = query.where(AgentSignalRow.payload["agent_name"].as_string() == agent_name)
             return [dict(row.payload) for row in session.scalars(query.limit(limit))]
 
-    def signal_points_since(self, start: datetime) -> list[tuple[str, str, str, str, str, float, float]]:
-        """(signal_id, agent, horizon, symbol, timestamp, signal, confidence) recorded since start, read without metadata."""
+    def signal_points_since(self, start: datetime, *, with_version: bool = False) -> list[tuple]:
+        """(signal_id, agent, horizon, symbol, timestamp, signal, confidence[, agent_version]) since start, without metadata."""
         payload = AgentSignalRow.payload
+        columns = [
+            AgentSignalRow.signal_id,
+            payload["agent_name"].as_string(),
+            payload["horizon"].as_string(),
+            AgentSignalRow.symbol,
+            payload["timestamp"].as_string(),
+            payload["signal"].as_float(),
+            payload["confidence"].as_float(),
+        ]
+        if with_version:
+            columns.append(payload["agent_version"].as_string())
         with self._session_factory() as session:
-            rows = session.execute(
-                select(
-                    AgentSignalRow.signal_id,
-                    payload["agent_name"].as_string(),
-                    payload["horizon"].as_string(),
-                    AgentSignalRow.symbol,
-                    payload["timestamp"].as_string(),
-                    payload["signal"].as_float(),
-                    payload["confidence"].as_float(),
-                ).where(AgentSignalRow.recorded_at >= start)
-            )
-            return [tuple(row) for row in rows]  # type: ignore[misc]
+            rows = session.execute(select(*columns).where(AgentSignalRow.recorded_at >= start))
+            return [tuple(row) for row in rows]
 
     def closes_since(self, timeframe: Timeframe | str, start: datetime) -> dict[str, list[tuple[datetime, float]]]:
         """(bar end, close) per symbol for bars ending at or after start, in one query, without building Candles."""

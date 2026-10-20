@@ -156,3 +156,62 @@ def score(
 
 def window_start(now: datetime, days: int) -> datetime:
     return (now - timedelta(days=days)).astimezone(timezone.utc)
+
+
+# --- reliability weights for fusion ---------------------------------------------------------------
+
+DESIGN_EFFECT = 5.0  # grades on the same bar across 50 stocks are not independent: discount the sample size
+UNPROVEN_WEIGHT = 0.5
+MIN_EFFECTIVE = 30.0
+
+
+def compute(repository, now: datetime, days: int, *, excluded: set[str] | None = None, versions: dict[str, str] | None = None) -> dict[str, object]:  # type: ignore[no-untyped-def]
+    """The scorecard over the last `days`. With `versions`, only signals from each agent's current version count."""
+    from contracts.enums import Timeframe
+
+    start = window_start(now, days)
+    points: list[SignalPoint] = []
+    for row in repository.signal_points_since(start, with_version=versions is not None):
+        signal_id, agent, horizon, symbol, stamp, signal, confidence = row[:7]
+        if versions is not None and agent in versions and (len(row) < 8 or row[7] != versions[agent]):
+            continue
+        try:
+            moment = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        points.append(SignalPoint(signal_id, agent, horizon, symbol, moment, float(signal), float(confidence)))
+    closes = {symbol: Closes(bars) for symbol, bars in repository.closes_since(Timeframe.M5, start - timedelta(days=1)).items()}
+    owner = {point.signal_id: point.agent for point in points}
+    supported: dict[str, int] = {}
+    approved: dict[str, int] = {}
+    for ids, ok in repository.proposal_support_since(start):
+        for agent in {owner[item] for item in ids if item in owner}:
+            supported[agent] = supported.get(agent, 0) + 1
+            if ok:
+                approved[agent] = approved.get(agent, 0) + 1
+    return {
+        "as_of": now.isoformat(),
+        "window_days": days,
+        "method": {
+            "intraday": "sign of signal vs 5m close 60 min later, same session",
+            "swing": "sign of signal vs close at the end of the next trading session",
+            "dedupe": "one sample per agent, horizon, symbol and entry bar (intraday) or session (swing)",
+            "neutral_below": NEUTRAL,
+        },
+        "agents": score(points, closes, now, supported, approved, excluded),
+    }
+
+
+def reliability_weight(row: dict) -> tuple[float, str]:
+    """Fusion weight from a scorecard row: 0 if proven worse than a coin flip, 0.5 if unproven, 1.0-1.5 if proven better."""
+    n = int(row.get("directional") or 0)
+    rate = row.get("hit_rate")
+    if rate is None or n / DESIGN_EFFECT < MIN_EFFECTIVE:
+        return UNPROVEN_WEIGHT, "unproven"
+    effective = n / DESIGN_EFFECT
+    low, high = _wilson(int(round(rate * effective)), int(round(effective)))
+    if high < 0.5:
+        return 0.0, "worse_than_coin_flip"
+    if low > 0.5:
+        return min(1.5, 1.0 + (low - 0.5) * 10), "better_than_coin_flip"
+    return UNPROVEN_WEIGHT, "unproven"

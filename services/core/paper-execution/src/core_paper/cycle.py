@@ -174,6 +174,7 @@ def run_paper_cycle(
                     timestamp=as_of,
                     max_notional=settings.max_order_notional,
                     portfolio=portfolio_context(repository, starting_cash, moment, settings) if portfolio_limits else None,
+                    market_ok=None if proposal.side != Side.BUY else not market_risk_off(repository, instrument.symbol, horizon, as_of),
                 )
                 if repository.insert_risk_decision(decision):
                     event_type = EventType.RISK_APPROVED if decision.status == RiskStatus.APPROVED else EventType.RISK_REJECTED
@@ -431,6 +432,25 @@ def _monitor_brackets(repository, publisher, schedule, starting_cash, mode: Trad
             continue
         price = stop if reason == "stop" else target
         _exit_proposal(repository, publisher, position, price, bar.end, reason, schedule, starting_cash, mode, fill_at="level")
+
+
+def market_risk_off(repository: CoreRepository, symbol: str, horizon: Horizon, as_of: datetime) -> bool:
+    """Risk-off when the newest valid Regime signal shows NIFTY in a downtrend *and* India VIX rising.
+
+    Regime reads only market-wide data, so it is a filter on new agent buys, not a per-stock vote
+    (its fusion weight is 0). No valid Regime signal: not risk-off (the filter fails open).
+    """
+    moment = as_of.astimezone(timezone.utc)
+    candidates = [
+        item
+        for item in repository.signals_for(symbol)
+        if item.agent_name.value == "regime" and item.horizon == horizon and item.timestamp.astimezone(timezone.utc) <= moment and item.valid_until.astimezone(timezone.utc) >= moment
+    ]
+    if not candidates:
+        return False
+    newest = max(candidates, key=lambda item: item.timestamp)
+    votes = {str(vote.get("name")): vote.get("value") for vote in newest.metadata.get("votes", []) if isinstance(vote, dict)}
+    return votes.get("index_trend") == -1 and votes.get("fear_gauge") == -1
 
 
 def _applied_strategy(repository: CoreRepository) -> bool:

@@ -1,4 +1,4 @@
-"""Fuse one symbol and horizon. effective_signal = signal * confidence."""
+"""Fuse one symbol and horizon: a confidence-weighted mean of agent signals, times agent weights."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -9,6 +9,9 @@ from contracts.enums import AgentName, Horizon
 from contracts.schemas.agent_signal import AgentSignal
 
 _QUANTUM = Decimal("0.00000001")
+# Market-wide agents are filters on new buys (core_paper.cycle.market_risk_off), not per-stock votes:
+# the same market reading would otherwise be counted once for every stock. Default weight 0.
+MARKET_FILTER_AGENTS = frozenset({"regime"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,10 +58,13 @@ def fuse(
         return None
     signal_total = sum((weight * Decimal(str(signal.signal)) * Decimal(str(signal.confidence)) for signal, weight in weighted), Decimal("0"))
     confidence_total = sum((weight * Decimal(str(signal.confidence)) for signal, weight in weighted), Decimal("0"))
+    # Signal: confidence-weighted mean, so an agent with no opinion (confidence 0) neither votes nor dilutes.
+    # Confidence: weight-averaged, so a lone confident agent among silent ones still reads as low confidence.
+    aggregated = _clipped_ratio(signal_total, confidence_total) if confidence_total > 0 else 0.0
     return Aggregate(
         symbol=weighted[0][0].symbol,
         horizon=horizon,
-        aggregated_signal=_clipped_ratio(signal_total, total_weight),
+        aggregated_signal=aggregated,
         aggregated_confidence=_ratio(confidence_total, total_weight),
         supporting_signal_ids=tuple(signal.signal_id for signal, _ in weighted),
     )
@@ -66,7 +72,8 @@ def fuse(
 
 def _weight(horizon: Horizon, agent: AgentName, weights: Mapping[Horizon, Mapping[str, float]] | None) -> Decimal:
     table = {} if weights is None else weights.get(horizon, {})
-    value = Decimal(str(table.get(agent.value, 1.0)))
+    default = 0.0 if agent.value in MARKET_FILTER_AGENTS else 1.0
+    value = Decimal(str(table.get(agent.value, default)))
     if value < 0:
         raise ValueError("agent weights must be non-negative")
     return value
