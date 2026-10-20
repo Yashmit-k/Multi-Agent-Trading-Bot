@@ -1,0 +1,136 @@
+{
+  "protocol": "services/quant/docs/structure-breaks-protocol.md",
+  "period": {
+    "first": "2024-04-01",
+    "last": "2026-10-05",
+    "sessions": 616
+  },
+  "variants": {
+    "T_0.5R_1R": {
+      "with_1h_trend_filter": {
+        "trades": 22336,
+        "tp1_rate": 0.525564111747851,
+        "win_rate": 0.261371776504298,
+        "mean_net_r": -0.5332839815100513,
+        "mean_net_return_pct": -0.22924165967765836,
+        "total_net_pnl": -975064.1958260064,
+        "profit_factor": 0.19308151316337913,
+        "max_drawdown_rupees": 975064.1958260065,
+        "exit_reasons": {
+          "tp2": 4112,
+          "stop": 8380,
+          "breakeven": 7100,
+          "time": 2744
+        },
+        "session_pnl_lower_bound": -1683.5111584825238,
+        "first_half": -528580.7452675328,
+        "second_half": -446483.4505584737,
+        "profitable": false
+      },
+      "no_filter_diagnostic": {
+        "trades": 42952,
+        "tp1_rate": 0.5327574967405476,
+        "win_rate": 0.2694635872601974,
+        "mean_net_r": -0.5197674129569064,
+        "mean_net_return_pct": -0.2234553967727733,
+        "total_net_pnl": -1826640.6622787314,
+        "profit_factor": 0.20878854342695083,
+        "max_drawdown_rupees": 1826640.6622787314,
+        "exit_reasons": {
+          "tp2": 8013,
+          "stop": 15902,
+          "breakeven": 13783,
+          "time": 5254
+        },
+        "session_pnl_lower_bound": -3060.9125158246366,
+        "first_half": -932270.1241557882,
+        "second_half": -894370.5381229434,
+        "profitable": false
+      }
+    },
+    "T_1R_1.5R": {
+      "with_1h_trend_filter": {
+        "trades": 19593,
+        "tp1_rate": 0.33649772878068696,
+        "win_rate": 0.35196243556372175,
+        "mean_net_r": -0.5071840437590193,
+        "mean_net_return_pct": -0.2196727731255345,
+        "total_net_pnl": -819661.2350248742,
+        "profit_factor": 0.3543793763628675,
+        "max_drawdown_rupees": 819661.2350248729,
+        "exit_reasons": {
+          "tp2": 3646,
+          "stop": 9075,
+          "breakeven": 2059,
+          "time": 4813
+        },
+        "session_pnl_lower_bound": -1412.2767460682212,
+        "first_half": -436183.8358739868,
+        "second_half": -383477.3991508874,
+        "profitable": false
+      },
+      "no_filter_diagnostic": {
+        "trades": 37458,
+        "tp1_rate": 0.3430241870895403,
+        "win_rate": 0.3612045490949864,
+        "mean_net_r": -0.4863651004047009,
+        "mean_net_return_pct": -0.2106032475722992,
+        "total_net_pnl": -1501107.9635356127,
+        "profit_factor": 0.3791894841681188,
+        "max_drawdown_rupees": 1501107.9635356115,
+        "exit_reasons": {
+          "tp2": 7140,
+          "stop": 17071,
+          "breakeven": 4006,
+          "time": 9241
+        },
+        "session_pnl_lower_bound": -2557.9007839387164,
+        "first_half": -754055.4706869535,
+        "second_half": -747052.4928486589,
+        "profitable": false
+      }
+    },
+    "T_1R_2R": {
+      "with_1h_trend_filter": {
+        "trades": 18880,
+        "tp1_rate": 0.3368114406779661,
+        "win_rate": 0.3436970338983051,
+        "mean_net_r": -0.503560979113927,
+        "mean_net_return_pct": -0.2192648080781404,
+        "total_net_pnl": -788595.7507460963,
+        "profit_factor": 0.3571440908437627,
+        "max_drawdown_rupees": 788595.750746096,
+        "exit_reasons": {
+          "tp2": 2279,
+          "stop": 8729,
+          "breakeven": 2571,
+          "time": 5301
+        },
+        "session_pnl_lower_bound": -1360.9622147369225,
+        "first_half": -417569.9957551074,
+        "second_half": -371025.7549909888,
+        "profitable": false
+      },
+      "no_filter_diagnostic": {
+        "trades": 35978,
+        "tp1_rate": 0.34384901884484964,
+        "win_rate": 0.3543276446717438,
+        "mean_net_r": -0.4811395762378111,
+        "mean_net_return_pct": -0.209370126911668,
+        "total_net_pnl": -1433325.028693265,
+        "profit_factor": 0.3846415369496235,
+        "max_drawdown_rupees": 1433325.0286932644,
+        "exit_reasons": {
+          "tp2": 4443,
+          "stop": 16375,
+          "breakeven": 4940,
+          "time": 10220
+        },
+        "session_pnl_lower_bound": -2453.8570597300077,
+        "first_half": -716831.1009087195,
+        "second_half": -716493.9277845456,
+        "profitable": false
+      }
+    }
+  }
+}
