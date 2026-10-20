@@ -57,6 +57,7 @@ def run_scheduled_cycle(
     now: datetime,
     broker_authenticated: bool,
     weights: dict | None = None,
+    manager_review: bool = False,
 ) -> int:
     """Settle and exit whenever the cash session is open. Enter only inside the entry window."""
     if mode != TradingMode.PAPER or not cash_session_open(now):
@@ -76,6 +77,7 @@ def run_scheduled_cycle(
         enforce_entry_window=True,
         require_universe_fresh=True,
         broker_authenticated=broker_authenticated,
+        manager_review=manager_review,
     )
 
 

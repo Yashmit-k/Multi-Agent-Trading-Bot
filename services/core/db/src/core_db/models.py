@@ -390,3 +390,22 @@ class AgentSignalDailyRow(Base):
     horizon: Mapped[str] = mapped_column(String(16), primary_key=True)
     version: Mapped[str] = mapped_column(String(16), primary_key=True)
     payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class ProposalReviewRow(Base):
+    """One portfolio-manager review: the request, its reasoning steps, and the verdict (core_db.reviews)."""
+
+    __tablename__ = "proposal_reviews"
+    __table_args__ = (Index("ix_proposal_reviews_proposal_id", "proposal_id"), Index("ix_proposal_reviews_created_at", "created_at"))
+
+    review_id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    proposal_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    request: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+    steps: Mapped[list] = mapped_column(JSON_VALUE, nullable=False)
+    verdict: Mapped[dict | None] = mapped_column(JSON_VALUE, nullable=True)

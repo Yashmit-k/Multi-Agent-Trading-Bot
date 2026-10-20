@@ -28,6 +28,8 @@ def assess(
     max_notional: Decimal | None = None,
     portfolio: PortfolioContext | None = None,
     market_ok: bool | None = None,
+    manager_ok: bool | None = None,
+    manager_note: str = "",
 ) -> RiskDecision:
     """Six order checks always; five portfolio checks on BUYs when the paper book is supplied."""
     bound = MAX_NOTIONAL if max_notional is None else max_notional
@@ -48,6 +50,8 @@ def assess(
     ]
     if market_ok is not None and proposal.side == Side.BUY:
         checks.append(_check("market_regime", market_ok, "market is risk-off (NIFTY downtrend with India VIX rising): no new agent buys"))
+    if manager_ok is not None and proposal.side == Side.BUY:
+        checks.append(_check("portfolio_manager", manager_ok, f"portfolio manager vetoed: {manager_note}"[:300]))
     if portfolio is not None and proposal.side == Side.BUY:
         checks += [_check(name, passed, failure) for name, passed, failure in portfolio.checks(proposal.symbol, notional)]
     failed = [check for check in checks if not check.passed]

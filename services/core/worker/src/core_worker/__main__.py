@@ -45,6 +45,9 @@ failed_cycles = 0
 last_error: str | None = None
 excluded = {item.strip().lower() for item in os.environ.get("FUSION_EXCLUDED_AGENTS", "").split(",") if item.strip()}
 notifier = Notifier.from_env()
+# The LLM portfolio manager reviews agent BUYs before risk (Settings can still switch it off).
+manager_review = os.environ.get("PORTFOLIO_MANAGER_REVIEW", "on").strip().lower() in {"on", "true", "1"}
+logger.info("portfolio_manager_review enabled=%s", manager_review)
 site_url = os.environ.get("PUBLIC_SITE_URL", "")
 logger.info("notifications configured=%s", notifier.configured)
 while True:
@@ -66,6 +69,7 @@ while True:
                 now=now,
                 broker_authenticated=authenticated,
                 weights=live_weights,
+                manager_review=manager_review,
             )
             failed_cycles, last_error = 0, None
         except Exception as exc:

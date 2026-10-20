@@ -107,6 +107,10 @@ def create_app(
         if credentials is None or credentials.credentials != resolved.internal_signal_token:
             raise HTTPException(status_code=401, detail="unauthorized")
 
+    from core_api.reviews import register as register_reviews
+
+    register_reviews(app, repository, publisher, require_user, require_internal, starting_cash=resolved.paper_starting_cash)
+
     @app.get("/api/v1/market/ingestion")
     def market_ingestion(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
         state = app.state.ingestion
@@ -1488,6 +1492,12 @@ def _health_checks(app: FastAPI, repository: CoreRepository, settings: Settings,
     else:
         checks.append(_check("Trace recorder", "ok", f"newest recorded message {_age_minutes(events[0]['recorded_at'], now)} min ago"))
     running = repository.paper_running()
+    seen = getattr(app.state, "manager_seen_at", None)
+    if seen is None:
+        checks.append(_check("Portfolio manager", "warn", "LLM reviewer has not polled since Core started"))
+    else:
+        age = (now - seen).total_seconds()
+        checks.append(_check("Portfolio manager", "ok" if age < 90 else "down", f"LLM reviewer polled {int(age)} s ago" if age < 90 else f"no poll for {int(age // 60)} min: BUYs wait 150 s, then the risk engine decides alone"))
     checks.append(_worker_check(app, running, now))
     book = repository.active_paper_session()
     checks.append(

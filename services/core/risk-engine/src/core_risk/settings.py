@@ -27,6 +27,8 @@ class RiskSettings:
     # Intraday (5-minute) agent entries. Off by default since the exit-rules study (2026-10-15): the fused
     # 5-minute signal flips within minutes and each round trip loses about 0.4% to charges.
     intraday_auto_entries: bool = False
+    # The LLM portfolio manager reviews each agent BUY before risk: approve, shrink or veto (never enlarge).
+    manager_review: bool = True
 
     def as_json(self) -> dict[str, object]:
         return {key: (str(value) if isinstance(value, Decimal) else value) for key, value in asdict(self).items()}
@@ -95,4 +97,5 @@ def describe_bounds() -> list[dict[str, object]]:
     ] + [
         {"key": "auto_entries", "label": "Agents may open new positions", "min": None, "max": None, "default": "true"},
         {"key": "intraday_auto_entries", "label": "Agents may open intraday (5-minute) positions", "min": None, "max": None, "default": "false"},
+        {"key": "manager_review", "label": "Portfolio manager reviews agent buys", "min": None, "max": None, "default": "true"},
     ]

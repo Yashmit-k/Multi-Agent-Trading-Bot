@@ -20,12 +20,14 @@ from contracts.schemas.execution import Execution
 from contracts.schemas.order import Order
 from contracts.schemas.portfolio import PortfolioSnapshot
 from contracts.schemas.position import Position
+from contracts.schemas.review import ReviewVerdict
 from core_db.repository import DAILY_ENTRY_LIMIT, CoreRepository
 from core_risk.settings import DEFAULTS as DEFAULT_SETTINGS, RiskSettings, parse_settings
 from core_decision import build_proposal, proposal_id_for
 from core_fusion import fuse
 from core_paper.costs import CostSchedule, fee_on, slipped_price
 from core_paper.execute import MAX_NOTIONAL, queue_entry, settle_entries, settle_sell
+from core_paper.review_gate import review_gate
 from core_paper.limits import PRODUCT_CNC, SELL_POLICY_VERSION
 from core_paper.charges import ZERODHA_EQUITY_RI
 from core_paper.trading_calendar import paper_test_entry_window
@@ -83,6 +85,7 @@ def run_paper_cycle(
     broker_authenticated: bool = True,
     allow_test_extension: bool = False,
     portfolio_limits: bool = True,
+    manager_review: bool = False,
 ) -> int:
     if max_new_orders is not None and max_new_orders < 0:
         raise ValueError("max_new_orders must be zero or positive")
@@ -164,9 +167,16 @@ def run_paper_cycle(
                     _publish(publisher, EventType.DECISION_CREATED, f"decision.created:{proposal.proposal_id}", as_of, proposal.proposal_id, proposal)
                     written += 1
             if repository.risk_for_proposal(proposal.proposal_id) is None:
+                # An agent BUY goes to the LLM portfolio manager first; it may shrink or veto it, never enlarge it.
+                gate = review_gate(repository, publisher, proposal, moment) if manager_review and proposal.side == Side.BUY and settings.manager_review else None
+                if gate is not None and gate.wait:
+                    continue
+                assessed = proposal
+                if gate is not None and gate.verdict == ReviewVerdict.REDUCE:
+                    assessed = proposal.model_copy(update={"quantity": max(1, int(proposal.quantity * gate.size_fraction))})
                 members = {item.symbol for item in repository.members_at(as_of)}
                 decision = assess(
-                    proposal,
+                    assessed,
                     mode=mode,
                     in_universe=proposal.symbol in members,
                     cash=repository.available_cash(starting_cash),
@@ -176,6 +186,8 @@ def run_paper_cycle(
                     portfolio=portfolio_context(repository, starting_cash, moment, settings) if portfolio_limits else None,
                     # Intraday only: on swing, risk-off days were followed by the best next-day returns (tuning study).
                     market_ok=None if proposal.side != Side.BUY or horizon != Horizon.INTRADAY else not market_risk_off(repository, instrument.symbol, horizon, as_of),
+                    manager_ok=None if gate is None or gate.verdict in {None, ReviewVerdict.UNAVAILABLE} else gate.verdict != ReviewVerdict.VETO,
+                    manager_note="" if gate is None else gate.critique,
                 )
                 if repository.insert_risk_decision(decision):
                     event_type = EventType.RISK_APPROVED if decision.status == RiskStatus.APPROVED else EventType.RISK_REJECTED
@@ -191,7 +203,8 @@ def run_paper_cycle(
                 _queue(repository, proposal, as_of, reason="signal", fill_at="next_open")
                 continue
             before = {item.order_id for item in repository.list_orders()}
-            queue_entry(repository, proposal, as_of, entry_window=extension, placed_at=moment, cap=settings.max_order_notional, daily_limit=settings.daily_entry_limit)
+            reduced = decision.approved_quantity if decision.approved_quantity < proposal.quantity else None  # a manager REDUCE
+            queue_entry(repository, proposal, as_of, entry_window=extension, placed_at=moment, cap=settings.max_order_notional, daily_limit=settings.daily_entry_limit, quantity_limit=reduced)
             queued = [item for item in repository.list_orders() if item.order_id not in before]
             created_orders += len(queued)
             for order in queued:

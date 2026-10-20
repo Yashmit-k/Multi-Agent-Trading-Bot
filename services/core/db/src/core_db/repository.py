@@ -645,6 +645,42 @@ class CoreRepository:
             session.commit()
             return True
 
+    # Portfolio-manager reviews (core_db.reviews).
+    def insert_review(self, request) -> bool:
+        from core_db import reviews
+
+        return reviews.insert(self._session_factory, request)
+
+    def get_review(self, review_id: str) -> dict | None:
+        from core_db import reviews
+
+        return reviews.get(self._session_factory, review_id)
+
+    def review_for_proposal(self, proposal_id: str) -> dict | None:
+        from core_db import reviews
+
+        return reviews.for_proposal(self._session_factory, proposal_id)
+
+    def list_reviews(self, *, limit: int = 50, symbol: str | None = None) -> list[dict]:
+        from core_db import reviews
+
+        return reviews.recent(self._session_factory, limit=limit, symbol=symbol)
+
+    def claim_reviews(self, now: datetime, *, limit: int = 2) -> list:
+        from core_db import reviews
+
+        return reviews.claim(self._session_factory, now, limit=limit)
+
+    def append_review_step(self, review_id: str, step: dict, now: datetime) -> bool:
+        from core_db import reviews
+
+        return reviews.append_step(self._session_factory, review_id, step, now)
+
+    def complete_review(self, review, now: datetime) -> bool:
+        from core_db import reviews
+
+        return reviews.complete(self._session_factory, review, now)
+
     def prune_history(self, now: datetime) -> dict[str, int]:
         """Age out bulky history (see core_db.retention); keeps everything trades depend on."""
         from core_db.retention import prune
