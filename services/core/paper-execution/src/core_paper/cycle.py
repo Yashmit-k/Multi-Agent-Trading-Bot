@@ -153,8 +153,8 @@ def run_paper_cycle(
                     continue
                 if proposal.side == Side.BUY and held > 0:
                     continue  # one position per stock: no adding to an existing holding
-                if proposal.side == Side.BUY and applied:
-                    continue  # an applied Strategy-lab strategy replaces agent entries
+                if proposal.side == Side.BUY and applied and settings.strategy_mode != "alongside":
+                    continue  # an applied Strategy-lab strategy replaces agent entries, unless set to trade alongside them
                 if proposal.side == Side.SELL and applied and _is_strategy_position(repository, instrument.symbol):
                     continue  # the strategy manages its own exits
                 if proposal.side == Side.BUY and horizon == Horizon.INTRADAY and not settings.intraday_auto_entries:
@@ -214,7 +214,7 @@ def run_paper_cycle(
         from core_paper.strategy_live import strategy_entries
 
         try:
-            strategy_entries(repository, publisher, starting_cash=starting_cash, moment=moment, settings=settings, mode=mode)
+            strategy_entries(repository, publisher, starting_cash=starting_cash, moment=moment, settings=settings, mode=mode, weights=weights, manager_review=manager_review)
         except Exception:
             logger.exception("strategy_entries_failed")
     if capped:

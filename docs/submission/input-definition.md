@@ -108,6 +108,7 @@ Every agent, deterministic or LLM, sends the same message to `POST /api/v1/inter
 | Open a paper session | `POST /api/v1/paper/sessions` `{"starting_cash": "1000000"}` | isolated cash book |
 | Kill switch | `POST /api/v1/risk/kill-switch` `{"armed": true}` | blocks new buys and queues flatten sells |
 | Ask the portfolio manager | `POST /api/v1/reviews` `{"symbol": "RELIANCE", "horizon": "SWING"}` (operator sign-in) | a hypothetical review; nothing is traded (section 5) |
+| How an applied strategy shares the book | `POST /api/v1/settings/risk` `{"values": {"strategy_mode": "replace" \| "alongside" \| "agents_agree"}}` | strategy replaces agent entries; both trade; or the strategy trades only when the agents agree |
 | Manager review on/off | `POST /api/v1/settings/risk` `{"values": {"manager_review": false}}` | agent BUYs skip the manager and go straight to risk |
 | Zerodha login | `GET /api/v1/zerodha/connect` → Kite login → `/zerodha/callback?request_token=…` | daily market-data access token |
 | Environment | `.env` / compose | `TRADING_MODE=PAPER`, `FUSION_EXCLUDED_AGENTS`, `NEWS_RSS_URLS`, `LLM_*`, `MANAGER_LLM_MODEL`, `MANAGER_FALLBACK_MODEL`, `LLM_REASSESS_MODEL`, `PORTFOLIO_MANAGER_REVIEW`, `PAPER_STARTING_CASH` |

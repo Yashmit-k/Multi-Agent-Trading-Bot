@@ -4,7 +4,7 @@ import { useState } from "react";
 import { errorText, postApi } from "@/lib/api";
 import { OperatorGate } from "@/components/operator/OperatorGate";
 
-export type Bound = { key: string; label: string; min: string | null; max: string | null; default: string };
+export type Bound = { key: string; label: string; min: string | null; max: string | null; default: string; choices?: Array<{ value: string; label: string }> };
 export type RiskSettingsView = { settings: Record<string, string | number | boolean>; bounds: Bound[]; updated_at: string | null; updated_by: string | null };
 
 const HINT: Record<string, string> = {
@@ -17,6 +17,7 @@ const HINT: Record<string, string> = {
   stop_loss_pct: "Exit if price falls this % below entry.",
   take_profit_pct: "Exit if price rises this % above entry.",
   auto_entries: "Off: agents can still exit holdings, but only you open new positions.",
+  strategy_mode: "Only matters while a Strategy-lab strategy is applied. Replace: only the strategy opens trades. Both trade: the strategy and the agents open trades independently, sharing cash and these limits. Agents agree: only the strategy opens trades, and only when the agents' fused view on that stock is not bearish; the portfolio manager then reviews it.",
   manager_review: "On: each agent BUY waits up to 240 s for the LLM portfolio manager, which can approve, shrink or veto it (never enlarge it). Off: the risk engine decides alone.",
   intraday_auto_entries: "Off by default: the exit-rules study found 5-minute entries lose about 0.4% a trade to charges. Swing entries and your manual orders are unaffected.",
 };
@@ -58,7 +59,20 @@ export function RiskSettingsForm({ initial }: { initial: RiskSettingsView }) {
             {view.bounds.map((bound) => (
               <label key={bound.key} className="block rounded border border-[#26303C] bg-[#0F141B] p-3 text-sm">
                 <span className="font-medium">{bound.label}</span>
-                {bound.min === null ? (
+                {bound.choices ? (
+                  <select
+                    disabled={!operator}
+                    value={String(draft[bound.key] ?? bound.default)}
+                    onChange={(event) => setDraft({ ...draft, [bound.key]: event.target.value })}
+                    className="mt-2 w-full rounded border border-[#26303C] bg-[#0B0F14] px-2 py-1 disabled:opacity-60"
+                  >
+                    {bound.choices.map((choice) => (
+                      <option key={choice.value} value={choice.value}>
+                        {choice.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : bound.min === null ? (
                   <span className="mt-2 flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -93,7 +107,7 @@ export function RiskSettingsForm({ initial }: { initial: RiskSettingsView }) {
             <button
               type="button"
               disabled={!operator || pending}
-              onClick={() => void save(Object.fromEntries(view.bounds.map((bound) => [bound.key, bound.min === null ? bound.default === "true" : bound.default])))}
+              onClick={() => void save(Object.fromEntries(view.bounds.map((bound) => [bound.key, bound.choices ? bound.default : bound.min === null ? bound.default === "true" : bound.default])))}
               className="rounded border border-[#26303C] px-3 py-1.5 text-sm disabled:opacity-50"
             >
               Reset to defaults

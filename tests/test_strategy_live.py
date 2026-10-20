@@ -148,3 +148,73 @@ def test_intraday_limit_entries_expire_after_valid_bars(repository: CoreReposito
     assert expire_strategy_orders(repository, SESSION + timedelta(minutes=9)) == 0  # still within 2 bars
     assert expire_strategy_orders(repository, SESSION + timedelta(minutes=11)) == 1
     assert repository.list_orders()[0].status == OrderStatus.CANCELLED
+
+
+def _apply(repository: CoreRepository, mode: str) -> TestClient:
+    client = _ready(repository)
+    repository.save_setting("risk", {"strategy_mode": mode}, updated_by="test", now=DECISION)
+    saved = client.post("/api/v1/strategies", json={"definition": STRATEGY}, headers=AUTH).json()
+    client.post(f"/api/v1/strategies/{saved['strategy_id']}/apply", json={"confirm": True}, headers=AUTH)
+    return client
+
+
+def _tcs_view(repository: CoreRepository, score: float) -> None:
+    from test_phase4 import _signal, _store
+
+    _store(repository, _signal(signal_id="sig-tcs-view", symbol="TCS", signal=score, timestamp=DECISION, valid_until=DECISION + timedelta(days=2)))
+
+
+def test_alongside_mode_lets_the_strategy_and_the_agents_both_trade(repository: CoreRepository) -> None:
+    _apply(repository, "alongside")
+    _cycle(repository, DECISION + timedelta(hours=1))
+    assert {order.symbol for order in repository.list_orders() if order.side == Side.BUY} == {"TCS", "RELIANCE"}
+
+
+def test_agents_agree_mode_blocks_a_strategy_entry_the_agents_are_bearish_on(repository: CoreRepository) -> None:
+    _apply(repository, "agents_agree")
+    _tcs_view(repository, -0.6)
+    _cycle(repository, DECISION + timedelta(hours=1))
+    assert repository.list_orders() == []  # TCS blocked by the agents; RELIANCE agent BUY not placed either
+
+
+def test_agents_agree_mode_trades_when_the_agents_are_not_bearish(repository: CoreRepository) -> None:
+    _apply(repository, "agents_agree")
+    _tcs_view(repository, 0.4)
+    _cycle(repository, DECISION + timedelta(hours=1))
+    [order] = repository.list_orders()
+    assert order.symbol == "TCS"
+    proposal = repository.get_proposal(order.proposal_id)
+    assert proposal.metadata["strategy_mode"] == "agents_agree" and proposal.metadata["agents_fused_signal"] > 0
+
+
+def test_agents_agree_mode_sends_the_entry_to_the_portfolio_manager(repository: CoreRepository) -> None:
+    from contracts.schemas.review import ProposalReview
+
+    _apply(repository, "agents_agree")
+    _tcs_view(repository, 0.4)
+    now = DECISION + timedelta(hours=1)
+    run_paper_cycle(repository, MemoryEventPublisher(), mode=TradingMode.PAPER, starting_cash=CASH, now=now, enforce_entry_window=False, manager_review=True)
+    assert repository.list_orders() == []  # waiting for the manager
+    [row] = repository.list_reviews()
+    assert row["proposal_id"].startswith("strategy-")
+    repository.complete_review(
+        ProposalReview(review_id=row["review_id"], kind="pipeline", proposal_id=row["proposal_id"], symbol="TCS", verdict="VETO", size_fraction=0.0,
+                       critique="The strategy's breakout fights a risk-off market.", reviewer="test", steps=2, timestamp=now),
+        now,
+    )
+    run_paper_cycle(repository, MemoryEventPublisher(), mode=TradingMode.PAPER, starting_cash=CASH, now=now + timedelta(seconds=30), enforce_entry_window=False, manager_review=True)
+    decision = repository.risk_for_proposal(row["proposal_id"])
+    assert decision is not None and decision.status.value == "REJECTED"
+    assert repository.list_orders() == []
+
+
+def test_strategy_mode_setting_is_validated(repository: CoreRepository) -> None:
+    from core_risk.settings import SettingsError, parse_settings
+
+    assert parse_settings({"strategy_mode": "alongside"}).strategy_mode == "alongside"
+    try:
+        parse_settings({"strategy_mode": "yolo"})
+    except SettingsError as exc:
+        assert "strategy_mode" in exc.errors
+    else:
+        raise AssertionError("bad mode accepted")

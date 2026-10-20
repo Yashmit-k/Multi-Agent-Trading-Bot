@@ -1,7 +1,7 @@
 """Apply a Strategy-lab strategy to live paper trading.
 
 When a strategy is applied (user_settings["active_strategy"], with a frozen copy of its definition),
-it replaces agent entries: each cycle it evaluates its entry rule on the latest completed bars and
+it replaces agent entries (or, per the strategy_mode setting, trades alongside them or only with their agreement): each cycle it evaluates its entry rule on the latest completed bars and
 proposes BUYs through the normal risk checks and CNC limit entry. Agents keep publishing signals
 and their existing positions still exit as before.
 
@@ -122,11 +122,21 @@ def _digest(*parts: str) -> str:
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:32]
 
 
-def strategy_entries(repository: CoreRepository, publisher, *, starting_cash: Decimal, moment: datetime, settings, mode: TradingMode) -> int:  # type: ignore[no-untyped-def]
-    """Propose and queue BUYs for every symbol whose entry rule fired on the bar that just completed."""
-    from core_paper.cycle import _order_event, _publish, portfolio_context
-    from core_paper.execute import queue_entry
-    from core_risk import assess
+def agents_view(repository: CoreRepository, symbol: str, horizon: Horizon, moment: datetime, weights: dict | None) -> float | None:
+    """The agents' fused signal on this stock now, or None when no agent has a valid opinion."""
+    from core_fusion import fuse
+
+    aggregate = fuse(repository.signals_for(symbol), horizon=horizon, as_of=moment, weights=weights)
+    return None if aggregate is None else aggregate.aggregated_signal
+
+
+def strategy_entries(repository: CoreRepository, publisher, *, starting_cash: Decimal, moment: datetime, settings, mode: TradingMode, weights: dict | None = None, manager_review: bool = False) -> int:  # type: ignore[no-untyped-def]
+    """Propose and queue BUYs for every symbol whose entry rule fired on the bar that just completed.
+
+    In "agents_agree" mode an entry also needs a fused agent view that is not bearish, and it then goes
+    through the portfolio manager like an agent BUY (it may wait a few cycles for the verdict).
+    """
+    from core_paper.cycle import _publish
 
     found = active_strategy(repository)
     if found is None:
@@ -135,10 +145,16 @@ def strategy_entries(repository: CoreRepository, publisher, *, starting_cash: De
     book = repository.active_paper_session()
     if book is None:
         return 0
+    agree = getattr(settings, "strategy_mode", "replace") == "agents_agree"
+    review = agree and manager_review and getattr(settings, "manager_review", False)
+    created = 0
+    # Entries from earlier cycles still waiting for the portfolio manager.
+    for waiting in repository.list_proposals():
+        if waiting.metadata.get("source") == SOURCE and waiting.metadata.get("needs_review") and repository.risk_for_proposal(waiting.proposal_id) is None:
+            created += _decide(repository, publisher, waiting, starting_cash=starting_cash, moment=moment, settings=settings, mode=mode, review=review)
     members = {item.symbol for item in repository.members_at(moment)}
     symbols = sorted(members) if definition.symbols == ["ALL"] else [s for s in definition.symbols if s in members]
     pending = {order.symbol for order in repository.list_orders() if order.side == Side.BUY and order.status in _OPEN_ORDER}
-    created = 0
     base_timeframe = Timeframe.M5 if definition.timeframe in INTRADAY else Timeframe.D1
     for symbol in symbols:
         if repository.held_quantity(symbol) > 0 or symbol in pending:
@@ -182,11 +198,16 @@ def strategy_entries(repository: CoreRepository, publisher, *, starting_cash: De
         if quantity < 1:
             continue
         final_target = targets[-1][0] if targets else entry * 10  # no target: exits come from stop/trailing/time/rule
+        horizon = Horizon.INTRADAY if definition.timeframe in INTRADAY else Horizon.SWING
+        view = agents_view(repository, symbol, horizon, moment, weights) if agree else None
+        if agree and view is not None and view < 0:
+            logger.info("strategy_entry_blocked_by_agents symbol=%s fused=%.3f", symbol, view)
+            continue
         proposal = TradeProposal(
             proposal_id=proposal_id,
             symbol=symbol,
             timestamp=bar_end.astimezone(timezone.utc),
-            horizon=Horizon.INTRADAY if definition.timeframe in INTRADAY else Horizon.SWING,
+            horizon=horizon,
             side=Side.BUY,
             quantity=quantity,
             entry_price=Decimal(str(round(entry, 2))),
@@ -209,6 +230,10 @@ def strategy_entries(repository: CoreRepository, publisher, *, starting_cash: De
                     else None
                 ),
                 "decided_at": moment.isoformat(),
+                "strategy_mode": getattr(settings, "strategy_mode", "replace"),
+                "agents_fused_signal": view,
+                "needs_review": review,
+                "limit_price": None if limit is None else round(limit, 2),
                 "stops_monitored": True,
                 "same_bar_exit": "stop_first",
                 "plan": {
@@ -221,39 +246,60 @@ def strategy_entries(repository: CoreRepository, publisher, *, starting_cash: De
                 },
             },
         )
-        decision = assess(
-            proposal,
-            mode=mode,
-            in_universe=True,
-            cash=repository.available_cash(starting_cash),
-            held_quantity=0,
-            timestamp=bar_end,
-            max_notional=settings.max_order_notional,
-            portfolio=portfolio_context(repository, starting_cash, moment, settings),
-        )
         if repository.insert_proposal(proposal):
             _publish(publisher, EventType.DECISION_CREATED, f"decision.created:{proposal_id}", bar_end, proposal_id, proposal)
-        if repository.insert_risk_decision(decision):
-            kind = EventType.RISK_APPROVED if decision.status == RiskStatus.APPROVED else EventType.RISK_REJECTED
-            _publish(publisher, kind, f"{kind.value}:{decision.risk_decision_id}", bar_end, proposal_id, decision)
-        if decision.status != RiskStatus.APPROVED:
-            continue
-        order = queue_entry(
-            repository,
-            proposal,
-            bar_end,
-            placed_at=moment,
-            cap=settings.max_order_notional,
-            daily_limit=settings.daily_entry_limit,
-            limit_override=None if limit is None else Decimal(str(round(limit, 2))),
-            quantity_limit=quantity,
-        )
-        if order is not None:
-            kind = _order_event(order)
-            _publish(publisher, kind, f"{kind.value}:{order.order_id}", bar_end, proposal_id, order)
-            if order.status == OrderStatus.OPEN:
-                created += 1
+        created += _decide(repository, publisher, proposal, starting_cash=starting_cash, moment=moment, settings=settings, mode=mode, review=review)
     return created
+
+
+def _decide(repository: CoreRepository, publisher, proposal: TradeProposal, *, starting_cash: Decimal, moment: datetime, settings, mode: TradingMode, review: bool) -> int:  # type: ignore[no-untyped-def]
+    """Portfolio-manager gate (agents_agree mode), risk, then the order. Returns 1 when an order opened."""
+    from contracts.schemas.review import ReviewVerdict
+    from core_paper.cycle import _order_event, _publish, portfolio_context
+    from core_paper.execute import queue_entry
+    from core_paper.review_gate import review_gate
+    from core_risk import assess
+
+    gate = review_gate(repository, publisher, proposal, moment) if review else None
+    if gate is not None and gate.wait:
+        return 0
+    assessed = proposal
+    if gate is not None and gate.verdict == ReviewVerdict.REDUCE:
+        assessed = proposal.model_copy(update={"quantity": max(1, int(proposal.quantity * gate.size_fraction))})
+    bar_end = proposal.timestamp
+    decision = assess(
+        assessed,
+        mode=mode,
+        in_universe=True,
+        cash=repository.available_cash(starting_cash),
+        held_quantity=0,
+        timestamp=bar_end,
+        max_notional=settings.max_order_notional,
+        portfolio=portfolio_context(repository, starting_cash, moment, settings),
+        manager_ok=None if gate is None or gate.verdict in {None, ReviewVerdict.UNAVAILABLE} else gate.verdict != ReviewVerdict.VETO,
+        manager_note="" if gate is None else gate.critique,
+    )
+    if repository.insert_risk_decision(decision):
+        kind = EventType.RISK_APPROVED if decision.status == RiskStatus.APPROVED else EventType.RISK_REJECTED
+        _publish(publisher, kind, f"{kind.value}:{decision.risk_decision_id}", bar_end, proposal.proposal_id, decision)
+    if decision.status != RiskStatus.APPROVED:
+        return 0
+    limit = proposal.metadata.get("limit_price")
+    order = queue_entry(
+        repository,
+        proposal,
+        bar_end,
+        placed_at=moment,
+        cap=settings.max_order_notional,
+        daily_limit=settings.daily_entry_limit,
+        limit_override=None if limit is None else Decimal(str(limit)),
+        quantity_limit=decision.approved_quantity,
+    )
+    if order is None:
+        return 0
+    kind = _order_event(order)
+    _publish(publisher, kind, f"{kind.value}:{order.order_id}", bar_end, proposal.proposal_id, order)
+    return 1 if order.status == OrderStatus.OPEN else 0
 
 
 # --- exits ----------------------------------------------------------------------------------------

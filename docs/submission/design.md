@@ -114,6 +114,7 @@ One schema package, `packages/contracts` (1.1.0), defines every message, and all
 | Decision engine | code | fused signal + latest bar | `TradeProposal` when \|signal\| ≥ 0.2 and confidence ≥ 0.3 |
 | Review gate | code | proposal + manager verdict | waits up to 240 s; applies REDUCE; records UNAVAILABLE on timeout |
 | Risk engine | code | proposal, book, verdict | 6 order checks, portfolio checks, market regime, and the `portfolio_manager` check |
+| Strategy (Strategy lab) | code, optional | a user-built rule algorithm applied to paper | per Settings `strategy_mode`: **replace** the agents' entries, trade **alongside** them, or trade only when the **agents agree** (fused view not bearish, then a portfolio-manager review) |
 | Paper execution | code | approved proposal | CNC limit order at next bar, Zerodha charges, 6 entries/day, 09:20–10:30 IST entry window, kill switch |
 | Trace recorder | code | every bus | append-only record of every handoff |
 

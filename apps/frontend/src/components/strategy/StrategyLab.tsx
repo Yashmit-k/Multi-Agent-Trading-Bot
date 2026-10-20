@@ -36,8 +36,20 @@ function Num({ text, value, onChange, hint, step = "any", optional = false, widt
   );
 }
 
+const MODE_TEXT: Record<string, string> = {
+  replace: "Mode: replace. The agents stop opening new positions; this strategy opens them instead, when its buy rule is true on a just-completed bar.",
+  alongside: "Mode: both trade. This strategy opens positions when its buy rule is true, and the agents keep opening their own, sharing the same cash and limits.",
+  agents_agree: "Mode: agents agree. Only this strategy opens positions, and only when the agents' fused view on that stock is not bearish; the portfolio manager then reviews each entry.",
+};
+
 function ApplyDialog({ definition, catalog, onCancel, onConfirm, pending }: { definition: Definition; catalog: Catalog; onCancel: () => void; onConfirm: () => void; pending: boolean }) {
   const [understood, setUnderstood] = useState(false);
+  const [mode, setMode] = useState<string>("replace");
+  useEffect(() => {
+    fetchApi<{ settings: Record<string, unknown> }>("/api/v1/settings/risk")
+      .then((view) => setMode(String(view.settings.strategy_mode ?? "replace")))
+      .catch(() => undefined);
+  }, []);
   const targets = definition.targets.length
     ? definition.targets.map((t) => `${Math.round(t.fraction * 100)}% at ${t.value}${t.kind === "percent" ? "%" : t.kind === "atr" ? "× ATR" : "R"}`).join(", ")
     : "none";
@@ -83,14 +95,14 @@ function ApplyDialog({ definition, catalog, onCancel, onConfirm, pending }: { de
         <div className="mt-4 rounded border border-[#F59E0B]/40 bg-[#F59E0B]/10 p-3 text-xs text-[#FCD34D]">
           <p className="font-semibold">What changes</p>
           <ul className="mt-1 list-disc space-y-1 pl-4">
-            <li>The agents stop opening new positions. This strategy opens them instead, when its buy rule is true on a just-completed bar.</li>
+            <li>{MODE_TEXT[mode] ?? MODE_TEXT.replace} Change this in Settings → “Applied strategy and the agents”.</li>
             <li>Its positions exit by its own stop, targets, trailing stop, time limits and sell rule. Positions the agents already hold keep exiting as before.</li>
             <li>Your Settings limits still apply to every order (per-order cap, entries per day, positions, sector, exposure). Entries are CNC limit orders at the latest price + 0.25%, so fills can differ from the backtest.</li>
             <li>Paper money only. Nothing is sent to Zerodha. You can stop applying it at any time.</li>
           </ul>
         </div>
         <label className="mt-3 flex items-start gap-2 text-xs">
-          <input type="checkbox" checked={understood} onChange={(event) => setUnderstood(event.target.checked)} />I understand this replaces the agents’ entries in my paper account.
+          <input type="checkbox" checked={understood} onChange={(event) => setUnderstood(event.target.checked)} />I understand how this strategy will trade in my paper account.
         </label>
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" className="rounded border border-[#26303C] px-3 py-1.5" onClick={onCancel}>

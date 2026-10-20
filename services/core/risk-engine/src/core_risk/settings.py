@@ -29,6 +29,10 @@ class RiskSettings:
     intraday_auto_entries: bool = False
     # The LLM portfolio manager reviews each agent BUY before risk: approve, shrink or veto (never enlarge).
     manager_review: bool = True
+    # How an applied Strategy-lab strategy and the agents share the book:
+    # replace = only the strategy opens trades; alongside = both open trades independently;
+    # agents_agree = only the strategy opens trades, and only when the agents' fused view is not bearish.
+    strategy_mode: str = "replace"
 
     def as_json(self) -> dict[str, object]:
         return {key: (str(value) if isinstance(value, Decimal) else value) for key, value in asdict(self).items()}
@@ -44,6 +48,14 @@ BOUNDS: dict[str, tuple[Decimal, Decimal, str]] = {
     "max_per_stock": (Decimal("1000"), Decimal("500000"), "Money in one stock (Rs)"),
     "stop_loss_pct": (Decimal("0.5"), Decimal("20"), "Stop loss (%)"),
     "take_profit_pct": (Decimal("0.5"), Decimal("50"), "Take profit (%)"),
+}
+
+CHOICES: dict[str, tuple[tuple[str, str], ...]] = {
+    "strategy_mode": (
+        ("replace", "Strategy replaces the agents"),
+        ("alongside", "Strategy and agents both trade"),
+        ("agents_agree", "Strategy trades only when the agents agree"),
+    ),
 }
 
 DEFAULTS = RiskSettings()
@@ -67,6 +79,12 @@ def parse_settings(payload: dict[str, object] | None, *, strict: bool = True) ->
             continue
         default = getattr(DEFAULTS, key)
         try:
+            if key in CHOICES:
+                allowed = [value for value, _ in CHOICES[key]]
+                if raw not in allowed:
+                    raise ValueError(f"must be one of {', '.join(allowed)}")
+                values[key] = raw
+                continue
             if isinstance(default, bool):
                 if not isinstance(raw, bool):
                     raise ValueError("must be true or false")
@@ -98,4 +116,6 @@ def describe_bounds() -> list[dict[str, object]]:
         {"key": "auto_entries", "label": "Agents may open new positions", "min": None, "max": None, "default": "true"},
         {"key": "intraday_auto_entries", "label": "Agents may open intraday (5-minute) positions", "min": None, "max": None, "default": "false"},
         {"key": "manager_review", "label": "Portfolio manager reviews agent buys", "min": None, "max": None, "default": "true"},
+        {"key": "strategy_mode", "label": "Applied strategy and the agents", "min": None, "max": None, "default": DEFAULTS.strategy_mode,
+         "choices": [{"value": value, "label": label} for value, label in CHOICES["strategy_mode"]]},
     ]
