@@ -66,13 +66,15 @@ export async function POST(request: Request, context: Context): Promise<Response
   const { path } = await context.params;
   const pathname = `/api/v1/${path.join("/")}`;
   const listed = allowWrite(pathname, process.env.FRONTEND_ALLOW_POST_PATHS);
-  const operator = allowOperatorWrite(pathname) && validToken(tokenFromCookieHeader(request.headers.get("cookie"))) && sameOrigin(request);
+  const signedIn = validToken(tokenFromCookieHeader(request.headers.get("cookie"))) && sameOrigin(request);
+  const operator = allowOperatorWrite(pathname) && signedIn;
   const visitor = allowPublicWrite(pathname);
   if (!listed && !operator && !visitor) {
     const detail = allowOperatorWrite(pathname) ? "operator_login_required" : "write_blocked_by_public_proxy";
     return Response.json({ detail }, { status: 403 });
   }
-  if (visitor && !operator && rateLimited(request)) {
+  // The preview limit protects the server from visitors; a signed-in operator is never limited.
+  if (visitor && !signedIn && rateLimited(request)) {
     return Response.json({ detail: "too_many_backtests_try_again_shortly" }, { status: 429 });
   }
   const url = new URL(request.url);
