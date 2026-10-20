@@ -28,6 +28,7 @@ from core_fusion import fuse
 from core_paper.costs import CostSchedule, fee_on, slipped_price
 from core_paper.execute import MAX_NOTIONAL, queue_entry, settle_entries, settle_sell
 from core_paper.review_gate import review_gate
+from core_paper.risk_inputs import trade_context
 from core_paper.limits import PRODUCT_CNC, SELL_POLICY_VERSION
 from core_paper.charges import ZERODHA_EQUITY_RI
 from core_paper.trading_calendar import paper_test_entry_window
@@ -188,6 +189,7 @@ def run_paper_cycle(
                     market_ok=None if proposal.side != Side.BUY or horizon != Horizon.INTRADAY else not market_risk_off(repository, instrument.symbol, horizon, as_of),
                     manager_ok=None if gate is None or gate.verdict in {None, ReviewVerdict.UNAVAILABLE} else gate.verdict != ReviewVerdict.VETO,
                     manager_note="" if gate is None else gate.critique,
+                    trade=trade_context(repository, assessed, starting_cash=starting_cash, now=moment, settings=settings) if proposal.side == Side.BUY and portfolio_limits else None,
                 )
                 if repository.insert_risk_decision(decision):
                     event_type = EventType.RISK_APPROVED if decision.status == RiskStatus.APPROVED else EventType.RISK_REJECTED

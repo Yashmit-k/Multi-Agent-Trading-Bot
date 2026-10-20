@@ -12,8 +12,9 @@ from contracts.enums import RiskStatus, Side, TradingMode
 from contracts.schemas.risk_decision import RiskCheck, RiskDecision
 from contracts.schemas.trade_proposal import TradeProposal
 from core_risk.portfolio import PortfolioContext
+from core_risk.trade import TradeContext
 
-RISK_VERSION = "1.2.0"
+RISK_VERSION = "1.3.0"
 MAX_NOTIONAL = Decimal("20000")
 
 
@@ -30,8 +31,11 @@ def assess(
     market_ok: bool | None = None,
     manager_ok: bool | None = None,
     manager_note: str = "",
+    trade: TradeContext | None = None,
 ) -> RiskDecision:
-    """Six order checks always; five portfolio checks on BUYs when the paper book is supplied."""
+    """Six order checks always. On BUYs: five portfolio checks with the book, seven trade checks with the trade context
+    (losses so far, risk per trade, reward to risk, price drift, stop-out cooldown, evidence quality), the market regime
+    and the portfolio manager's verdict when given."""
     bound = MAX_NOTIONAL if max_notional is None else max_notional
     notional = proposal.entry_price * proposal.quantity
     checks = [
@@ -54,6 +58,8 @@ def assess(
         checks.append(_check("portfolio_manager", manager_ok, f"portfolio manager vetoed: {manager_note}"[:300]))
     if portfolio is not None and proposal.side == Side.BUY:
         checks += [_check(name, passed, failure) for name, passed, failure in portfolio.checks(proposal.symbol, notional)]
+    if trade is not None and proposal.side == Side.BUY:
+        checks += [_check(name, passed, failure) for name, passed, failure in trade.checks(proposal)]
     failed = [check for check in checks if not check.passed]
     approved = not failed
     return RiskDecision(
@@ -66,7 +72,7 @@ def assess(
         rejection_reason=None if approved else "; ".join(check.detail for check in failed),
         approved_quantity=proposal.quantity if approved else 0,
         approved_price=proposal.entry_price if approved else None,
-        metadata={"kill_switch": "noop", "portfolio_checks": portfolio is not None and proposal.side == Side.BUY},
+        metadata={"kill_switch": "noop", "portfolio_checks": portfolio is not None and proposal.side == Side.BUY, "trade_checks": trade is not None and proposal.side == Side.BUY},
     )
 
 

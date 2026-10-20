@@ -13,17 +13,23 @@ MAX_EXPOSURE_FRACTION = Decimal("0.30")
 MAX_PER_STOCK = Decimal("40000")
 DAILY_ENTRY_LIMIT = 6
 
-# NIFTY sector index per constituent. A stock without a matching index counts as its own sector.
+# Sector group per constituent: the NIFTY sectoral index where one exists, else an NSE sector name. A stock
+# missing here counts as its own sector, so every current constituent is listed.
 SECTOR_OF: dict[str, str] = {
     **{s: "NIFTY BANK" for s in ("AXISBANK", "HDFCBANK", "ICICIBANK", "INDUSINDBK", "KOTAKBANK", "SBIN")},
     **{s: "NIFTY FIN SERVICE" for s in ("BAJFINANCE", "BAJAJFINSV", "HDFCLIFE", "SBILIFE", "SHRIRAMFIN")},
     **{s: "NIFTY IT" for s in ("HCLTECH", "INFY", "TCS", "TECHM", "WIPRO")},
-    **{s: "NIFTY AUTO" for s in ("BAJAJ-AUTO", "EICHERMOT", "HEROMOTOCO", "M&M", "MARUTI", "TMPV")},
+    **{s: "NIFTY AUTO" for s in ("BAJAJ-AUTO", "EICHERMOT", "HEROMOTOCO", "M&M", "MARUTI", "TMPV", "TATAMOTORS")},
     **{s: "NIFTY FMCG" for s in ("BRITANNIA", "HINDUNILVR", "ITC", "NESTLEIND", "TATACONSUM")},
-    **{s: "NIFTY METAL" for s in ("HINDALCO", "JSWSTEEL", "TATASTEEL")},
-    **{s: "NIFTY PHARMA" for s in ("CIPLA", "DRREDDY", "SUNPHARMA")},
-    **{s: "NIFTY ENERGY" for s in ("BPCL", "NTPC", "ONGC", "POWERGRID", "RELIANCE")},
-    "TITAN": "NIFTY CONSR DURBL",
+    **{s: "NIFTY METAL" for s in ("HINDALCO", "JSWSTEEL", "TATASTEEL", "ADANIENT")},
+    **{s: "NIFTY HEALTHCARE" for s in ("CIPLA", "DRREDDY", "SUNPHARMA", "APOLLOHOSP")},
+    **{s: "NIFTY ENERGY" for s in ("BPCL", "NTPC", "ONGC", "POWERGRID", "RELIANCE", "COALINDIA")},
+    **{s: "NIFTY CONSR DURBL" for s in ("TITAN", "ASIANPAINT")},
+    **{s: "CAPITAL GOODS" for s in ("LT", "BEL")},
+    **{s: "CEMENT & MATERIALS" for s in ("ULTRACEMCO", "GRASIM")},
+    "ADANIPORTS": "SERVICES",
+    "TRENT": "CONSUMER SERVICES",
+    "BHARTIARTL": "TELECOM",
 }
 
 

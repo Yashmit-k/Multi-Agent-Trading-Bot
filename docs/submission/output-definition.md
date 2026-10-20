@@ -99,7 +99,13 @@ How a pipeline verdict changes the trade: VETO fails the risk check `portfolio_m
 
 ## 3. `RiskDecision` — Risk Engine output
 
-Six order checks always. For an agent BUY there are also portfolio checks (positions, sector, exposure, per stock, entries per day), the intraday market-regime check, and the `portfolio_manager` check when the manager reviewed it. Any failure rejects the proposal.
+Six order checks always. Every new BUY (agent or applied strategy) also gets:
+- 5 portfolio checks: `max_open_positions`, `sector_concentration`, `exposure_cap`, `per_stock_cap`, `daily_entry_cap`;
+- 7 trade checks (risk 1.3.0): `daily_loss_limit`, `drawdown_limit`, `risk_per_trade`, `reward_to_risk`, `price_drift`, `stop_out_cooldown`, `evidence_quality`;
+- `market_regime` on intraday buys;
+- `portfolio_manager` when the manager reviewed it.
+
+Any failure rejects the proposal, and `rejection_reason` names every failed check. The samples below predate risk 1.3.0, so they show only the six order checks.
 
 **Approved [bootstrap paper run, 1 Oct 2026]**
 

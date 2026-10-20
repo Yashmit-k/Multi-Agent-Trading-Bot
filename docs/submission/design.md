@@ -113,7 +113,7 @@ One schema package, `packages/contracts` (1.1.0), defines every message, and all
 | Signal fusion | code | newest valid opinion per agent | confidence-weighted average with per-agent reliability weights |
 | Decision engine | code | fused signal + latest bar | `TradeProposal` when \|signal\| ≥ 0.2 and confidence ≥ 0.3 |
 | Review gate | code | proposal + manager verdict | waits up to 240 s; applies REDUCE; records UNAVAILABLE on timeout |
-| Risk engine | code | proposal, book, verdict | 6 order checks, portfolio checks, market regime, and the `portfolio_manager` check |
+| Risk engine | code (1.3.0) | proposal, book, market, supporting opinions, verdict | 6 order checks; for BUYs 5 portfolio checks (positions, sector, exposure, per stock, entries/day), 7 trade checks (daily loss limit, drawdown limit, loss at the stop per trade, reward-to-risk, price drift since the signal, stop-out cooldown, evidence quality: no buy resting only on fallback heuristics), intraday market regime, and the `portfolio_manager` verdict. Every limit is a bounded Setting. |
 | Strategy (Strategy lab) | code, optional | a user-built rule algorithm applied to paper | per Settings `strategy_mode`: **replace** the agents' entries, trade **alongside** them, or trade only when the **agents agree** (fused view not bearish, then a portfolio-manager review) |
 | Paper execution | code | approved proposal | CNC limit order at next bar, Zerodha charges, 6 entries/day, 09:20–10:30 IST entry window, kill switch |
 | Trace recorder | code | every bus | append-only record of every handoff |

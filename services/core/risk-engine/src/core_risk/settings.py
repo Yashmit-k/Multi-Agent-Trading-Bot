@@ -23,6 +23,14 @@ class RiskSettings:
     max_per_stock: Decimal = Decimal("40000")
     stop_loss_pct: Decimal = Decimal("2")
     take_profit_pct: Decimal = Decimal("4")
+    # Trade-level checks on every new BUY (core_risk.trade).
+    max_daily_loss_pct: Decimal = Decimal("2")
+    max_drawdown_pct: Decimal = Decimal("10")
+    max_risk_per_trade_pct: Decimal = Decimal("1")
+    min_reward_risk: Decimal = Decimal("1")
+    max_price_drift_pct: Decimal = Decimal("3")
+    stop_cooldown_hours: int = 24
+    block_fallback_evidence: bool = True
     auto_entries: bool = True  # False: agents may still exit holdings, but only manual orders open new ones
     # Intraday (5-minute) agent entries. Off by default since the exit-rules study (2026-10-15): the fused
     # 5-minute signal flips within minutes and each round trip loses about 0.4% to charges.
@@ -48,6 +56,12 @@ BOUNDS: dict[str, tuple[Decimal, Decimal, str]] = {
     "max_per_stock": (Decimal("1000"), Decimal("500000"), "Money in one stock (Rs)"),
     "stop_loss_pct": (Decimal("0.5"), Decimal("20"), "Stop loss (%)"),
     "take_profit_pct": (Decimal("0.5"), Decimal("50"), "Take profit (%)"),
+    "max_daily_loss_pct": (Decimal("0.1"), Decimal("20"), "Daily loss limit (% of starting cash)"),
+    "max_drawdown_pct": (Decimal("1"), Decimal("50"), "Drawdown limit (% below peak)"),
+    "max_risk_per_trade_pct": (Decimal("0.05"), Decimal("10"), "Loss at the stop per trade (% of starting cash)"),
+    "min_reward_risk": (Decimal("0"), Decimal("10"), "Minimum target ÷ stop distance"),
+    "max_price_drift_pct": (Decimal("0.2"), Decimal("20"), "Price drift since the signal (%)"),
+    "stop_cooldown_hours": (Decimal("0"), Decimal("240"), "No re-entry after a stop-out (hours)"),
 }
 
 CHOICES: dict[str, tuple[tuple[str, str], ...]] = {
@@ -115,6 +129,7 @@ def describe_bounds() -> list[dict[str, object]]:
     ] + [
         {"key": "auto_entries", "label": "Agents may open new positions", "min": None, "max": None, "default": "true"},
         {"key": "intraday_auto_entries", "label": "Agents may open intraday (5-minute) positions", "min": None, "max": None, "default": "false"},
+        {"key": "block_fallback_evidence", "label": "Block buys backed only by fallback heuristics", "min": None, "max": None, "default": "true"},
         {"key": "manager_review", "label": "Portfolio manager reviews agent buys", "min": None, "max": None, "default": "true"},
         {"key": "strategy_mode", "label": "Applied strategy and the agents", "min": None, "max": None, "default": DEFAULTS.strategy_mode,
          "choices": [{"value": value, "label": label} for value, label in CHOICES["strategy_mode"]]},

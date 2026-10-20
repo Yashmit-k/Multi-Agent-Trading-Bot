@@ -258,6 +258,7 @@ def _decide(repository: CoreRepository, publisher, proposal: TradeProposal, *, s
     from core_paper.cycle import _order_event, _publish, portfolio_context
     from core_paper.execute import queue_entry
     from core_paper.review_gate import review_gate
+    from core_paper.risk_inputs import trade_context
     from core_risk import assess
 
     gate = review_gate(repository, publisher, proposal, moment) if review else None
@@ -278,6 +279,7 @@ def _decide(repository: CoreRepository, publisher, proposal: TradeProposal, *, s
         portfolio=portfolio_context(repository, starting_cash, moment, settings),
         manager_ok=None if gate is None or gate.verdict in {None, ReviewVerdict.UNAVAILABLE} else gate.verdict != ReviewVerdict.VETO,
         manager_note="" if gate is None else gate.critique,
+        trade=trade_context(repository, assessed, starting_cash=starting_cash, now=moment, settings=settings),
     )
     if repository.insert_risk_decision(decision):
         kind = EventType.RISK_APPROVED if decision.status == RiskStatus.APPROVED else EventType.RISK_REJECTED

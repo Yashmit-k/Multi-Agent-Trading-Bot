@@ -78,7 +78,18 @@ def test_sells_and_callers_without_a_book_are_unchanged() -> None:
 
 
 def test_unknown_stocks_are_their_own_sector() -> None:
-    assert sector_of("LT") == "OWN:LT" and sector_of("INFY") == "NIFTY IT"
+    assert sector_of("ZOMATO") == "OWN:ZOMATO" and sector_of("INFY") == "NIFTY IT"
+
+
+def test_every_nifty_constituent_has_a_sector() -> None:
+    import csv
+
+    from core_db.seed import SEED_PATH
+
+    with SEED_PATH.open(newline="", encoding="utf-8") as handle:
+        symbols = {row["symbol"] for row in csv.DictReader(handle) if row["universe"].strip() == "NIFTY50"}
+    assert symbols and sorted(symbol for symbol in symbols if sector_of(symbol).startswith("OWN:")) == []
+    assert sector_of("LT") == sector_of("BEL") and sector_of("ULTRACEMCO") == sector_of("GRASIM")
 
 
 def test_positions_and_portfolio_are_marked_to_the_latest_bar(repository) -> None:
