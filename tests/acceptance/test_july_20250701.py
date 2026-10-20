@@ -4,8 +4,10 @@ Re-recorded 2026-10-20 for quant agents 1.3.0, feature engine 1.2.0 and fusion
 with regime as a market filter (confidence-weighted, participation confidence,
 session VWAP). The same three orders and quantities result; entry bars, signal
 count, and P&L change: 1.0.0 gave 35 signals and -375.10 at 0 bp, 1.1.0 gave 30
-and -16.70, 1.2.0 gave 45 and -440.80, 1.3.0 gives 30 and -34.90. One session is
-a determinism check, not evidence that any version is better.
+and -16.70, 1.2.0 gave 45 and -440.80, 1.3.0 gave 30 and -34.90. Re-recorded the
+same day for 1.4.0 (intraday reversal settings from the tuning study): 700 signals,
+quantities 65/29/63, +304.70. One session is a determinism check, not evidence that
+any version is better (this replay uses fusion's default weights, not live priors).
 """
 
 from datetime import datetime, timezone
@@ -27,14 +29,14 @@ END = datetime(2025, 7, 1, 10, 0, tzinfo=timezone.utc)
 SYMBOLS = ("RELIANCE", "TCS", "INFY")
 SNAPSHOT = "nifty50_5m_20261005"
 PAIRS = (
-    (Decimal("0"), Decimal("0"), Decimal("-34.90")),
-    (Decimal("1"), Decimal("0"), Decimal("-64.46")),
-    (Decimal("2"), Decimal("0"), Decimal("-94.03")),
-    (Decimal("5"), Decimal("0"), Decimal("-182.73")),
-    (Decimal("0"), Decimal("1"), Decimal("-64.68")),
-    (Decimal("2"), Decimal("1"), Decimal("-123.82")),
+    (Decimal("0"), Decimal("0"), Decimal("304.70")),
+    (Decimal("1"), Decimal("0"), Decimal("274.97")),
+    (Decimal("2"), Decimal("0"), Decimal("245.26")),
+    (Decimal("5"), Decimal("0"), Decimal("156.09")),
+    (Decimal("0"), Decimal("1"), Decimal("275.01")),
+    (Decimal("2"), Decimal("1"), Decimal("215.56")),
 )
-QUANTITIES = {"RELIANCE": 66, "TCS": 28, "INFY": 63}
+QUANTITIES = {"RELIANCE": 65, "TCS": 29, "INFY": 63}
 
 
 @pytest.mark.skipif(not SNAPSHOT_CANDLES.is_file(), reason="nifty50_5m_20261005 snapshot is not on disk")
@@ -60,7 +62,7 @@ def test_july_20250701_ladder_matches_the_recorded_run() -> None:
             index_bars=index_bars,
         )
         assert report["candles_processed"] == 225
-        assert report["signals_generated"] == 30
+        assert report["signals_generated"] == 700
         assert report["orders_generated"] == 3
         assert report["orders_filled"] == 3
         assert report["positions"] == QUANTITIES

@@ -53,3 +53,24 @@ def test_confidence_is_participation_not_signal_size() -> None:
     assert one.signal == 0.25 and one.confidence == 0.25  # only a quarter of the evidence took a position
     none = score_votes((Vote("a", 0, 1.0),), required=(), missing=())
     assert none.confidence == 0.0
+
+
+def test_intraday_settings_from_the_tuning_study(clock, calendar) -> None:
+    from contracts.enums import Horizon
+
+    from quant_agents.agents.volume import VolumeAgent
+
+    momentum = MomentumAgent(clock, calendar)
+    momentum.horizon = Horizon.INTRADAY
+    assert _signal(momentum, roc_10_z=1.5, trend_strength_adx=30, relative_strength_nifty=0.01) == -1.0  # reversal
+    assert _signal(momentum, roc_10_z=0.8, trend_strength_adx=30) == 0  # inside the stricter z 1.0 band
+    momentum.horizon = Horizon.SWING
+    assert _signal(momentum, roc_10_z=1.5, trend_strength_adx=30, relative_strength_nifty=0.01) == 1.0  # trend-following
+    reversion = MeanReversionAgent(clock, calendar)
+    reversion.horizon = Horizon.INTRADAY
+    assert _signal(reversion, last_close=94, bollinger_upper=105, bollinger_lower=95, trend_strength_adx=35) > 0  # no ADX gate
+    volume = VolumeAgent(clock, calendar)
+    volume.horizon = Horizon.INTRADAY
+    assert _signal(volume, last_volume=5000, volume_mean=1000, return_1=0.01, relative_volume=4.0, price_volume_corr=0.5) < 0
+    volume.horizon = Horizon.SWING
+    assert _signal(volume, last_volume=5000, volume_mean=1000, return_1=0.01, relative_volume=4.0, price_volume_corr=0.5) > 0

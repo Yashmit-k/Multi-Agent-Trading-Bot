@@ -25,4 +25,6 @@ def test_compute_weights_defaults_and_filters(repository: CoreRepository) -> Non
     table, detail = compute_weights(repository, datetime(2026, 10, 20, tzinfo=timezone.utc), {"fundamental"})
     assert table[Horizon.SWING]["regime"] == 0.0 and table[Horizon.INTRADAY]["regime"] == 0.0
     assert table[Horizon.SWING]["fundamental"] == 0.0
-    assert table[Horizon.SWING]["technical"] == 0.5  # no graded signals yet: unproven
+    assert table[Horizon.SWING]["technical"] == 0.0  # backtest prior: no validated swing edge
+    assert table[Horizon.INTRADAY]["momentum"] == 0.575 and table[Horizon.INTRADAY]["technical"] == 0.0
+    assert table[Horizon.SWING]["news"] == 0.5  # not backtestable: unproven until the live scorecard says otherwise

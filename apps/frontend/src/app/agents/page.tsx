@@ -50,6 +50,7 @@ type Scorecard = { as_of: string; window_days: number; agents: ScoreRow[]; fusio
 
 const BASIS: Record<string, string> = {
   better_than_coin_flip: "proven better than a coin flip",
+  backtest_prior: "from the 2024-26 backtest (live record still short)",
   unproven: "unproven (current version)",
   worse_than_coin_flip: "proven worse: votes ignored",
   market_filter: "market filter, not a vote",

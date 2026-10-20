@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Mapping
 
-from contracts.enums import AgentName
+from contracts.enums import AgentName, Horizon
 
 from quant_agents.base import AgentDecision, BaseQuantAgent
 from quant_agents.feature_view import FeatureView
@@ -20,6 +20,7 @@ WEIGHTS = {
 # Thresholds on Feature Engine ratios. Graded votes keep one heavy day from reading as full confidence:
 # the scorer sets confidence to |weighted vote mean|, so a single vote could only ever be 0 or 1.
 SURGE = 2.0
+INTRADAY_SURGE = 3.0
 EXTREME = 3.0
 CONVICTION_CORR = 0.3
 
@@ -36,12 +37,19 @@ class VolumeAgent(BaseQuantAgent):
         ret = view.get("return_1")
         if last_volume is None or volume_mean is None or ret is None:
             return AgentDecision(votes=tuple(votes))
-        direction = 1 if ret > 0 else -1 if ret < 0 else 0
+        intraday = getattr(self, "horizon", None) is Horizon.INTRADAY
+        # INTRADAY (1.4.0, pre-registered tuning study): heavy-volume moves reverse within the hour, so the vote
+        # goes against the bar's direction and needs a 3x surge. Validated IC +0.005 on Jul-Dec 2025.
+        if intraday:
+            direction = -1 if ret > 0 else 1 if ret < 0 else 0
+        else:
+            direction = 1 if ret > 0 else -1 if ret < 0 else 0
         heavy = last_volume > volume_mean
         votes.append(Vote("volume_price", direction if heavy else 0, WEIGHTS["volume_price"]))
         relative = view.get("relative_volume")
         if relative is not None:
-            votes.append(Vote("volume_surge", direction if relative > SURGE else 0, WEIGHTS["volume_surge"]))
+            surge = INTRADAY_SURGE if intraday else SURGE
+            votes.append(Vote("volume_surge", direction if relative > surge else 0, WEIGHTS["volume_surge"]))
             votes.append(Vote("volume_extreme", direction if relative > EXTREME else 0, WEIGHTS["volume_extreme"]))
         correlation = view.get("price_volume_corr")
         if correlation is not None:

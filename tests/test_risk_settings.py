@@ -92,18 +92,25 @@ def test_intraday_entries_when_enabled(repository: CoreRepository) -> None:
     assert "INTRADAY" in _horizons(repository)
 
 
-def test_market_filter_blocks_agent_buys_when_risk_off(repository: CoreRepository) -> None:
+def test_market_filter_does_not_block_swing_buys(repository: CoreRepository) -> None:
+    """The tuning study found swing risk-off days were followed by the best next-day returns."""
     from contracts.enums import AgentName, Horizon
 
     _ready(repository)
     risk_off = _signal(signal_id="sig-regime", symbol="TCS", agent_name=AgentName.REGIME, signal=-1.0, confidence=1.0, timestamp=DECISION, valid_until=DECISION + timedelta(days=2))
-    risk_off = risk_off.model_copy(update={"metadata": {**risk_off.metadata, "votes": [{"name": "risk_tilt", "value": -1, "weight": 1.0}, {"name": "index_trend", "value": -1, "weight": 1.0}, {"name": "fear_gauge", "value": -1, "weight": 1.0}]}})
+    risk_off = risk_off.model_copy(update={"metadata": {**risk_off.metadata, "votes": [{"name": "index_trend", "value": -1, "weight": 1.0}, {"name": "fear_gauge", "value": -1, "weight": 1.0}]}})
     _store(repository, risk_off)
+    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION, enforce_entry_window=False)
+    assert [o for o in repository.list_orders() if o.symbol == "TCS"]  # swing buy still placed
+
+
+def test_market_risk_off_reads_the_regime_votes(repository: CoreRepository) -> None:
+    from contracts.enums import AgentName, Horizon
     from core_paper.cycle import market_risk_off
 
-    assert market_risk_off(repository, "TCS", Horizon.SWING, DECISION)
-    run_paper_cycle(repository, _sink(), mode=TradingMode.PAPER, starting_cash=CASH, now=DECISION, enforce_entry_window=False, weights={Horizon.SWING: {"regime": 0.0}})
-    tcs = [p for p in repository.list_proposals() if p.symbol == "TCS"]
-    decisions = [repository.risk_for_proposal(p.proposal_id) for p in tcs]
-    assert decisions and all(d is not None and d.status.value == "REJECTED" and "risk-off" in (d.rejection_reason or "") for d in decisions)
-    assert not [o for o in repository.list_orders() if o.symbol == "TCS"]
+    _ready(repository)
+    regime = _signal(signal_id="sig-regime-i", symbol="TCS", agent_name=AgentName.REGIME, horizon=Horizon.INTRADAY, signal=-1.0, confidence=1.0, timestamp=DECISION, valid_until=DECISION + timedelta(hours=2))
+    regime = regime.model_copy(update={"metadata": {**regime.metadata, "votes": [{"name": "index_trend", "value": -1, "weight": 1.0}, {"name": "fear_gauge", "value": -1, "weight": 1.0}]}})
+    _store(repository, regime)
+    assert market_risk_off(repository, "TCS", Horizon.INTRADAY, DECISION)
+    assert not market_risk_off(repository, "TCS", Horizon.SWING, DECISION)  # no swing regime signal: fails open

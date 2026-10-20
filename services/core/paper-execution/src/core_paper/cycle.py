@@ -174,7 +174,8 @@ def run_paper_cycle(
                     timestamp=as_of,
                     max_notional=settings.max_order_notional,
                     portfolio=portfolio_context(repository, starting_cash, moment, settings) if portfolio_limits else None,
-                    market_ok=None if proposal.side != Side.BUY else not market_risk_off(repository, instrument.symbol, horizon, as_of),
+                    # Intraday only: on swing, risk-off days were followed by the best next-day returns (tuning study).
+                    market_ok=None if proposal.side != Side.BUY or horizon != Horizon.INTRADAY else not market_risk_off(repository, instrument.symbol, horizon, as_of),
                 )
                 if repository.insert_risk_decision(decision):
                     event_type = EventType.RISK_APPROVED if decision.status == RiskStatus.APPROVED else EventType.RISK_REJECTED
