@@ -180,3 +180,24 @@ def test_a_weighted_opinion_from_fallback_heuristics_must_be_rechecked_first(mon
     assert body["verdict"] == "APPROVE"
     assert any(step.get("kind") == "critique" and "fallback" in step["summary"] for step in core.steps)
     assert intel.reassessed
+
+
+def test_reassess_endpoint_accepts_a_json_body(monkeypatch) -> None:
+    from fastapi.testclient import TestClient
+
+    from contracts.enums import TradingMode
+    from intelligence_agents.service import create_app
+    from intelligence_agents.settings import IntelligenceSettings
+
+    settings = IntelligenceSettings.from_env()
+    settings = type(settings)(**{**{f: getattr(settings, f) for f in settings.__dataclass_fields__}, "trading_mode": TradingMode.PAPER, "internal_signal_token": "t", "symbols": ("INFY",)})
+
+    class Sink:
+        def submit(self, signal):
+            raise AssertionError("not reached")
+
+    client = TestClient(create_app(settings, sink=Sink()))
+    body = {"agent": "news", "symbol": "INFY", "request_id": "r", "review_id": "v"}
+    assert client.post("/reassess", json=body).status_code == 401
+    assert client.post("/reassess", json={**body, "agent": "astrology"}, headers={"Authorization": "Bearer t"}).status_code == 422
+    assert client.post("/reassess", json={**body, "symbol": "NOPE"}, headers={"Authorization": "Bearer t"}).json()["detail"] == "unknown_symbol"

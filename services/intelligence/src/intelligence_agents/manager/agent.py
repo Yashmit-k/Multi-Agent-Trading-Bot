@@ -153,7 +153,7 @@ class PortfolioManager:
                 steps.log("replan", summary="Turn budget nearly spent: asking for a verdict now with the evidence gathered.")
             turn = self._complete(model, messages, steps, tool_choice=choice)
             messages.append(turn.message)
-            if turn.text:
+            if sum(char.isalpha() for char in turn.text) >= 12:
                 steps.log("plan", summary=turn.text, metadata={"model": model.model})
             if not turn.tool_calls:
                 messages.append({"role": "user", "content": "Continue: call a tool, or call submit_verdict if you are done."})

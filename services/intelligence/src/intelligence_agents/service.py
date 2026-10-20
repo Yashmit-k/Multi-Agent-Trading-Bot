@@ -20,6 +20,14 @@ from intelligence_agents.sink.http import HttpSignalSink
 logger = logging.getLogger(__name__)
 
 
+class ReassessBody(BaseModel):
+    agent: str
+    symbol: str
+    horizon: str = "SWING"
+    request_id: str
+    review_id: str
+
+
 def _require_live_sink(settings: IntelligenceSettings, sink: object | None) -> object:
     if settings.trading_mode not in LIVE_MODES:
         return sink
@@ -84,13 +92,6 @@ def create_app(settings: IntelligenceSettings | None = None, *, sink: object | N
     def fundamental_rows(symbol: str, as_of: str | None = None) -> list[dict[str, object]]:
         moment = datetime.now(timezone.utc) if as_of is None else datetime.fromisoformat(as_of)
         return [item.model_dump(mode="json") for item in fund_store.points_for(symbol, moment)]
-
-    class ReassessBody(BaseModel):
-        agent: str
-        symbol: str
-        horizon: str = "SWING"
-        request_id: str
-        review_id: str
 
     @app.post("/reassess")
     def reassess(body: ReassessBody, authorization: str | None = Header(default=None)) -> dict[str, object]:
