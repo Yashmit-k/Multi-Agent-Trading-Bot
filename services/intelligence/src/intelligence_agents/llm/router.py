@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 from typing import Protocol
 from urllib.parse import urlparse
 
@@ -19,6 +20,52 @@ class LLMProvider(Protocol):
     model: str
 
     def complete(self, request: LLMRequest, *, tier: str) -> LLMAssessment: ...
+
+
+class ModelChain:
+    """Several real models tried in order. A model out of quota is skipped for QUOTA_PAUSE, then retried.
+
+    Free tiers give each model its own daily quota, so a chain keeps real LLM answers flowing after the first
+    model is used up. The answer records the model that actually produced it.
+    """
+
+    QUOTA_PAUSE = timedelta(hours=1)
+
+    def __init__(self, providers: list[LLMProvider], *, clock=None) -> None:
+        self._providers = providers
+        self._paused: dict[str, datetime] = {}
+        self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self.model = providers[0].model
+        self.last_generation: str | None = None
+        self.last_failure_type: str | None = None
+        self.quota_exhausted = False
+
+    def complete(self, request: LLMRequest, *, tier: str) -> LLMAssessment:
+        now = self._clock()
+        last: Exception | None = None
+        for provider in self._providers:
+            until = self._paused.get(provider.model)
+            if until is not None and now < until:
+                continue
+            try:
+                result = provider.complete(request, tier=tier)
+                self.last_generation = "success"
+                self.quota_exhausted = False
+                return result
+            except Exception as exc:
+                last = exc
+                failure = str(getattr(exc, "failure_type", type(exc).__name__))
+                self.last_failure_type = failure
+                if failure == "quota_exhaustion":
+                    self._paused[provider.model] = now + self.QUOTA_PAUSE
+                    logger.warning("llm_model_paused", extra={"model": provider.model, "minutes": int(self.QUOTA_PAUSE.total_seconds() // 60)})
+        self.last_generation = "failure"
+        self.quota_exhausted = all(self._paused.get(p.model, now) > now for p in self._providers)
+        if last is None:
+            from intelligence_agents.errors import LLMProviderError
+
+            last = LLMProviderError("quota_exhaustion", "every model in the chain is paused")
+        raise last
 
 
 class FallbackProvider:
@@ -101,9 +148,10 @@ class LLMRouter:
                     self._tracker.record(assessment.prompt_tokens, assessment.completion_tokens)
                 except Exception:
                     logger.warning("llm_tier2_failed")
-        # A fixture fallback is never cached, so the next cycle retries the real model.
+        # A fixture fallback is never cached, so the next cycle retries the real model. The key is the router's
+        # model name, not the model that answered, so an answer from a backup model in the chain is found again.
         if self._use_cache and not assessment.fallback:
-            self._cache.put(request.content_hash, assessment.model, assessment)
+            self._cache.put(request.content_hash, model, assessment)
         return assessment
 
     def health_snapshot(self) -> dict[str, object]:
@@ -148,6 +196,7 @@ def build_router(
     json_mode: bool = False,
     reasoning_effort: str = "",
     cache: LLMCache | None = None,
+    fallback_models: tuple[str, ...] = (),
 ) -> LLMRouter:
     fixture = FixtureLLMProvider()
     tracker = CostTracker(daily_budget_usd=daily_budget_usd)
@@ -177,8 +226,13 @@ def build_router(
     name = provider_name_from_url(base_url)
     host = urlparse(base_url).hostname or ""
     logger.info("llm_router", extra={"llm_mode": "openai", "llm_host": host, "model": tier1_model, "provider": name})
-    tier1 = OpenAICompatibleProvider(base_url, api_key, tier1_model or "tier1", timeout=timeout, **kwargs)
-    tier2 = OpenAICompatibleProvider(base_url, api_key, tier2_model or "tier2", timeout=timeout, **kwargs)
+    def chain(first: str) -> LLMProvider:
+        names = [first, *(name for name in fallback_models if name and name != first)]
+        providers = [OpenAICompatibleProvider(base_url, api_key, name, timeout=timeout, **kwargs) for name in names]
+        return providers[0] if len(providers) == 1 else ModelChain(providers)
+
+    tier1 = chain(tier1_model or "tier1")
+    tier2 = chain(tier2_model or "tier2")
     return LLMRouter(
         FallbackProvider(tier1, fixture),
         FallbackProvider(tier2, fixture),

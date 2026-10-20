@@ -121,6 +121,8 @@ services:
       LLM_REASONING_EFFORT: ${LLM_REASONING_EFFORT:-low}
       # A re-check requested by the portfolio manager uses a second model with its own quota.
       LLM_REASSESS_MODEL: ${LLM_REASSESS_MODEL:-gemini-3-flash-preview}
+      # Tried in order when the main model fails or its free daily quota is used up (each model has its own).
+      LLM_FALLBACK_MODELS: ${LLM_FALLBACK_MODELS:-gemini-3.6-flash,gemini-3-flash-preview}
     depends_on:
       core-api:
         condition: service_healthy

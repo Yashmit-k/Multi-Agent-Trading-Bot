@@ -93,6 +93,7 @@ def make_router(settings: IntelligenceSettings, *, tier1_model: str | None = Non
         json_mode=settings.llm_json_mode,
         reasoning_effort=settings.llm_reasoning_effort,
         cache=LLMCache(settings.sqlite_path if persistent else None),
+        fallback_models=settings.llm_fallback_models,
     )
 
 

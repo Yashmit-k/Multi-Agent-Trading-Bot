@@ -44,6 +44,8 @@ class IntelligenceSettings:
     core_api_token: str = ""
     # Model for a re-check the portfolio manager asks for (a second, independent look). Empty: tier 2.
     llm_reassess_model: str = ""
+    # Backup models tried in order when the main one fails or is out of quota (each has its own free quota).
+    llm_fallback_models: tuple[str, ...] = ()
 
     @classmethod
     def from_env(cls) -> IntelligenceSettings:
@@ -81,6 +83,7 @@ class IntelligenceSettings:
             llm_reasoning_effort=os.environ.get("LLM_REASONING_EFFORT", "").strip().lower(),
             core_api_token=os.environ.get("CORE_API_TOKEN", ""),
             llm_reassess_model=os.environ.get("LLM_REASSESS_MODEL", "").strip(),
+            llm_fallback_models=tuple(item.strip() for item in os.environ.get("LLM_FALLBACK_MODELS", "").split(",") if item.strip()),
         )
         settings.validate()
         return settings

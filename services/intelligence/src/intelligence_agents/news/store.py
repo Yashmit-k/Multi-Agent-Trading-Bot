@@ -82,7 +82,8 @@ class SqliteNewsStore:
 
     def record_empty_symbol_drop(self, title: str = "") -> None:
         self._dropped_empty_symbols += 1
-        logger.warning(
+        # Most market headlines name no NIFTY 50 company; that is expected, so this is debug, not a warning.
+        logger.debug(
             "articles_dropped_empty_symbols",
             extra={"count": self._dropped_empty_symbols, "title": title[:80]},
         )
@@ -162,7 +163,8 @@ class MemoryNewsStore:
 
     def record_empty_symbol_drop(self, title: str = "") -> None:
         self.dropped_empty_symbols += 1
-        logger.warning(
+        # Most market headlines name no NIFTY 50 company; that is expected, so this is debug, not a warning.
+        logger.debug(
             "articles_dropped_empty_symbols",
             extra={"count": self.dropped_empty_symbols, "title": title[:80]},
         )
