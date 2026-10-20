@@ -26,6 +26,24 @@ JSON_EXAMPLE = (
 )
 
 
+def rate_limit_error(body: str) -> LLMProviderError:
+    """Gemini names the limit it hit (quotaId) and how long to wait (retryDelay). A daily limit is quota
+    exhaustion; a per-minute limit is only a rate limit, so the model is paused for seconds, not hours."""
+    import re
+
+    delay = re.search(r'"retryDelay"\s*:\s*"([0-9.]+)s"', body)
+    retry_after = float(delay.group(1)) if delay else None
+    ids = re.findall(r'"quotaId"\s*:\s*"([A-Za-z-]+)"', body)
+    if any("PerDay" in item for item in ids):
+        return LLMProviderError("quota_exhaustion", "http_429_daily", retry_after=retry_after)
+    if ids:
+        return LLMProviderError("http_429", "http_429_rate", retry_after=retry_after)
+    lowered = body[:300].lower()
+    if "quota" in lowered or "exceeded" in lowered:
+        return LLMProviderError("quota_exhaustion", "http_429", retry_after=retry_after)
+    return LLMProviderError("http_429", "http_429", retry_after=retry_after)
+
+
 class OpenAICompatibleProvider:
     def __init__(
         self,
@@ -135,7 +153,8 @@ class OpenAICompatibleProvider:
                     "llm_provider_failed",
                     extra={"attempt": attempt, "model": self.model, "failure_type": exc.failure_type},
                 )
-                if exc.failure_type in {"http_429", "http_5xx"} and attempt < self._retries:
+                waits_longer = exc.retry_after is not None and exc.retry_after > delay
+                if exc.failure_type in {"http_429", "http_5xx"} and attempt < self._retries and not waits_longer:
                     self._sleep(delay)
                     delay *= 2
                     continue
@@ -240,10 +259,7 @@ class OpenAICompatibleProvider:
         if status == 200:
             return
         if status == 429:
-            body = (response.text or "")[:200].lower()
-            if "quota" in body or "exceeded" in body:
-                raise LLMProviderError("quota_exhaustion", "http_429")
-            raise LLMProviderError("http_429", "http_429")
+            raise rate_limit_error(response.text or "")
         if status >= 500:
             raise LLMProviderError("http_5xx", f"http_{status}")
         response.raise_for_status()

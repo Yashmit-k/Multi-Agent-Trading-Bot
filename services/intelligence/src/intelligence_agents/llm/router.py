@@ -40,6 +40,15 @@ class ModelChain:
         self.last_failure_type: str | None = None
         self.quota_exhausted = False
 
+    def _pause_for(self, failure: str, retry_after: float | None) -> timedelta | None:
+        """How long to skip a model: the provider's own retry delay when given, else an hour for a used-up
+        daily quota and a minute for a rate limit. Other failures (timeouts, 5xx) are not paused."""
+        if failure not in {"quota_exhaustion", "http_429"}:
+            return None
+        if retry_after is not None:
+            return timedelta(seconds=min(max(retry_after, 5.0), 24 * 3600))
+        return self.QUOTA_PAUSE if failure == "quota_exhaustion" else timedelta(minutes=1)
+
     def complete(self, request: LLMRequest, *, tier: str) -> LLMAssessment:
         now = self._clock()
         last: Exception | None = None
@@ -56,9 +65,10 @@ class ModelChain:
                 last = exc
                 failure = str(getattr(exc, "failure_type", type(exc).__name__))
                 self.last_failure_type = failure
-                if failure == "quota_exhaustion":
-                    self._paused[provider.model] = now + self.QUOTA_PAUSE
-                    logger.warning("llm_model_paused", extra={"model": provider.model, "minutes": int(self.QUOTA_PAUSE.total_seconds() // 60)})
+                pause = self._pause_for(failure, getattr(exc, "retry_after", None))
+                if pause is not None:
+                    self._paused[provider.model] = now + pause
+                    logger.warning("llm_model_paused", extra={"model": provider.model, "failure_type": failure, "seconds": int(pause.total_seconds())})
         self.last_generation = "failure"
         self.quota_exhausted = all(self._paused.get(p.model, now) > now for p in self._providers)
         if last is None:
