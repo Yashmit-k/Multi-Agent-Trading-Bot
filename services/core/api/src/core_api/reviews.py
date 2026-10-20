@@ -57,8 +57,10 @@ def _short_metadata(metadata: dict) -> dict:
     return out
 
 
-def _used_fallback(metadata: dict) -> bool | None:
+def _used_fallback(metadata: dict, reason_codes: list[str] | None = None) -> bool | None:
     """True when an LLM agent's opinion came from the fixture heuristic instead of the model; None for rule agents."""
+    if "fixture.heuristic" in (reason_codes or []):
+        return True
     llm = metadata.get("llm")
     if not isinstance(llm, list) or not llm:
         return None
@@ -81,7 +83,7 @@ def tool_opinions(repository: CoreRepository, symbol: str, horizon: Horizon, now
                 "fusion_weight": weights.get(item.agent_name.value),
                 "age_minutes": round((now - item.timestamp.astimezone(timezone.utc)).total_seconds() / 60, 1),
                 "reason_codes": item.reason_codes[:5],
-                "llm_fallback": _used_fallback(item.metadata),
+                "llm_fallback": _used_fallback(item.metadata, item.reason_codes),
                 "details": _short_metadata(item.metadata),
             }
         )
