@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import numpy as np
 
-from core_api.strategy_lab import Bars
+from core_paper.strategy_engine import Bars
 from core_api.watchlist import CHECKS, build_watchlist
 
 UTC = timezone.utc
@@ -13,7 +13,8 @@ UTC = timezone.utc
 def _bars(closes: np.ndarray) -> Bars:
     ends = [datetime(2024, 1, 1, 10, 0, tzinfo=UTC) + timedelta(days=i) for i in range(len(closes))]
     volume = np.linspace(1000, 2000, len(closes))
-    return Bars(ends, closes.copy(), closes * 1.005, closes * 0.995, closes, volume)
+    starts = [moment - timedelta(hours=6, minutes=15) for moment in ends]
+    return Bars(starts, ends, closes.copy(), closes * 1.005, closes * 0.995, closes, volume)
 
 
 def test_uptrend_beats_downtrend_and_history_exists() -> None:

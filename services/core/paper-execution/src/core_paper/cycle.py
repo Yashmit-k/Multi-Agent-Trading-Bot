@@ -96,6 +96,7 @@ def run_paper_cycle(
     costs = paper_schedule(schedule)
     _settle_open_orders(repository, publisher, costs, starting_cash, now=moment)
     _monitor_brackets(repository, publisher, costs, starting_cash, mode)
+    _manage_strategy_exits(repository, publisher, costs, starting_cash, mode, moment)
     _settle_open_orders(repository, publisher, costs, starting_cash, now=moment)
     if repository.kill_switch_armed():
         _queue_flattens(repository, publisher, costs, starting_cash, mode)
@@ -118,6 +119,7 @@ def run_paper_cycle(
         return written
     created_orders = 0
     capped = False
+    applied = _applied_strategy(repository)
     extension = paper_test_entry_window(moment) if allow_test_extension and mode == TradingMode.PAPER else None
     for instrument in repository.list_instruments():
         if capped:
@@ -148,6 +150,10 @@ def run_paper_cycle(
                     continue
                 if proposal.side == Side.BUY and held > 0:
                     continue  # one position per stock: no adding to an existing holding
+                if proposal.side == Side.BUY and applied:
+                    continue  # an applied Strategy-lab strategy replaces agent entries
+                if proposal.side == Side.SELL and applied and _is_strategy_position(repository, instrument.symbol):
+                    continue  # the strategy manages its own exits
                 if proposal.side == Side.BUY and horizon == Horizon.INTRADAY and not settings.intraday_auto_entries:
                     continue  # intraday entries are off (Settings); intraday exits of holdings still run
                 if proposal.side == Side.SELL:
@@ -189,6 +195,13 @@ def run_paper_cycle(
             for order in queued:
                 event_type = _order_event(order)
                 _publish(publisher, event_type, f"{event_type.value}:{order.order_id}", as_of, proposal.proposal_id, order)
+    if applied and not capped:
+        from core_paper.strategy_live import strategy_entries
+
+        try:
+            strategy_entries(repository, publisher, starting_cash=starting_cash, moment=moment, settings=settings, mode=mode)
+        except Exception:
+            logger.exception("strategy_entries_failed")
     if capped:
         logger.info("new_order_cap cap=%s created=%s", max_new_orders, created_orders)
     _settle_open_orders(repository, publisher, costs, starting_cash, now=moment)
@@ -400,6 +413,8 @@ def _monitor_brackets(repository, publisher, schedule, starting_cash, mode: Trad
     for position in repository.list_positions():
         if position.quantity <= 0:
             continue
+        if _is_strategy_position(repository, position.symbol):
+            continue  # managed by core_paper.strategy_live (targets, breakeven, trailing, time exits)
         entry = _entry_execution(repository, position.symbol)
         if entry is None:
             continue
@@ -416,6 +431,27 @@ def _monitor_brackets(repository, publisher, schedule, starting_cash, mode: Trad
             continue
         price = stop if reason == "stop" else target
         _exit_proposal(repository, publisher, position, price, bar.end, reason, schedule, starting_cash, mode, fill_at="level")
+
+
+def _applied_strategy(repository: CoreRepository) -> bool:
+    from core_paper.strategy_live import active_strategy
+
+    return active_strategy(repository) is not None
+
+
+def _is_strategy_position(repository: CoreRepository, symbol: str) -> bool:
+    from core_paper.strategy_live import is_strategy_position
+
+    return is_strategy_position(repository, symbol)
+
+
+def _manage_strategy_exits(repository, publisher, schedule, starting_cash, mode: TradingMode, moment: datetime) -> None:
+    from core_paper.strategy_live import manage_strategy_positions
+
+    try:
+        manage_strategy_positions(repository, publisher, schedule, starting_cash, mode, moment)
+    except Exception:
+        logger.exception("strategy_exits_failed")
 
 
 def _queue_flattens(repository, publisher, schedule, starting_cash, mode: TradingMode) -> None:

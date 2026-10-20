@@ -21,7 +21,7 @@ export function LabResults({ result }: { result: LabResult }) {
         <Stat label="Net P&L" value={rupees(m.net_pnl)} tone={m.net_pnl >= 0 ? "up" : "down"} hint={`after ${rupees(m.charges)} charges`} />
         <Stat label="Total return" value={pct(m.total_return)} tone={m.total_return >= 0 ? "up" : "down"} hint={result.benchmark ? `NIFTY 50 ${pct(result.benchmark.total_return)}` : undefined} />
         <Stat label="Max drawdown" value={pct(-m.max_drawdown)} tone="down" hint={`Sharpe ${m.sharpe === null ? "n/a" : m.sharpe.toFixed(2)}`} />
-        <Stat label="Trades" value={m.trades} hint={`win rate ${pct(m.win_rate)} · PF ${m.profit_factor === null ? "n/a" : m.profit_factor.toFixed(2)}`} />
+        <Stat label="Trades" value={m.trades} hint={`win rate ${pct(m.win_rate)} · PF ${m.profit_factor === null ? "n/a" : m.profit_factor.toFixed(2)}${m.expectancy_r === null || m.expectancy_r === undefined ? "" : ` · ${m.expectancy_r.toFixed(2)}R/trade`}`} />
       </div>
       <Card title="Equity vs NIFTY 50 buy-and-hold">
         <LabChart strategy={result.equity_curve} benchmark={result.benchmark?.curve ?? null} />
@@ -67,16 +67,19 @@ export function LabResults({ result }: { result: LabResult }) {
         </Card>
       </div>
       <Card title={`Trades (newest first${result.trades_listed_limit && m.trades > result.trades_listed_limit ? `, last ${result.trades_listed_limit} listed` : ""})`}>
-        <Table head={["Symbol", "Entry (IST)", "Exit (IST)", "Qty", "Entry ₹", "Exit ₹", "Exit reason", "Charges", "Net P&L"]} minWidth={860}>
+        <Table head={["Symbol", "Side", "Entry (IST)", "Exit (IST)", "Qty", "Entry ₹", "Avg exit ₹", "Exits", "Charges", "Net P&L"]} minWidth={940}>
           {trades.slice(0, shown).map((trade, index) => (
             <tr key={`${trade.symbol}-${trade.entry_at}-${index}`}>
               <Td>{trade.symbol}</Td>
+              <Td className={`text-xs ${trade.direction === "short" ? "text-[#EF4444]" : "text-[#22C55E]"}`}>{trade.direction === "short" ? "SHORT" : "LONG"}</Td>
               <Td className="whitespace-nowrap text-xs">{ist(trade.entry_at)}</Td>
               <Td className="whitespace-nowrap text-xs">{ist(trade.exit_at)}</Td>
               <Td className="tabular-nums">{trade.quantity}</Td>
               <Td className="tabular-nums">{trade.entry_price.toFixed(2)}</Td>
               <Td className="tabular-nums">{trade.exit_price.toFixed(2)}</Td>
-              <Td className="text-xs text-[#94A3B8]">{trade.reason.replaceAll("_", " ")}</Td>
+              <Td className="text-xs text-[#94A3B8]">
+                {trade.legs && trade.legs.length > 1 ? trade.legs.map((leg) => `${leg.quantity}@${leg.price.toFixed(1)} ${leg.reason.replaceAll("_", " ")}`).join(", ") : trade.reason.replaceAll("_", " ")}
+              </Td>
               <Td className="tabular-nums text-xs">{trade.charges.toFixed(2)}</Td>
               <Td className={`tabular-nums ${trade.net_pnl >= 0 ? "text-[#22C55E]" : "text-[#EF4444]"}`}>{rupees(trade.net_pnl)}</Td>
             </tr>

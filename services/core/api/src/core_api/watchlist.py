@@ -14,7 +14,7 @@ from typing import Callable
 
 import numpy as np
 
-from core_api.strategy_lab import IST, Bars, Operand, _atr, _ema, _rsi, _sma, indicator
+from core_paper.strategy_engine import IST, Bars, _atr, _ema, _rsi, _sma, raw_indicator
 
 CHECKS: list[tuple[str, str]] = [
     ("trend_200", "Close above its 200-day SMA (long-term uptrend)"),
@@ -50,7 +50,7 @@ def _series(bars: Bars) -> dict[str, np.ndarray]:
         "signal": signal,
         "vol5": _sma(bars.volume.astype(float), 5),
         "vol20": _sma(bars.volume.astype(float), 20),
-        "high60": indicator(bars, Operand(indicator="highest", period=60), {}),
+        "high60": raw_indicator(bars, "highest", 60, None, None, False, {}),
         "atr_pct": _atr(bars, 14) / close * 100,
         "ret20": ret20,
     }

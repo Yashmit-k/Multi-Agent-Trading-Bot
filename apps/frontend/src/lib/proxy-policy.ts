@@ -26,7 +26,8 @@ const OPERATOR_WRITES: RegExp[] = [
   /^\/api\/v1\/paper\/orders\/[\w:.-]+\/cancel$/,
   /^\/api\/v1\/paper\/positions\/[\w&.-]+\/close$/,
   /^\/api\/v1\/strategies$/,
-  /^\/api\/v1\/strategies\/[\w-]+\/(backtest|delete)$/,
+  /^\/api\/v1\/strategies\/[\w-]+\/(backtest|delete|apply)$/,
+  /^\/api\/v1\/strategies\/active\/stop$/,
   /^\/api\/v1\/risk\/kill-switch$/,
 ];
 

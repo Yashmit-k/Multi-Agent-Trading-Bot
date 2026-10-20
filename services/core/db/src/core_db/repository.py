@@ -487,16 +487,16 @@ class CoreRepository:
                 out.setdefault(symbol, []).append((as_utc(end), float(close)))
         return out
 
-    def ohlcv(self, symbol: str, timeframe: Timeframe | str, start: datetime, end: datetime) -> list[tuple[datetime, float, float, float, float, float]]:
-        """(end, open, high, low, close, volume) for bars ending in [start, end], oldest first, without building Candles."""
+    def ohlcv(self, symbol: str, timeframe: Timeframe | str, start: datetime, end: datetime) -> list[tuple[datetime, datetime, float, float, float, float, float]]:
+        """(start, end, open, high, low, close, volume) for bars ending in [start, end], oldest first, without building Candles."""
         value = timeframe.value if isinstance(timeframe, Timeframe) else str(timeframe)
         with self._session_factory() as session:
             rows = session.execute(
-                select(CandleRow.end, CandleRow.open, CandleRow.high, CandleRow.low, CandleRow.close, CandleRow.volume)
+                select(CandleRow.start, CandleRow.end, CandleRow.open, CandleRow.high, CandleRow.low, CandleRow.close, CandleRow.volume)
                 .where(CandleRow.symbol == symbol, CandleRow.timeframe == value, CandleRow.end >= start, CandleRow.end <= end)
                 .order_by(CandleRow.end)
             )
-            return [(as_utc(e), float(o), float(h), float(l), float(c), float(v)) for e, o, h, l, c, v in rows]
+            return [(as_utc(b), as_utc(e), float(o), float(h), float(l), float(c), float(v)) for b, e, o, h, l, c, v in rows]
 
     def proposal_support_since(self, start: datetime) -> list[tuple[list[str], bool]]:
         """For each proposal since start: its supporting signal ids and whether risk approved it."""

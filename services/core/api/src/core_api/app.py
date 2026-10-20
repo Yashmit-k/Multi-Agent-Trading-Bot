@@ -692,14 +692,9 @@ def create_app(
     # --- strategy lab and watchlist -----------------------------------------------------------
 
     def _load_bars(symbol: str, timeframe: str, start: datetime, end: datetime):  # type: ignore[no-untyped-def]
-        from core_api.strategy_lab import Bars
-        import numpy as np
+        from core_paper.strategy_engine import bars_from_rows
 
-        rows = repository.ohlcv(symbol, timeframe, start, end)
-        if not rows:
-            return None
-        columns = list(zip(*rows))
-        return Bars(list(columns[0]), *(np.array(column, dtype=float) for column in columns[1:]))
+        return bars_from_rows(repository.ohlcv(symbol, timeframe, start, end))
 
     def _universe() -> list[str]:
         members = repository.members_at(datetime.now(timezone.utc))
@@ -729,9 +724,14 @@ def create_app(
 
     @app.get("/api/v1/strategies/catalog")
     def strategy_catalog(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
-        from core_api.strategy_lab import MAX_5M_DAYS, MAX_5M_SYMBOLS, TEMPLATES, operand_catalog
+        from core_api.strategy_lab import MAX_INTRADAY_DAYS, MAX_INTRADAY_SYMBOLS, TEMPLATES, operand_catalog
 
-        return {"operands": operand_catalog(), "templates": TEMPLATES, "universe": _universe(), "limits": {"max_5m_symbols": MAX_5M_SYMBOLS, "max_5m_days": MAX_5M_DAYS}}
+        return {
+            "operands": operand_catalog(),
+            "templates": TEMPLATES,
+            "universe": _universe(),
+            "limits": {"max_5m_symbols": MAX_INTRADAY_SYMBOLS, "max_5m_days": MAX_INTRADAY_DAYS, "max_intraday_symbols": MAX_INTRADAY_SYMBOLS, "max_intraday_days": MAX_INTRADAY_DAYS},
+        }
 
     @app.get("/api/v1/strategies")
     def list_user_strategies(_: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:
@@ -747,6 +747,67 @@ def create_app(
         strategy_id = body.strategy_id or f"strat-{uuid4().hex[:12]}"
         repository.save_strategy(strategy_id, definition.name, definition.model_dump(mode="json"), datetime.now(timezone.utc))
         return repository.get_strategy(strategy_id) or {}
+
+    # --- applying a strategy to paper trading (declared before the {strategy_id} routes) ---
+
+    def _active_view() -> dict[str, object]:
+        from core_paper.strategy_live import active_strategy
+
+        found = active_strategy(repository)
+        if found is None:
+            return {"active": None}
+        meta, definition = found
+        return {
+            "active": {
+                "strategy_id": meta["strategy_id"],
+                "name": definition.name,
+                "applied_at": meta.get("applied_at"),
+                "applied_by": meta.get("applied_by"),
+                "timeframe": definition.timeframe,
+                "symbols": definition.symbols,
+                "entry": definition.entry.label(),
+                "exit": definition.exit.label() if definition.exit else None,
+                "definition": definition.model_dump(mode="json"),
+            }
+        }
+
+    @app.get("/api/v1/strategies/active")
+    def get_active_strategy(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        return _active_view()
+
+    class ApplyBody(BaseModel):
+        confirm: bool = False
+        operator: str = "operator"
+
+    @app.post("/api/v1/strategies/active/stop")
+    def stop_active_strategy(body: ApplyBody, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        if not body.confirm:
+            raise HTTPException(status_code=422, detail="confirmation_required")
+        repository.save_setting("active_strategy", {"strategy_id": None, "stopped_at": datetime.now(timezone.utc).isoformat(), "stopped_by": body.operator[:64]}, updated_by=body.operator[:64] or "operator", now=datetime.now(timezone.utc))
+        return _active_view()
+
+    @app.post("/api/v1/strategies/{strategy_id}/apply")
+    def apply_strategy(strategy_id: str, body: ApplyBody, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        from core_paper.strategy_live import live_problems
+
+        if not body.confirm:
+            raise HTTPException(status_code=422, detail="confirmation_required")
+        found = repository.get_strategy(strategy_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail="strategy_not_found")
+        definition = _definition(found["definition"])
+        problems = live_problems(definition)
+        if problems:
+            raise HTTPException(status_code=422, detail={"errors": problems})
+        now = datetime.now(timezone.utc)
+        # A frozen copy: editing the saved strategy later does not change what is being traded.
+        repository.save_setting(
+            "active_strategy",
+            {"strategy_id": strategy_id, "definition": definition.model_dump(mode="json"), "applied_at": now.isoformat(), "applied_by": body.operator[:64] or "operator"},
+            updated_by=body.operator[:64] or "operator",
+            now=now,
+        )
+        return _active_view()
 
     @app.get("/api/v1/strategies/{strategy_id}")
     def get_user_strategy(strategy_id: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
@@ -789,21 +850,19 @@ def create_app(
 
     @app.get("/api/v1/strategies/{strategy_id}/scan")
     def scan_user_strategy(strategy_id: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
-        from core_api.strategy_lab import evaluate
+        from core_paper.strategy_live import latest_signal_bars
 
         found = repository.get_strategy(strategy_id)
         if found is None:
             raise HTTPException(status_code=404, detail="strategy_not_found")
         definition = _definition(found["definition"])
         now = datetime.now(timezone.utc)
-        lookback = timedelta(days=500) if definition.timeframe == "1d" else timedelta(days=10)
         symbols = _universe() if definition.symbols == ["ALL"] else definition.symbols
         hits = []
         for symbol in symbols:
-            bars = _load_bars(symbol, definition.timeframe, now - lookback, now)
-            if bars is None or len(bars.close) < 2:
-                continue
-            if evaluate(bars, definition.entry, mode="all")[-1]:
+            context, signal = latest_signal_bars(repository, definition, symbol, now)
+            if context is not None and signal:
+                bars = context.bars
                 hits.append({"symbol": symbol, "bar_end": bars.end[-1].isoformat(), "close": round(float(bars.close[-1]), 2)})
         return {"strategy_id": strategy_id, "as_of": now.isoformat(), "matches": hits, "scanned": len(symbols)}
 

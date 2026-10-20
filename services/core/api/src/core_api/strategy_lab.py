@@ -1,15 +1,19 @@
-"""Strategy lab: user-built rule strategies, backtested on stored NSE candles.
+"""Strategy lab backtester: user-built rule strategies on stored NSE candles.
 
-A strategy is plain JSON: entry conditions (all must hold), exit conditions (any), optional
-stop / target / maximum hold / 15:15 square-off, and position size. Conditions compare two
-operands, where each operand is an indicator (EMA, SMA, RSI, MACD, Bollinger, ATR, volume,
-return, highest, lowest, price) or a number.
+Definitions, indicators and rule evaluation live in core_paper.strategy_engine, so a strategy
+backtested here is evaluated exactly the same way when applied to live paper trading.
 
-Rules of the simulation:
-- no look-ahead: a condition is evaluated on a bar's close and acted on at the next bar's open;
-- one position per symbol, fixed rupee size per trade, whole shares;
-- Zerodha delivery (CNC) charges on both legs plus slippage on every fill;
-- a stop fills at min(open, stop), a target at max(open, target); if one bar touches both, the stop wins;
+Simulation rules:
+- no look-ahead: rules are evaluated at a bar's close; a market entry fills at the next bar's open, a
+  limit entry (price read at the signal bar) on the first later bar that trades through it;
+- one position per symbol; exits are checked bar by bar: the stop first (on the fill bar too, as the
+  path inside a bar is unknown), then targets (from the bar after the fill), then the trailing stop
+  (from the best price of earlier bars), the time limit, the 15:15 square-off and the exit rule
+  (which exits at the next bar's open);
+- after the first target the stop can move to breakeven; if that same bar also trades back to entry,
+  the rest exits at breakeven;
+- Zerodha charges on every leg: delivery (CNC), or intraday (MIS) for square-off strategies; plus
+  slippage on every fill;
 - portfolio pass: trades are taken in entry order while a position slot and the cash are free.
 Results are in-sample: a rule tuned on this data will look better here than it will trade.
 """
@@ -17,86 +21,39 @@ Results are in-sample: a rule tuned on this data will look better here than it w
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
-from typing import Literal
-from zoneinfo import ZoneInfo
 
 import numpy as np
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, model_validator
 
-IST = ZoneInfo("Asia/Kolkata")
+from core_paper.strategy_engine import (  # noqa: F401 - re-exported for the API and watchlist
+    CATALOG,
+    INTRADAY,
+    IST,
+    Bars,
+    Condition,
+    Context,
+    Group,
+    Operand,
+    StrategyDefinition,
+    catalog,
+    context_for,
+    evaluate,
+    operand_values,
+    raw_indicator,
+    resample,
+    stop_price,
+    target_prices,
+)
+
 SQUARE_OFF = time(15, 15)
-MAX_5M_SYMBOLS = 10
-MAX_5M_DAYS = 400
+MAX_INTRADAY_SYMBOLS = 10
+MAX_INTRADAY_DAYS = 400
 MAX_TRADES_LISTED = 1500
-
-Indicator = Literal[
-    "close", "open", "high", "low", "volume",
-    "sma", "ema", "rsi", "macd", "macd_signal", "macd_hist",
-    "bb_upper", "bb_lower", "atr", "atr_pct", "volume_sma", "return_pct", "highest", "lowest",
-]
-NEEDS_PERIOD = {"sma", "ema", "rsi", "bb_upper", "bb_lower", "atr", "atr_pct", "volume_sma", "return_pct", "highest", "lowest"}
-LABELS = {
-    "close": "Close", "open": "Open", "high": "High", "low": "Low", "volume": "Volume",
-    "sma": "SMA", "ema": "EMA", "rsi": "RSI", "macd": "MACD line (12, 26)", "macd_signal": "MACD signal (9)",
-    "macd_hist": "MACD histogram", "bb_upper": "Bollinger upper (2σ)", "bb_lower": "Bollinger lower (2σ)",
-    "atr": "ATR", "atr_pct": "ATR % of close", "volume_sma": "Average volume", "return_pct": "Return % over N bars",
-    "highest": "Highest high of previous N bars", "lowest": "Lowest low of previous N bars",
-}
-
-
-class Operand(BaseModel):
-    indicator: Indicator | None = None
-    period: int | None = Field(default=None, ge=1, le=400)
-    value: float | None = None
-
-    @model_validator(mode="after")
-    def _one_kind(self) -> "Operand":
-        if (self.indicator is None) == (self.value is None):
-            raise ValueError("an operand is either an indicator or a number")
-        if self.indicator in NEEDS_PERIOD and self.period is None:
-            raise ValueError(f"{self.indicator} needs a period")
-        return self
-
-    def label(self) -> str:
-        if self.value is not None:
-            return f"{self.value:g}"
-        name = LABELS[self.indicator or "close"]
-        return f"{name}({self.period})" if self.indicator in NEEDS_PERIOD else name
-
-
-class Condition(BaseModel):
-    left: Operand
-    op: Literal[">", "<", ">=", "<=", "crosses_above", "crosses_below"]
-    right: Operand
-
-    def label(self) -> str:
-        words = {"crosses_above": "crosses above", "crosses_below": "crosses below"}
-        return f"{self.left.label()} {words.get(self.op, self.op)} {self.right.label()}"
-
-
-class StrategyDefinition(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
-    description: str = Field(default="", max_length=1000)
-    timeframe: Literal["1d", "5m"] = "1d"
-    symbols: list[str] = Field(default_factory=lambda: ["ALL"], min_length=1, max_length=60)
-    entry: list[Condition] = Field(min_length=1, max_length=8)
-    exit: list[Condition] = Field(default_factory=list, max_length=8)
-    stop_loss_pct: float | None = Field(default=2.0, gt=0, le=50)
-    take_profit_pct: float | None = Field(default=4.0, gt=0, le=200)
-    max_hold_bars: int | None = Field(default=None, ge=1, le=5000)
-    square_off_intraday: bool = False
-    position_notional: float = Field(default=20000, ge=1000, le=100000)
-    max_open_positions: int = Field(default=10, ge=1, le=50)
-    initial_cash: float = Field(default=500000, ge=10000, le=100_000_000)
-    slippage_bps: float = Field(default=5, ge=0, le=100)
-
-    @field_validator("symbols")
-    @classmethod
-    def _upper(cls, value: list[str]) -> list[str]:
-        return sorted({item.strip().upper() for item in value if item.strip()})
+# Kept for older callers.
+MAX_5M_SYMBOLS, MAX_5M_DAYS = MAX_INTRADAY_SYMBOLS, MAX_INTRADAY_DAYS
 
 
 class BacktestRequest(BaseModel):
@@ -110,225 +67,253 @@ class BacktestRequest(BaseModel):
         return self
 
 
-# --- indicators -----------------------------------------------------------------------------------
+# --- charges --------------------------------------------------------------------------------------
 
 
-@dataclass
-class Bars:
-    end: list[datetime]
-    open: np.ndarray
-    high: np.ndarray
-    low: np.ndarray
-    close: np.ndarray
-    volume: np.ndarray
+def leg_charges(buy_notional: float, sell_notional: float, product: str) -> float:
+    """Zerodha equity charges for buying `buy_notional` and selling `sell_notional` (one round trip or part of one)."""
+    from core_paper.charges import ZERODHA_EQUITY_RI as book
+    from core_paper.charges import delivery_buy, delivery_sell
 
-
-def _ema(values: np.ndarray, period: int) -> np.ndarray:
-    out = np.full(len(values), np.nan)
-    if len(values) < period:
-        return out
-    alpha = 2.0 / (period + 1)
-    out[period - 1] = values[:period].mean()
-    for i in range(period, len(values)):
-        out[i] = alpha * values[i] + (1 - alpha) * out[i - 1]
-    return out
-
-
-def _sma(values: np.ndarray, period: int) -> np.ndarray:
-    out = np.full(len(values), np.nan)
-    if len(values) < period:
-        return out
-    sums = np.cumsum(np.insert(values, 0, 0.0))
-    out[period - 1 :] = (sums[period:] - sums[:-period]) / period
-    return out
-
-
-def _rolling(values: np.ndarray, period: int, fn) -> np.ndarray:  # type: ignore[no-untyped-def]
-    out = np.full(len(values), np.nan)
-    for i in range(period, len(values)):
-        out[i] = fn(values[i - period : i])  # previous N bars, excluding the current one
-    return out
-
-
-def _rsi(close: np.ndarray, period: int) -> np.ndarray:
-    out = np.full(len(close), np.nan)
-    if len(close) <= period:
-        return out
-    change = np.diff(close)
-    gain, loss = np.clip(change, 0, None), np.clip(-change, 0, None)
-    avg_gain, avg_loss = gain[:period].mean(), loss[:period].mean()
-    for i in range(period, len(close)):
-        if i > period:
-            avg_gain = (avg_gain * (period - 1) + gain[i - 1]) / period
-            avg_loss = (avg_loss * (period - 1) + loss[i - 1]) / period
-        out[i] = 100.0 if avg_loss == 0 else 100 - 100 / (1 + avg_gain / avg_loss)
-    return out
-
-
-def _atr(bars: Bars, period: int) -> np.ndarray:
-    previous = np.concatenate([[bars.close[0]], bars.close[:-1]])
-    true_range = np.maximum(bars.high - bars.low, np.maximum(abs(bars.high - previous), abs(bars.low - previous)))
-    return _ema(true_range, period)
-
-
-def indicator(bars: Bars, operand: Operand, cache: dict) -> np.ndarray:
-    key = (operand.indicator, operand.period, operand.value)
-    if key in cache:
-        return cache[key]
-    n = len(bars.close)
-    kind, period = operand.indicator, operand.period or 0
-    if operand.value is not None:
-        out = np.full(n, float(operand.value))
-    elif kind in ("close", "open", "high", "low", "volume"):
-        out = getattr(bars, kind).astype(float)
-    elif kind == "sma":
-        out = _sma(bars.close, period)
-    elif kind == "ema":
-        out = _ema(bars.close, period)
-    elif kind == "rsi":
-        out = _rsi(bars.close, period)
-    elif kind in ("macd", "macd_signal", "macd_hist"):
-        line = _ema(bars.close, 12) - _ema(bars.close, 26)
-        valid = ~np.isnan(line)
-        signal = np.full(n, np.nan)
-        if valid.sum() >= 9:
-            first = int(np.argmax(valid))
-            signal[first:] = _ema(line[first:], 9)
-        out = {"macd": line, "macd_signal": signal, "macd_hist": line - signal}[kind]
-    elif kind in ("bb_upper", "bb_lower"):
-        mid = _sma(bars.close, period)
-        std = np.full(n, np.nan)
-        for i in range(period - 1, n):
-            std[i] = bars.close[i - period + 1 : i + 1].std()
-        out = mid + 2 * std if kind == "bb_upper" else mid - 2 * std
-    elif kind == "atr":
-        out = _atr(bars, period)
-    elif kind == "atr_pct":
-        out = _atr(bars, period) / bars.close * 100
-    elif kind == "volume_sma":
-        out = _sma(bars.volume.astype(float), period)
-    elif kind == "return_pct":
-        out = np.full(n, np.nan)
-        out[period:] = (bars.close[period:] / bars.close[:-period] - 1) * 100
-    elif kind == "highest":
-        out = _rolling(bars.high, period, np.max)
-    elif kind == "lowest":
-        out = _rolling(bars.low, period, np.min)
-    else:  # pragma: no cover - guarded by the Literal type
-        raise ValueError(kind)
-    cache[key] = out
-    return out
-
-
-def evaluate(bars: Bars, conditions: list[Condition], *, mode: str) -> np.ndarray:
-    """Boolean per bar: all conditions (mode="all") or any (mode="any"). NaN never passes."""
-    n = len(bars.close)
-    if not conditions:
-        return np.zeros(n, dtype=bool)
-    cache: dict = {}
-    results = []
-    for condition in conditions:
-        left, right = indicator(bars, condition.left, cache), indicator(bars, condition.right, cache)
-        with np.errstate(invalid="ignore"):
-            if condition.op in (">", "<", ">=", "<="):
-                passed = {">": left > right, "<": left < right, ">=": left >= right, "<=": left <= right}[condition.op]
-            else:
-                prev_left, prev_right = np.roll(left, 1), np.roll(right, 1)
-                prev_left[0] = prev_right[0] = np.nan
-                if condition.op == "crosses_above":
-                    passed = (left > right) & (prev_left <= prev_right)
-                else:
-                    passed = (left < right) & (prev_left >= prev_right)
-        valid = ~(np.isnan(left) | np.isnan(right))
-        results.append(passed & valid)
-    stack = np.vstack(results)
-    return stack.all(axis=0) if mode == "all" else stack.any(axis=0)
+    if product == "CNC":
+        total = 0.0
+        if buy_notional > 0:
+            total += float(delivery_buy(Decimal(str(round(buy_notional, 2))), book).total)
+        if sell_notional > 0:
+            total += float(delivery_sell(Decimal(str(round(sell_notional, 2))), book, include_dp=True).total)
+        return total
+    rate = float(book.intraday_brokerage_rate)
+    cap = float(book.intraday_brokerage_cap)
+    brokerage = (min(buy_notional * rate, cap) if buy_notional else 0.0) + (min(sell_notional * rate, cap) if sell_notional else 0.0)
+    stt = sell_notional * float(book.intraday_stt_rate)
+    exchange = (buy_notional + sell_notional) * float(book.transaction_rate)
+    sebi = (buy_notional + sell_notional) * float(book.sebi_inr_per_crore) / 1e7
+    stamp = buy_notional * float(book.intraday_stamp_rate)
+    return brokerage + stt + exchange + sebi + stamp + float(book.gst_rate) * (brokerage + exchange + sebi)
 
 
 # --- simulation -----------------------------------------------------------------------------------
 
 
 @dataclass
+class Leg:
+    quantity: int
+    price: float
+    reason: str
+    at: datetime
+
+
+@dataclass
 class Trade:
     symbol: str
+    direction: str
     entry_at: datetime
     exit_at: datetime
     entry_price: float
-    exit_price: float
     quantity: int
-    reason: str
-    charges: float
-    net_pnl: float
-    bars_held: int
+    stop: float | None
+    legs: list[Leg] = field(default_factory=list)
+    charges: float = 0.0
+    net_pnl: float = 0.0
+    bars_held: int = 0
+
+    @property
+    def exit_price(self) -> float:
+        shares = sum(leg.quantity for leg in self.legs)
+        return sum(leg.quantity * leg.price for leg in self.legs) / shares if shares else self.entry_price
+
+    @property
+    def reason(self) -> str:
+        return self.legs[-1].reason if self.legs else "open"
+
+    @property
+    def risk_money(self) -> float | None:
+        return None if self.stop is None else abs(self.entry_price - self.stop) * self.quantity
 
 
-def _charges(notional: float, *, buy: bool) -> float:
-    from core_paper.charges import ZERODHA_EQUITY_RI, delivery_buy, delivery_sell
+def _quantity(strategy: StrategyDefinition, entry: float, stop: float | None) -> int:
+    if strategy.sizing.kind == "risk_percent":
+        risk_per_share = abs(entry - stop) if stop is not None else 0.0
+        if risk_per_share <= 0:
+            return 0
+        shares = int(strategy.initial_cash * strategy.sizing.value / 100 // risk_per_share)
+        return min(shares, int(strategy.sizing.max_notional // entry))
+    return int(strategy.sizing.value // entry)
 
-    value = Decimal(str(round(notional, 2)))
-    quote = delivery_buy(value, ZERODHA_EQUITY_RI) if buy else delivery_sell(value, ZERODHA_EQUITY_RI, include_dp=True)
-    return float(quote.total)
+
+def _last_entry(strategy: StrategyDefinition) -> time | None:
+    if strategy.last_entry_time:
+        hours, minutes = (int(part) for part in strategy.last_entry_time.split(":"))
+        return time(hours, minutes)
+    return time(15, 0) if strategy.square_off_intraday else None
 
 
-def simulate_symbol(symbol: str, bars: Bars, strategy: StrategyDefinition, first_index: int) -> list[Trade]:
-    entries = evaluate(bars, strategy.entry, mode="all")
-    exits = evaluate(bars, strategy.exit, mode="any")
+def simulate_symbol(symbol: str, context: Context, strategy: StrategyDefinition, first_index: int) -> list[Trade]:
+    bars = context.bars
+    n = len(bars)
+    entries = evaluate(context, strategy.entry)
+    exits = evaluate(context, strategy.exit)
+    long = strategy.direction == "long"
+    sign = 1.0 if long else -1.0
     slip = strategy.slippage_bps / 10_000
     clocks = [moment.astimezone(IST) for moment in bars.end]
+    starts = [moment.astimezone(IST) for moment in bars.start]
+    days = bars.sessions()
+    limit_series = operand_values(context, strategy.entry_order.price) if strategy.entry_order.type == "limit" else None
+    latest_entry = _last_entry(strategy)
+    intraday = strategy.timeframe in INTRADAY
     trades: list[Trade] = []
-    n = len(bars.close)
-    i = max(first_index, 1)
-    while i < n:
-        if not entries[i - 1] or i - 1 < first_index:
+    i = max(first_index, 0)
+    while i < n - 1:
+        if not entries[i]:
             i += 1
             continue
-        if strategy.timeframe == "5m" and strategy.square_off_intraday and clocks[i].time() > SQUARE_OFF:
-            i += 1  # no new intraday entry after the square-off time
+        signal = i
+        fill, raw = None, math.nan
+        if strategy.entry_order.type == "market":
+            candidates = [signal + 1]
+        else:
+            candidates = list(range(signal + 1, min(n, signal + 1 + strategy.entry_order.valid_bars)))
+        limit = float(limit_series[signal]) if limit_series is not None else math.nan
+        for k in candidates:
+            if strategy.square_off_intraday and days[k] != days[signal]:
+                break  # intraday orders do not carry over to the next session
+            if latest_entry is not None and intraday and starts[k].time() >= latest_entry:
+                break
+            if strategy.entry_order.type == "market":
+                fill, raw = k, float(bars.open[k])
+                break
+            if math.isnan(limit):
+                break
+            touched = bars.low[k] <= limit if long else bars.high[k] >= limit
+            if touched:
+                fill, raw = k, (min(float(bars.open[k]), limit) if long else max(float(bars.open[k]), limit))
+                break
+        if fill is None:
+            i = signal + 1
             continue
-        entry_price = float(bars.open[i]) * (1 + slip)
-        quantity = int(strategy.position_notional // entry_price)
+        entry = raw * (1 + sign * slip)
+        stop = stop_price(strategy, context, signal, entry)
+        if stop is not None and (math.isnan(stop) or (stop >= entry if long else stop <= entry)):
+            i = signal + 1  # stop undefined or on the wrong side: no trade
+            continue
+        quantity = _quantity(strategy, entry, stop)
         if quantity < 1:
-            i += 1
+            i = signal + 1
             continue
-        stop = entry_price * (1 - strategy.stop_loss_pct / 100) if strategy.stop_loss_pct else None
-        target = entry_price * (1 + strategy.take_profit_pct / 100) if strategy.take_profit_pct else None
-        exit_index, exit_raw, reason = n - 1, float(bars.close[n - 1]), "end_of_data"
-        j = i
-        while j < n:
-            # On the entry bar the fill was the open, so a touch later in that bar fills at the level itself.
-            if stop is not None and bars.low[j] <= stop:
-                exit_index, exit_raw, reason = j, min(float(bars.open[j]), stop) if j > i else stop, "stop"
-                break
-            if target is not None and bars.high[j] >= target:
-                exit_index, exit_raw, reason = j, max(float(bars.open[j]), target) if j > i else target, "target"
-                break
-            if strategy.timeframe == "5m" and strategy.square_off_intraday:
-                same_day = clocks[j].date() == clocks[i].date()
-                if not same_day:
-                    exit_index, exit_raw, reason = j - 1, float(bars.close[j - 1]), "square_off"
-                    break
-                if clocks[j].time() >= SQUARE_OFF:
-                    exit_index, exit_raw, reason = j, float(bars.close[j]), "square_off"
-                    break
-            if strategy.max_hold_bars and j - i + 1 >= strategy.max_hold_bars:
-                exit_index, exit_raw, reason = j, float(bars.close[j]), "max_hold"
-                break
-            if exits[j] and j + 1 < n:
-                exit_index, exit_raw, reason = j + 1, float(bars.open[j + 1]), "exit_rule"
-                break
-            j += 1
-        exit_price = exit_raw * (1 - slip)
-        bought, sold = entry_price * quantity, exit_price * quantity
-        charges = _charges(bought, buy=True) + _charges(sold, buy=False)
-        trades.append(
-            Trade(symbol, bars.end[i], bars.end[exit_index], entry_price, exit_price, quantity, reason, charges, sold - bought - charges, exit_index - i + 1)
-        )
+        targets = target_prices(strategy, context, signal, entry, stop)
+        trade = _manage(symbol, bars, strategy, fill, entry, stop, targets, quantity, exits, clocks, days)
+        trades.append(trade)
+        exit_index = next(k for k in range(fill, n) if bars.end[k] == trade.exit_at)
         i = exit_index + 1
     return trades
 
 
+def _manage(symbol, bars: Bars, strategy: StrategyDefinition, fill: int, entry: float, stop: float | None, targets, quantity: int, exits, clocks, days) -> Trade:  # type: ignore[no-untyped-def]
+    n = len(bars)
+    long = strategy.direction == "long"
+    sign = 1.0 if long else -1.0
+    slip = strategy.slippage_bps / 10_000
+    trade = Trade(symbol, strategy.direction, bars.end[fill], bars.end[fill], entry, quantity, stop)
+    remaining = quantity
+    current_stop = stop
+    best = entry
+    risk = abs(entry - stop) if stop is not None else None
+    pending_targets = []
+    allocated = 0
+    for price, fraction in targets:
+        shares = int(math.floor(quantity * fraction + 1e-9))
+        shares = min(shares, quantity - allocated)
+        if shares > 0:
+            pending_targets.append([price, shares])
+            allocated += shares
+    hit_first = False
+    trail = strategy.trailing
+    trail_atr = None
+    if trail is not None and trail.kind == "atr":
+        trail_atr = raw_indicator(bars, "atr", trail.period, None, None, strategy.timeframe in INTRADAY, {})
+
+    def close(shares: int, raw_price: float, reason: str, k: int) -> None:
+        nonlocal remaining
+        if shares <= 0:
+            return
+        trade.legs.append(Leg(shares, raw_price * (1 - sign * slip), reason, bars.end[k]))
+        remaining -= shares
+
+    last = n - 1
+    for j in range(fill, n):
+        if strategy.square_off_intraday and (days[j] != days[fill] or clocks[j].time() > SQUARE_OFF):
+            k = j - 1 if days[j] != days[fill] or clocks[j].time() > SQUARE_OFF else j
+            close(remaining, float(bars.close[max(k, fill)]), "square_off", max(k, fill))
+            last = max(k, fill)
+            break
+        low, high, open_ = float(bars.low[j]), float(bars.high[j]), float(bars.open[j])
+        # 1. stop (including a trailing or breakeven stop)
+        if current_stop is not None and (low <= current_stop if long else high >= current_stop):
+            price = current_stop if j == fill else (min(open_, current_stop) if long else max(open_, current_stop))
+            label = "stop" if not hit_first and current_stop == stop else ("breakeven" if current_stop == entry else "trailing_stop")
+            close(remaining, price, label, j)
+            last = j
+            break
+        # 2. targets, from the bar after the fill
+        if j > fill:
+            for target in list(pending_targets):
+                price, shares = target
+                if (high >= price if long else low <= price):
+                    close(min(shares, remaining), (max(open_, price) if long else min(open_, price)), "target", j)
+                    pending_targets.remove(target)
+                    if not hit_first:
+                        hit_first = True
+                        if strategy.breakeven_after_first_target:
+                            current_stop = entry if current_stop is None else (max(current_stop, entry) if long else min(current_stop, entry))
+                            if remaining > 0 and (low <= entry if long else high >= entry):
+                                close(remaining, entry, "breakeven", j)  # same bar came back: order unknown, assume breakeven
+            if remaining <= 0:
+                last = j
+                break
+        # 3. trailing stop update, from bars up to this one (applies from the next bar)
+        if trail is not None:
+            best = max(best, high) if long else min(best, low)
+            moved_r = abs(best - entry) / risk if risk else math.inf
+            if moved_r >= trail.activate_after_r:
+                if trail.kind == "percent":
+                    distance = best * trail.value / 100
+                else:
+                    atr = trail_atr[j] if trail_atr is not None else math.nan
+                    distance = trail.value * atr if not math.isnan(atr) else math.nan
+                if not math.isnan(distance):
+                    level = best - distance if long else best + distance
+                    if current_stop is None or (level > current_stop if long else level < current_stop):
+                        current_stop = level
+        # 4. time limit
+        if strategy.max_hold_bars and j - fill + 1 >= strategy.max_hold_bars:
+            close(remaining, float(bars.close[j]), "max_hold", j)
+            last = j
+            break
+        # 5. exit rule: evaluated at this close, filled at the next open
+        if exits[j] and j + 1 < n and not (strategy.square_off_intraday and days[j + 1] != days[fill]):
+            close(remaining, float(bars.open[j + 1]), "exit_rule", j + 1)
+            last = j + 1
+            break
+    else:
+        last = n - 1
+    if remaining > 0:
+        close(remaining, float(bars.close[last]), "end_of_data", last)
+    trade.exit_at = bars.end[last]
+    trade.bars_held = last - fill + 1
+    entry_notional = entry * quantity
+    exit_notional = sum(leg.quantity * leg.price for leg in trade.legs)
+    if long:
+        trade.charges = leg_charges(entry_notional, exit_notional, strategy.product)
+        trade.net_pnl = exit_notional - entry_notional - trade.charges
+    else:
+        trade.charges = leg_charges(exit_notional, entry_notional, strategy.product)
+        trade.net_pnl = entry_notional - exit_notional - trade.charges
+    return trade
+
+
 def portfolio(trades: list[Trade], strategy: StrategyDefinition) -> tuple[list[Trade], list[Trade]]:
-    """Take trades in entry order while a slot and the cash are free. Returns (taken, skipped)."""
+    """Take trades in entry order while a slot and the cash (cost plus buy charges) are free."""
     taken: list[Trade] = []
     skipped: list[Trade] = []
     open_trades: list[Trade] = []
@@ -336,19 +321,19 @@ def portfolio(trades: list[Trade], strategy: StrategyDefinition) -> tuple[list[T
     for trade in sorted(trades, key=lambda item: (item.entry_at, item.symbol)):
         for item in [t for t in open_trades if t.exit_at <= trade.entry_at]:
             open_trades.remove(item)
-            cash += item.exit_price * item.quantity - _charges(item.exit_price * item.quantity, buy=False)
+            cash += item.entry_price * item.quantity + item.net_pnl
         cost = trade.entry_price * trade.quantity
-        if len(open_trades) >= strategy.max_open_positions or cost + _charges(cost, buy=True) > cash:
+        if len(open_trades) >= strategy.max_open_positions or cost > cash:
             skipped.append(trade)
             continue
-        cash -= cost + _charges(cost, buy=True)
+        cash -= cost
         open_trades.append(trade)
         taken.append(trade)
     return taken, skipped
 
 
 def equity_curve(taken: list[Trade], closes: dict[str, dict[date, float]], days: list[date], initial: float) -> list[dict[str, object]]:
-    """End-of-day equity: initial cash + realized P&L + open positions marked at that day's close."""
+    """End-of-day equity: starting cash + realized P&L + open positions marked at that day's close."""
     curve = []
     for day in days:
         realized = sum(t.net_pnl for t in taken if t.exit_at.astimezone(IST).date() <= day)
@@ -357,7 +342,7 @@ def equity_curve(taken: list[Trade], closes: dict[str, dict[date, float]], days:
             if t.entry_at.astimezone(IST).date() <= day < t.exit_at.astimezone(IST).date():
                 mark = closes.get(t.symbol, {}).get(day)
                 if mark is not None:
-                    unrealized += (mark - t.entry_price) * t.quantity
+                    unrealized += (mark - t.entry_price) * t.quantity * (1 if t.direction == "long" else -1)
         curve.append({"date": day.isoformat(), "equity": round(initial + realized + unrealized, 2)})
     return curve
 
@@ -372,7 +357,9 @@ def metrics(taken: list[Trade], curve: list[dict[str, object]], initial: float) 
     final = float(equity[-1])
     reasons: dict[str, int] = {}
     for t in taken:
-        reasons[t.reason] = reasons.get(t.reason, 0) + 1
+        for leg in t.legs:
+            reasons[leg.reason] = reasons.get(leg.reason, 0) + 1
+    r_values = [t.net_pnl / t.risk_money for t in taken if t.risk_money]
     return {
         "trades": len(taken),
         "win_rate": len(wins) / len(nets) if nets else None,
@@ -385,38 +372,45 @@ def metrics(taken: list[Trade], curve: list[dict[str, object]], initial: float) 
         "profit_factor": (sum(wins) / sum(losses)) if losses else None,
         "average_win": float(np.mean(wins)) if wins else None,
         "average_loss": float(-np.mean(losses)) if losses else None,
+        "expectancy_r": float(np.mean(r_values)) if r_values else None,
         "average_bars_held": float(np.mean([t.bars_held for t in taken])) if taken else None,
         "exit_reasons": reasons,
     }
 
 
-def run_strategy(
-    strategy: StrategyDefinition,
-    request: BacktestRequest,
-    load_bars,  # (symbol, timeframe, start, end) -> Bars | None
-    universe: list[str],
-    benchmark: Bars | None = None,
-) -> dict[str, object]:
+def run_strategy(strategy: StrategyDefinition, request: BacktestRequest, load_bars, universe: list[str], benchmark: Bars | None = None) -> dict[str, object]:
+    """load_bars(symbol, timeframe in {"5m", "1d"}, start, end) -> Bars | None; 15m and 1h are resampled from 5m."""
     symbols = universe if strategy.symbols == ["ALL"] else [s for s in strategy.symbols if s in set(universe)]
     if not symbols:
         raise ValueError("no known symbols selected")
-    if strategy.timeframe == "5m":
-        if len(symbols) > MAX_5M_SYMBOLS:
-            raise ValueError(f"5-minute backtests are limited to {MAX_5M_SYMBOLS} symbols on this server")
-        if (request.end - request.start).days > MAX_5M_DAYS:
-            raise ValueError(f"5-minute backtests are limited to {MAX_5M_DAYS} days on this server")
+    intraday = strategy.timeframe in INTRADAY
+    if intraday:
+        if len(symbols) > MAX_INTRADAY_SYMBOLS:
+            raise ValueError(f"intraday backtests are limited to {MAX_INTRADAY_SYMBOLS} symbols on this server")
+        if (request.end - request.start).days > MAX_INTRADAY_DAYS:
+            raise ValueError(f"intraday backtests are limited to {MAX_INTRADAY_DAYS} days on this server")
     start = datetime.combine(request.start, time(0), IST).astimezone(timezone.utc)
     end = datetime.combine(request.end, time(23, 59), IST).astimezone(timezone.utc)
-    warmup = timedelta(days=400) if strategy.timeframe == "1d" else timedelta(days=10)
+    warmup = timedelta(days=400) if not intraday else timedelta(days=30)
     all_trades: list[Trade] = []
     closes: dict[str, dict[date, float]] = {}
     days: set[date] = set()
     for symbol in symbols:
-        bars = load_bars(symbol, strategy.timeframe, start - warmup, end)
-        if bars is None or len(bars.close) < 2:
+        base = load_bars(symbol, "5m" if intraday else "1d", start - warmup, end)
+        if base is None or len(base) < 2:
             continue
-        first = next((k for k, moment in enumerate(bars.end) if moment >= start), len(bars.end))
-        all_trades += simulate_symbol(symbol, bars, strategy, first)
+        bars = base if strategy.timeframe in ("5m", "1d") else resample(base, {"15m": 15, "1h": 60}[strategy.timeframe])
+        if len(bars) < 2:
+            continue
+
+        def higher(timeframe: str, _base=base, _symbol=symbol):  # type: ignore[no-untyped-def]
+            if timeframe == "1d":
+                return load_bars(_symbol, "1d", start - timedelta(days=400), end)
+            return resample(_base, {"15m": 15, "1h": 60}[timeframe])
+
+        context = context_for(strategy, bars, higher)
+        first = next((k for k, moment in enumerate(bars.end) if moment >= start), len(bars))
+        all_trades += simulate_symbol(symbol, context, strategy, first)
         daily: dict[date, float] = {}
         for moment, close in zip(bars.end, bars.close):
             if moment >= start:
@@ -428,9 +422,9 @@ def run_strategy(
     ordered_days = sorted(days)
     curve = equity_curve(taken, closes, ordered_days, strategy.initial_cash)
     result = metrics(taken, curve, strategy.initial_cash)
-    half = ordered_days[len(ordered_days) // 2] if ordered_days else None
     halves = {}
-    if half is not None:
+    if ordered_days:
+        half = ordered_days[len(ordered_days) // 2]
         first_half = [t for t in taken if t.entry_at.astimezone(IST).date() < half]
         second_half = [t for t in taken if t.entry_at.astimezone(IST).date() >= half]
         halves = {
@@ -439,21 +433,28 @@ def run_strategy(
             "second_half": {"trades": len(second_half), "net_pnl": round(sum(t.net_pnl for t in second_half), 2)},
         }
     bench = None
-    if benchmark is not None and len(benchmark.close):
+    if benchmark is not None and len(benchmark):
         points = [(m.astimezone(IST).date(), float(c)) for m, c in zip(benchmark.end, benchmark.close) if start <= m <= end]
         if len(points) > 1:
-            base = points[0][1]
+            base_close = points[0][1]
             bench = {
                 "symbol": "NIFTY50",
                 "from": points[0][0].isoformat(),
                 "to": points[-1][0].isoformat(),
-                "total_return": points[-1][1] / base - 1,
-                "curve": [{"date": d.isoformat(), "equity": round(strategy.initial_cash * c / base, 2)} for d, c in points],
+                "total_return": points[-1][1] / base_close - 1,
+                "curve": [{"date": d.isoformat(), "equity": round(strategy.initial_cash * c / base_close, 2)} for d, c in points],
             }
+    notes = [
+        "In-sample: this is the data the rule was written against. Expect live results to be worse.",
+        "Rules use each bar's close; entries fill on later bars, and higher-timeframe values come from completed bars only.",
+        f"Charges: Zerodha {'intraday (MIS)' if strategy.product == 'MIS' else 'delivery (CNC)'} on every leg, plus {strategy.slippage_bps:g} bp slippage per fill.",
+    ]
+    if strategy.direction == "short":
+        notes.append("Short side is a research backtest: the paper engine trades long only.")
     return {
         "kind": "strategy_lab",
         "strategy": strategy.model_dump(mode="json"),
-        "rules": {"entry": [c.label() for c in strategy.entry], "exit": [c.label() for c in strategy.exit]},
+        "rules": {"entry": strategy.entry.label(), "exit": strategy.exit.label() if strategy.exit else None},
         "start": request.start.isoformat(),
         "end": request.end.isoformat(),
         "symbols_tested": len(closes),
@@ -466,12 +467,14 @@ def run_strategy(
         "trades": [
             {
                 "symbol": t.symbol,
+                "direction": t.direction,
                 "entry_at": t.entry_at.isoformat(),
                 "exit_at": t.exit_at.isoformat(),
                 "entry_price": round(t.entry_price, 2),
                 "exit_price": round(t.exit_price, 2),
                 "quantity": t.quantity,
                 "reason": t.reason,
+                "legs": [{"quantity": leg.quantity, "price": round(leg.price, 2), "reason": leg.reason, "at": leg.at.isoformat()} for leg in t.legs],
                 "charges": round(t.charges, 2),
                 "net_pnl": round(t.net_pnl, 2),
                 "bars_held": t.bars_held,
@@ -480,12 +483,20 @@ def run_strategy(
         ],
         "trades_listed_limit": MAX_TRADES_LISTED,
         "live_enabled": False,
-        "notes": [
-            "In-sample: this is the data the rule was written against. Expect live results to be worse.",
-            "Signals use the bar close and fill at the next bar's open, so no future data is used.",
-            "Charges are Zerodha delivery (CNC) on both legs, plus slippage on each fill.",
-        ],
+        "notes": notes,
     }
+
+
+def _c(left: dict, op: str, right: dict, **extra) -> dict:  # type: ignore[no-untyped-def]
+    return {"left": left, "op": op, "right": right, **extra}
+
+
+def _all(*items: dict) -> dict:
+    return {"logic": "all", "items": list(items)}
+
+
+def _any(*items: dict) -> dict:
+    return {"logic": "any", "items": list(items)}
 
 
 TEMPLATES: list[dict[str, object]] = [
@@ -493,54 +504,121 @@ TEMPLATES: list[dict[str, object]] = [
         "name": "EMA 20/50 crossover",
         "description": "Buy when the 20-day EMA crosses above the 50-day EMA; sell when it crosses back below.",
         "timeframe": "1d",
-        "entry": [{"left": {"indicator": "ema", "period": 20}, "op": "crosses_above", "right": {"indicator": "ema", "period": 50}}],
-        "exit": [{"left": {"indicator": "ema", "period": 20}, "op": "crosses_below", "right": {"indicator": "ema", "period": 50}}],
-        "stop_loss_pct": 5, "take_profit_pct": 15,
+        "entry": _all(_c({"indicator": "ema", "period": 20}, "crosses_above", {"indicator": "ema", "period": 50})),
+        "exit": _any(_c({"indicator": "ema", "period": 20}, "crosses_below", {"indicator": "ema", "period": 50})),
+        "stop": {"kind": "percent", "value": 5},
+        "targets": [{"kind": "percent", "value": 15, "fraction": 1}],
     },
     {
-        "name": "RSI oversold bounce",
+        "name": "RSI oversold bounce in an uptrend",
         "description": "Buy when RSI(14) crosses back above 30 while the stock is above its 200-day SMA; exit when RSI passes 60.",
         "timeframe": "1d",
-        "entry": [
-            {"left": {"indicator": "rsi", "period": 14}, "op": "crosses_above", "right": {"value": 30}},
-            {"left": {"indicator": "close"}, "op": ">", "right": {"indicator": "sma", "period": 200}},
-        ],
-        "exit": [{"left": {"indicator": "rsi", "period": 14}, "op": ">", "right": {"value": 60}}],
-        "stop_loss_pct": 4, "take_profit_pct": 8, "max_hold_bars": 15,
+        "entry": _all(
+            _c({"indicator": "rsi", "period": 14}, "crosses_above", {"value": 30}),
+            _c({"indicator": "close"}, ">", {"indicator": "sma", "period": 200}),
+        ),
+        "exit": _any(_c({"indicator": "rsi", "period": 14}, ">", {"value": 60})),
+        "stop": {"kind": "atr", "value": 2, "period": 14},
+        "targets": [{"kind": "r_multiple", "value": 2, "fraction": 1}],
+        "max_hold_bars": 15,
     },
     {
-        "name": "20-day breakout",
-        "description": "Buy when the close breaks above the highest high of the previous 20 days on above-average volume.",
+        "name": "20-day breakout on volume, ATR trailing stop",
+        "description": "Buy a close above the previous 20-day high on 1.5x average volume; trail the stop 3 ATR below the best price.",
         "timeframe": "1d",
-        "entry": [
-            {"left": {"indicator": "close"}, "op": ">", "right": {"indicator": "highest", "period": 20}},
-            {"left": {"indicator": "volume"}, "op": ">", "right": {"indicator": "volume_sma", "period": 20}},
-        ],
-        "exit": [{"left": {"indicator": "close"}, "op": "<", "right": {"indicator": "ema", "period": 20}}],
-        "stop_loss_pct": 4, "take_profit_pct": 12,
+        "entry": _all(
+            _c({"indicator": "close"}, ">", {"indicator": "highest", "period": 20}),
+            _c({"indicator": "volume_ratio", "period": 20}, ">", {"value": 1.5}),
+        ),
+        "stop": {"kind": "atr", "value": 2, "period": 14},
+        "targets": [],
+        "trailing": {"kind": "atr", "value": 3, "period": 14},
     },
     {
-        "name": "MACD trend",
-        "description": "Buy when the MACD line crosses above its signal line with price above the 50-day EMA.",
+        "name": "SuperTrend + ADX trend",
+        "description": "Buy when SuperTrend(10, 3) turns up while ADX(14) is above 20; exit when it turns down.",
         "timeframe": "1d",
-        "entry": [
-            {"left": {"indicator": "macd"}, "op": "crosses_above", "right": {"indicator": "macd_signal"}},
-            {"left": {"indicator": "close"}, "op": ">", "right": {"indicator": "ema", "period": 50}},
-        ],
-        "exit": [{"left": {"indicator": "macd"}, "op": "crosses_below", "right": {"indicator": "macd_signal"}}],
-        "stop_loss_pct": 4, "take_profit_pct": 10,
+        "entry": _all(
+            _c({"indicator": "supertrend_dir", "period": 10, "param": 3}, "crosses_above", {"value": 0}),
+            _c({"indicator": "adx", "period": 14}, ">", {"value": 20}),
+        ),
+        "exit": _any(_c({"indicator": "supertrend_dir", "period": 10, "param": 3}, "crosses_below", {"value": 0})),
+        "stop": {"kind": "level", "level": {"indicator": "supertrend", "period": 10, "param": 3}},
+        "targets": [],
     },
     {
-        "name": "Intraday EMA 9/21 (5m)",
-        "description": "Buy when the 9-bar EMA crosses above the 21-bar EMA on 5-minute bars; squared off at 15:15.",
+        "name": "15-minute opening-range breakout",
+        "description": "Buy a 5-minute close above the first 15 minutes' high, above VWAP, before 11:00. Half off at 1R, stop to breakeven, rest at 2R; out by 15:15.",
         "timeframe": "5m",
         "symbols": ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK"],
-        "entry": [{"left": {"indicator": "ema", "period": 9}, "op": "crosses_above", "right": {"indicator": "ema", "period": 21}}],
-        "exit": [{"left": {"indicator": "ema", "period": 9}, "op": "crosses_below", "right": {"indicator": "ema", "period": 21}}],
-        "stop_loss_pct": 1, "take_profit_pct": 2, "square_off_intraday": True,
+        "entry": _all(
+            _c({"indicator": "close"}, "crosses_above", {"indicator": "opening_range_high", "period": 15}),
+            _c({"indicator": "close"}, ">", {"indicator": "vwap"}),
+            _c({"indicator": "time_hhmm"}, "<=", {"value": 1100}),
+        ),
+        "stop": {"kind": "level", "level": {"indicator": "opening_range_low", "period": 15}},
+        "targets": [{"kind": "r_multiple", "value": 1, "fraction": 0.5}, {"kind": "r_multiple", "value": 2, "fraction": 0.5}],
+        "breakeven_after_first_target": True,
+        "square_off_intraday": True,
+    },
+    {
+        "name": "Break of structure, retest entry, two targets",
+        "description": "15-minute break of structure while the daily trend is up (daily close above its 50-day EMA). Buy the retest of the broken swing high; stop below the swing low; half at 1R, rest at 1.5R.",
+        "timeframe": "15m",
+        "symbols": ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK"],
+        "entry": _all(
+            _c({"indicator": "bos_up", "period": 2}, "==", {"value": 1}),
+            _c({"indicator": "close", "timeframe": "1d"}, ">", {"indicator": "ema", "period": 50, "timeframe": "1d"}),
+        ),
+        "entry_order": {"type": "limit", "price": {"indicator": "swing_high", "period": 2, "offset": 1}, "valid_bars": 8},
+        "stop": {"kind": "level", "level": {"indicator": "swing_low", "period": 2}},
+        "targets": [{"kind": "r_multiple", "value": 1, "fraction": 0.5}, {"kind": "r_multiple", "value": 1.5, "fraction": 0.5}],
+        "breakeven_after_first_target": True,
+        "square_off_intraday": True,
+    },
+    {
+        "name": "Stochastic pullback in an uptrend",
+        "description": "Buy when Stochastic %K crosses above %D below 20 while the close is above the 50-day EMA; exit when %K passes 80.",
+        "timeframe": "1d",
+        "entry": _all(
+            _c({"indicator": "stoch_k", "period": 14, "period2": 3}, "crosses_above", {"indicator": "stoch_d", "period": 14, "period2": 3}),
+            _c({"indicator": "stoch_k", "period": 14, "period2": 3}, "<", {"value": 20}),
+            _c({"indicator": "close"}, ">", {"indicator": "ema", "period": 50}),
+        ),
+        "exit": _any(_c({"indicator": "stoch_k", "period": 14, "period2": 3}, ">", {"value": 80})),
+        "stop": {"kind": "percent", "value": 4},
+        "targets": [{"kind": "percent", "value": 8, "fraction": 1}],
+    },
+    {
+        "name": "Bollinger squeeze breakout",
+        "description": "Buy when the close breaks above the upper Bollinger band after the bands were narrow (width under 6% for 5 bars), with MACD above signal.",
+        "timeframe": "1d",
+        "entry": _all(
+            _c({"indicator": "close"}, "crosses_above", {"indicator": "bb_upper", "period": 20, "param": 2}),
+            _c({"indicator": "bb_width_pct", "period": 20, "param": 2, "offset": 1}, "<", {"value": 6}, for_bars=5),
+            _c({"indicator": "macd"}, ">", {"indicator": "macd_signal"}),
+        ),
+        "stop": {"kind": "level", "level": {"indicator": "bb_mid", "period": 20, "param": 2}, "buffer_pct": 0.5},
+        "targets": [{"kind": "r_multiple", "value": 1, "fraction": 0.5}, {"kind": "r_multiple", "value": 2.5, "fraction": 0.5}],
+        "breakeven_after_first_target": True,
+    },
+    {
+        "name": "Intraday VWAP fade (short, research)",
+        "description": "Short when a 5-minute close falls back below VWAP after a gap up of more than 1%; out by 15:15. Research only: the paper engine trades long.",
+        "timeframe": "5m",
+        "direction": "short",
+        "symbols": ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK"],
+        "entry": _all(
+            _c({"indicator": "gap_pct"}, ">", {"value": 1}),
+            _c({"indicator": "close"}, "crosses_below", {"indicator": "vwap"}),
+        ),
+        "stop": {"kind": "level", "level": {"indicator": "day_high"}, "buffer_pct": 0.1},
+        "targets": [{"kind": "r_multiple", "value": 1, "fraction": 0.5}, {"kind": "r_multiple", "value": 2, "fraction": 0.5}],
+        "breakeven_after_first_target": True,
+        "square_off_intraday": True,
     },
 ]
 
 
 def operand_catalog() -> list[dict[str, object]]:
-    return [{"indicator": key, "label": label, "needs_period": key in NEEDS_PERIOD} for key, label in LABELS.items()]
+    return catalog()

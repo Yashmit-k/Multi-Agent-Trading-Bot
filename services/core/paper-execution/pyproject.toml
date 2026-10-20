@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "core-paper"
 version = "1.0.0"
 requires-python = ">=3.12"
-dependencies = ["contracts", "core-db", "core-fusion", "core-decision", "core-risk", "core-market-data"]
+dependencies = ["contracts", "core-db", "core-fusion", "core-decision", "core-risk", "core-market-data", "numpy>=1.26", "pydantic>=2"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/core_paper"]
