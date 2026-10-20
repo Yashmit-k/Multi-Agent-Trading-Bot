@@ -37,6 +37,9 @@ services:
     ports: !reset []
     restart: unless-stopped
 
+  portfolio-manager:
+    restart: unless-stopped
+
   quant:
     ports: !reset []
     restart: unless-stopped

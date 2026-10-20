@@ -7,7 +7,8 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException
+from pydantic import BaseModel
 
 from contracts.enums import TradingMode
 from intelligence_agents.logging import configure_logging
@@ -83,6 +84,37 @@ def create_app(settings: IntelligenceSettings | None = None, *, sink: object | N
     def fundamental_rows(symbol: str, as_of: str | None = None) -> list[dict[str, object]]:
         moment = datetime.now(timezone.utc) if as_of is None else datetime.fromisoformat(as_of)
         return [item.model_dump(mode="json") for item in fund_store.points_for(symbol, moment)]
+
+    class ReassessBody(BaseModel):
+        agent: str
+        symbol: str
+        horizon: str = "SWING"
+        request_id: str
+        review_id: str
+
+    @app.post("/reassess")
+    def reassess(body: ReassessBody, authorization: str | None = Header(default=None)) -> dict[str, object]:
+        """The portfolio manager asks one agent to look at one stock again, now."""
+        if not resolved.internal_signal_token or authorization != f"Bearer {resolved.internal_signal_token}":
+            raise HTTPException(status_code=401, detail="unauthorized")
+        from contracts.enums import Horizon
+
+        from intelligence_agents.reassess import AGENTS, Reassessor
+
+        symbol = body.symbol.strip().upper()
+        if body.agent not in AGENTS:
+            raise HTTPException(status_code=422, detail="unknown_agent")
+        if symbol not in resolved.symbols:
+            raise HTTPException(status_code=422, detail="unknown_symbol")
+        if resolved_sink is None or resolved.trading_mode not in LIVE_MODES:
+            raise HTTPException(status_code=409, detail="no_signal_sink")
+        if getattr(app.state, "reassessor", None) is None:
+            app.state.reassessor = Reassessor(resolved, resolved_sink)
+        try:
+            horizon = Horizon(body.horizon.upper())
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="invalid_horizon") from exc
+        return app.state.reassessor.run(agent=body.agent, symbol=symbol, horizon=horizon, request_id=body.request_id, review_id=body.review_id)
 
     @app.get("/health")
     def health_view() -> dict[str, object]:

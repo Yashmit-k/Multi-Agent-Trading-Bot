@@ -147,6 +147,7 @@ def build_router(
     max_output_tokens: int = 160,
     json_mode: bool = False,
     reasoning_effort: str = "",
+    cache: LLMCache | None = None,
 ) -> LLMRouter:
     fixture = FixtureLLMProvider()
     tracker = CostTracker(daily_budget_usd=daily_budget_usd)
@@ -158,6 +159,7 @@ def build_router(
             fallback,
             tracker,
             tier2_enabled=False,
+            cache=cache,
             use_cache=use_cache,
             provider_name="fixture",
             host="",
@@ -182,6 +184,7 @@ def build_router(
         FallbackProvider(tier2, fixture),
         tracker,
         tier2_enabled=tier2_enabled,
+        cache=cache,
         use_cache=use_cache,
         provider_name=name,
         host=host,

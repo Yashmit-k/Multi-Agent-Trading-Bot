@@ -119,6 +119,8 @@ services:
       LLM_JSON_MODE: ${LLM_JSON_MODE:-false}
       # "none" disables Gemini thinking (fastest); "low" suits gpt-oss; "omit" leaves the field out.
       LLM_REASONING_EFFORT: ${LLM_REASONING_EFFORT:-low}
+      # A re-check requested by the portfolio manager uses a second model with its own quota.
+      LLM_REASSESS_MODEL: ${LLM_REASSESS_MODEL:-gemini-3.5-flash-lite}
     depends_on:
       core-api:
         condition: service_healthy
@@ -128,6 +130,28 @@ services:
       - intelligence-data:/var/lib/intelligence
       # Real quarterly fundamentals (see data/intelligence/README.md). Missing file = warning, agents stay idle.
       - ./data/intelligence:/data/intelligence:ro
+
+  # LLM portfolio manager: reviews each agent BUY before risk (approve / reduce / veto), using tools and
+  # re-check requests to the intelligence agents. Same image as intelligence, different entry point.
+  portfolio-manager:
+    build:
+      context: .
+      dockerfile: services/intelligence/Dockerfile
+    command: ["python", "-m", "intelligence_agents.manager"]
+    env_file: .env
+    environment:
+      CORE_API_URL: http://core-api:8000
+      INTELLIGENCE_URL: http://intelligence:8080
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      # Its own models, so it does not share the news agents' daily quota.
+      MANAGER_LLM_MODEL: ${MANAGER_LLM_MODEL:-gemini-3.5-flash}
+      MANAGER_FALLBACK_MODEL: ${MANAGER_FALLBACK_MODEL:-gemini-3.5-flash-lite}
+      MANAGER_REASONING_EFFORT: ${MANAGER_REASONING_EFFORT:-low}
+    depends_on:
+      core-api:
+        condition: service_healthy
+    restart: unless-stopped
 
   quant:
     build:

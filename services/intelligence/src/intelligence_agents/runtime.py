@@ -73,11 +73,14 @@ def make_price_provider(settings: IntelligenceSettings):
     return CoreMarketDataProvider(settings.core_api_url, settings.core_api_token)
 
 
-def make_router(settings: IntelligenceSettings) -> LLMRouter:
+def make_router(settings: IntelligenceSettings, *, tier1_model: str | None = None) -> LLMRouter:
+    from intelligence_agents.llm.cache import LLMCache
+
+    persistent = settings.store == "sqlite" and settings.trading_mode is not TradingMode.BACKTEST
     return build_router(
         api_key=settings.llm_api_key,
         base_url=settings.llm_base_url,
-        tier1_model=settings.llm_tier1_model,
+        tier1_model=tier1_model or settings.llm_tier1_model,
         tier2_model=settings.llm_tier2_model,
         timeout=settings.llm_timeout_seconds,
         daily_budget_usd=settings.llm_daily_budget_usd,
@@ -89,6 +92,7 @@ def make_router(settings: IntelligenceSettings) -> LLMRouter:
         max_output_tokens=settings.llm_max_output_tokens,
         json_mode=settings.llm_json_mode,
         reasoning_effort=settings.llm_reasoning_effort,
+        cache=LLMCache(settings.sqlite_path if persistent else None),
     )
 
 
