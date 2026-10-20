@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 MANAGER_VERSION = "1.0.0"
 MAX_TURNS = 9
-MAX_CRITIQUES = 2
+MAX_CRITIQUES = 3
 
 SYSTEM_PROMPT = """You are the portfolio manager of a paper-trading desk for NIFTY 50 stocks. Specialist agents
 (technical, momentum, mean reversion, volume, market regime, news, fundamental, valuation, earnings) each
@@ -205,9 +205,10 @@ class PortfolioManager:
             return f"{', '.join(shaky)} carries fusion weight but rests on fallback heuristics, not the model; ask it to re-check (ask_agent_to_recheck) before deciding."
         conflicts = [str(item) for item in args.get("conflicts") or [] if str(item).strip()]
         disagreeing = (toolbox.last_opinions or {}).get("agents_disagreeing_with_fusion") or []
-        missing = [agent for agent in disagreeing if not any(agent in item for item in conflicts)]
+        text = " ".join(conflicts + [critique]).lower()
+        missing = [agent for agent in disagreeing if agent.replace("_", " ") not in text.replace("_", " ")]
         if missing:
-            return f"these agents disagree with the fused signal and are not addressed in conflicts: {', '.join(missing)}."
+            return f"these agents disagree with the fused signal and are not addressed: {', '.join(missing)}. Add one conflicts entry per agent, starting with its name, e.g. '{missing[0]}: ...'."
         return None
 
     @staticmethod
