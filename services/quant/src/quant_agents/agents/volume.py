@@ -28,7 +28,8 @@ CONVICTION_CORR = 0.3
 class VolumeAgent(BaseQuantAgent):
     agent_name = AgentName.VOLUME
     required_features = ("last_volume", "volume_mean", "return_1")
-    optional_features = ("relative_volume", "volume_acceleration", "volume_imbalance", "price_volume_corr")
+    # volume_imbalance needs order-book data the feature engine does not have, and no vote uses it.
+    optional_features = ("relative_volume", "volume_acceleration", "price_volume_corr")
 
     def interpret(self, view: FeatureView, extra_views: Mapping[str, FeatureView]) -> AgentDecision:
         votes: list[Vote] = []

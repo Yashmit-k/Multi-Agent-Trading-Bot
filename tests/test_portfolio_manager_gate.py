@@ -153,3 +153,14 @@ def test_manager_tools_are_internal_and_tolerate_bad_input(repository: CoreRepos
     assert "entries_today" in client.get("/api/v1/internal/tools/portfolio", headers=INTERNAL).json()
     assert client.get("/api/v1/internal/tools/track_record?symbol=RELIANCE", headers=INTERNAL).json()["past_reviews"] == []
     assert client.get("/api/v1/internal/tools/teleport", headers=INTERNAL).status_code == 404
+
+
+def test_fusion_prefers_the_newest_agent_release_for_the_same_bar() -> None:
+    from core_fusion import select_signals
+
+    base = sample_agent_signal("RELIANCE").model_copy(update={"horizon": Horizon.SWING, "timestamp": FIXTURE_AS_OF, "as_of": FIXTURE_AS_OF, "valid_until": FIXTURE_AS_OF + timedelta(hours=6)})
+    old = base.model_copy(update={"signal_id": "zzz-old", "agent_version": "1.2.0", "signal": -0.9})
+    new = base.model_copy(update={"signal_id": "aaa-new", "agent_version": "1.10.0", "signal": 0.4})
+    for order in ([old, new], [new, old]):
+        [chosen] = select_signals(order, horizon=Horizon.SWING, as_of=FIXTURE_AS_OF)
+        assert chosen.agent_version == "1.10.0"

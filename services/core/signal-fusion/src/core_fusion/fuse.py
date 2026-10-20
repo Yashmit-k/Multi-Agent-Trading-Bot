@@ -82,7 +82,18 @@ def _weight(horizon: Horizon, agent: AgentName, weights: Mapping[Horizon, Mappin
 def _newer(candidate: AgentSignal, current: AgentSignal) -> bool:
     if _aware(candidate.timestamp) != _aware(current.timestamp):
         return _aware(candidate.timestamp) > _aware(current.timestamp)
+    # The same bar scored by two releases of an agent (it re-scores after an upgrade): the newer release wins.
+    if _version(candidate.agent_version) != _version(current.agent_version):
+        return _version(candidate.agent_version) > _version(current.agent_version)
     return candidate.signal_id > current.signal_id
+
+
+def _version(text: str) -> tuple[int, ...]:
+    parts = []
+    for piece in text.split("."):
+        digits = "".join(char for char in piece if char.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
 
 
 def _ratio(numerator: Decimal, denominator: Decimal) -> float:
