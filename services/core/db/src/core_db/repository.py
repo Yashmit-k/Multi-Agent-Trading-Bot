@@ -645,6 +645,12 @@ class CoreRepository:
             session.commit()
             return True
 
+    def prune_history(self, now: datetime) -> dict[str, int]:
+        """Age out bulky history (see core_db.retention); keeps everything trades depend on."""
+        from core_db.retention import prune
+
+        return prune(self._session_factory, now)
+
     def daily_equity_exists(self, session_id: str, trading_day: str) -> bool:
         with self._session_factory() as session:
             return session.get(DailyEquityRow, f"{session_id}:{trading_day}") is not None

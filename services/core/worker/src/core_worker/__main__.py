@@ -3,6 +3,7 @@ import os
 import time
 from datetime import datetime, timezone
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from contracts.enums import TradingMode
 from core_db.repository import CoreRepository
@@ -19,6 +20,7 @@ from core_worker.notify import Notifier, health_problems_from_api, maybe_notify
 from core_worker.paper_schedule import broker_allows_entries, excluded_agent_weights, run_scheduled_cycle
 
 logger = logging.getLogger(__name__)
+IST = ZoneInfo("Asia/Kolkata")
 
 database_url = os.environ.get("DATABASE_URL", "sqlite:///./core.db")
 repository = CoreRepository(create_schema(database_url))
@@ -75,6 +77,17 @@ while True:
             current_weights(repository, now, excluded)  # hourly, so the Agents page is current on closed days too
         except Exception:
             logger.exception("agent_weights_refresh_failed")
+    try:
+        # History retention once a day after 17:00 IST (state in user_settings, so a restart does not repeat it).
+        local_day = now.astimezone(IST).date().isoformat()
+        if now.astimezone(IST).hour >= 17:
+            state = repository.get_setting("maintenance_state")
+            if not state or state["payload"].get("pruned") != local_day:
+                counts = repository.prune_history(now)
+                repository.save_setting("maintenance_state", {"pruned": local_day, "counts": counts}, updated_by="worker", now=now)
+                logger.info("retention_done %s", counts)
+    except Exception:
+        logger.exception("retention_failed")
     try:
         # End-of-day book, once per trading day after the close (no-op at other times).
         write_daily_if_due(repository, now)

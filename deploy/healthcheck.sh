@@ -42,6 +42,13 @@ if bad:
 ')"
 fi
 
+# Disk: alert at DISK_ALERT_PCT (default 85%) used on the root filesystem.
+DISK_ALERT_PCT="${DISK_ALERT_PCT:-85}"
+disk_used=$(df -P / | awk 'NR==2 {gsub("%","",$5); print $5}')
+if [ -n "$disk_used" ] && [ "$disk_used" -ge "$DISK_ALERT_PCT" ]; then
+  message="${message:+$message; }StockX: server disk ${disk_used}% full (alert at ${DISK_ALERT_PCT}%)"
+fi
+
 now=$(date +%s)
 last_message=""; last_sent=0
 [ -f "$STATE" ] && { last_message="$(sed -n 1p "$STATE")"; last_sent="$(sed -n 2p "$STATE")"; }

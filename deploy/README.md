@@ -80,6 +80,19 @@ Then open `http://127.0.0.1:8000/api/v1/zerodha/connect` with your Core token, f
 - **Attach an Elastic IP before relying on the URL.** Without one, a stop/start changes the public IP, and with it the sslip.io hostname and `DOMAIN`.
 - **A free Groq LLM needs pacing.** Keep the compose defaults `LLM_MIN_INTERVAL_SECONDS=2.5` and `LLM_REASONING_EFFORT=low` for `openai/gpt-oss-20b`.
 
+## Disk and history retention
+
+- The worker prunes history once a day after 17:00 IST (`core_db/retention.py`):
+  - agent signals older than 30 days are summarised into `agent_signal_daily`, then removed (signals cited by trades are kept);
+  - trace copies of `agent.signal` messages older than 7 days are removed;
+  - `signal_accepted` audit rows older than 30 days are removed.
+  Candles, orders, fills and positions are never pruned.
+- `deploy/healthcheck.sh` alerts when the disk is 85% full (`DISK_ALERT_PCT`).
+- Weekly cron, Sunday 03:00 IST, clears Docker's build cache (images in use are untouched):
+  ```
+  30 21 * * 6 docker builder prune -f --filter until=168h >> $HOME/backups/maintenance.log 2>&1
+  ```
+
 ## Notifications (Telegram)
 
 1. In Telegram, message **@BotFather**, send `/newbot`, and copy the bot token.

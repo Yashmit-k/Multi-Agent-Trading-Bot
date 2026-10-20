@@ -378,3 +378,15 @@ class UserStrategyRow(Base):
     payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AgentSignalDailyRow(Base):
+    """Daily summary of an agent's signals, kept after the raw rows age out (core_db retention)."""
+
+    __tablename__ = "agent_signal_daily"
+
+    day: Mapped[str] = mapped_column(String(10), primary_key=True)
+    agent: Mapped[str] = mapped_column(String(32), primary_key=True)
+    horizon: Mapped[str] = mapped_column(String(16), primary_key=True)
+    version: Mapped[str] = mapped_column(String(16), primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
