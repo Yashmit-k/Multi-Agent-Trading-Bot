@@ -41,6 +41,7 @@ weights = excluded_agent_weights(os.environ.get("FUSION_EXCLUDED_AGENTS", ""))
 logger.info("fusion_excluded_agents agents=%s", os.environ.get("FUSION_EXCLUDED_AGENTS", ""))
 failed_cycles = 0
 last_error: str | None = None
+excluded = {item.strip().lower() for item in os.environ.get("FUSION_EXCLUDED_AGENTS", "").split(",") if item.strip()}
 notifier = Notifier.from_env()
 site_url = os.environ.get("PUBLIC_SITE_URL", "")
 logger.info("notifications configured=%s", notifier.configured)
@@ -54,7 +55,6 @@ while True:
         try:
             run_once(repository, now)
             authenticated = broker_allows_entries(api_base, api_token)
-            excluded = {item.strip().lower() for item in os.environ.get("FUSION_EXCLUDED_AGENTS", "").split(",") if item.strip()}
             live_weights = current_weights(repository, now, excluded) or weights
             run_scheduled_cycle(
                 repository,
@@ -70,6 +70,11 @@ while True:
             failed_cycles += 1
             last_error = f"{type(exc).__name__}: {exc}"
             logger.exception("paper_cycle_failed consecutive=%s", failed_cycles)
+    if mode == TradingMode.PAPER and not cash_session_open(now):
+        try:
+            current_weights(repository, now, excluded)  # hourly, so the Agents page is current on closed days too
+        except Exception:
+            logger.exception("agent_weights_refresh_failed")
     try:
         # End-of-day book, once per trading day after the close (no-op at other times).
         write_daily_if_due(repository, now)

@@ -29,18 +29,22 @@ function marketState(): "open" | "closed" {
 export function ModeBanner({
   mode,
   killSwitch = "UNKNOWN",
+  market: serverMarket = null,
 }: {
   mode: TradingMode | "UNKNOWN";
   killSwitch?: string;
+  market?: { open: boolean; trading_day: boolean } | null;
 }) {
   const live = mode === "LIVE";
   const clock = useIstClock();
   const [market, setMarket] = useState<"open" | "closed" | null>(null);
   useEffect(() => {
-    setMarket(marketState());
-    const timer = setInterval(() => setMarket(marketState()), 60000);
+    // The server's NSE calendar knows exchange holidays; the clock-only check is a fallback.
+    const read = () => setMarket(serverMarket ? (serverMarket.open ? "open" : "closed") : marketState());
+    read();
+    const timer = setInterval(read, 60000);
     return () => clearInterval(timer);
-  }, []);
+  }, [serverMarket]);
   const armed = killSwitch === "armed";
   return (
     <header

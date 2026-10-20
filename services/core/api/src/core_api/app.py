@@ -130,6 +130,7 @@ def create_app(
             "exchange_scope": "NSE",
             # Same meaning as /zerodha/status: a Kite client exists (API key and secret set).
             "zerodha_configured": app.state.kite_client is not None or zerodha.credentials_present(),
+            "market": _market_state(datetime.now(timezone.utc)),
         }
 
     @app.get("/api/v1/system/health")
@@ -1757,6 +1758,19 @@ def _worker_check(app: FastAPI, running: bool, now: datetime) -> dict[str, objec
     if running:
         return _check(name, "warn" if market_open else "idle", f"worker not running ({silent}); paper trading is on" + ("" if market_open else ", market closed"))
     return _check(name, "idle", "stopped: starts only on explicit authorization")
+
+
+def _market_state(now: datetime) -> dict[str, object]:
+    """NSE cash session state from the trading calendar (weekends and exchange holidays included)."""
+    from core_paper.trading_calendar import cash_session_open, session_for
+
+    local = now.astimezone(_IST)
+    try:
+        trading_day = session_for(local.date()) is not None
+        is_open = cash_session_open(now)
+    except Exception:  # noqa: BLE001 - outside calendar coverage
+        trading_day, is_open = local.weekday() < 5, False
+    return {"open": is_open, "trading_day": trading_day, "reason": "open" if is_open else ("closed" if trading_day else "holiday_or_weekend")}
 
 
 def _token_times(repository: CoreRepository, now: datetime) -> dict[str, object]:
