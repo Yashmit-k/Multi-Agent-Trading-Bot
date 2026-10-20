@@ -18,7 +18,7 @@
 - Every handoff, including each reasoning step of the manager, is a typed message on a Redis bus. A trace recorder stores it, and the dashboard shows it live.
 - Live trading is hard-coded off.
 
-**Target user.** An individual Indian retail trader, or a small research team, who wants to forward-test a systematic multi-signal NIFTY 50 strategy on real market data with fake money. They need to see exactly why every decision was made, including where the agents disagreed, before trusting it with capital. The Strategy Lab and the Research findings page also serve the same user when testing their own rules honestly.
+**Target user.** An individual Indian retail trader, or a small research team, who wants to forward-test a systematic multi-signal NIFTY 50 strategy on real market data with fake money. They need to see exactly why every decision was made, including where the agents disagreed, before trusting it with capital. The Strategy Lab serves the same user: they can build any rule-based algorithm, backtest it with the live fill and cost model, and apply it to paper trading, either replacing the agents, trading alongside them, or trading only when the agents agree (a Settings choice).
 
 ## Scope relative to the approved CA2 description
 
@@ -27,9 +27,9 @@ The architecture, the specialist agents, the rule "agents give opinions, code de
 | CA2 item | Status now | Why |
 |---|---|---|
 | Agent coordination | **Added: the LLM portfolio manager** (supervisor/critic) with tools, re-check requests to other agents, critique and revision, and model failover | The first build's agents only published opinions into a fixed pipeline. The manager makes the agents reason about each other's output. It can only approve, shrink or veto, so it adds judgement without adding a way to lose money. |
-| ML agent | Implemented, **not loaded** | Three pre-registered ML studies found no robust return edge after costs ([Research findings](https://13-238-176-73.sslip.io/findings)). An agent must pass its gate before it gets a vote. |
+| ML agent | Implemented, **not loaded** | Three pre-registered ML studies found no robust return edge after costs ([study write-ups](../../services/quant/docs/)). An agent must pass its gate before it gets a vote. |
 | Fusion weights | Set by a backtest of every agent ([agent-tuning result](../../services/quant/docs/agent-tuning-result.md)) | No quant agent kept a validated swing edge, so their swing weight is 0. Fundamental, valuation, earnings and ML have weight 0. They still run, and the portfolio manager weighs their arguments. |
 | LLM capacity | Free-tier Gemini | When the daily quota runs out, the intelligence agents fall back to a labelled heuristic (`fixture.heuristic`). The manager detects fallback-based opinions and asks for a re-check on a second model. |
 | Intraday entries | Off by default | The exit-rules and selective-intraday studies found 5-minute entries lose money to charges. Intraday exits still run. |
 | SHADOW / LIVE modes | Disabled | No strategy has passed the acceptance gate. |
-| Profitable strategy | Not claimed | 13 studies are published with their failures on the Research findings page. |
+| Profitable strategy | Not claimed | 13 pre-registered studies are published with their failures in [`services/quant/docs/`](../../services/quant/docs/). |

@@ -8,7 +8,7 @@
 > - [Input definition](docs/submission/input-definition.md) and [Output definition](docs/submission/output-definition.md), with real samples
 > - [Agent execution traces](docs/submission/agent-trace/): real Redis bus messages captured by the trace recorder. Start with [the portfolio-manager reviews](docs/submission/agent-trace/20261020-portfolio-manager-reviews.md): planning, tool calls, critique and revision, an agent-to-agent re-check request and its reply, model failover, and the verdict.
 > - Portfolio manager (LLM supervisor agent): [`services/intelligence/src/intelligence_agents/manager/`](services/intelligence/src/intelligence_agents/manager/); live at [/manager](https://13-238-176-73.sslip.io/manager)
-> - [Research findings](https://13-238-176-73.sslip.io/findings): 13 pre-registered studies, including the failures
+> - [Research write-ups](services/quant/docs/): 13 pre-registered studies (protocol committed before each result), including the failures
 > - [Demo video script](docs/submission/demo-script.md)
 >
 > Team (commit authors): Yashmit Kotekar ([@Yashmit-k](https://github.com/Yashmit-k)), ishita2403, nimitajestin. Each member should confirm their GitHub username here.
