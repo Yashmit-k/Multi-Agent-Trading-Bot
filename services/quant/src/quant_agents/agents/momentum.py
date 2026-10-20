@@ -1,4 +1,9 @@
-"""Momentum agent: signs of precomputed return and trend features."""
+"""Momentum agent: multi-bar return beyond noise, confirmed by trend strength and strength vs NIFTY.
+
+Dropped: the sign of the last single bar (noise on 5-minute bars, 35% of the old weight) and MACD
+(already a Technical vote). The return vote needs the 10-bar move to exceed half its expected noise
+(feature roc_10_z, from the Feature Engine); otherwise the agent abstains on it.
+"""
 
 from __future__ import annotations
 
@@ -10,42 +15,29 @@ from quant_agents.base import AgentDecision, BaseQuantAgent
 from quant_agents.feature_view import FeatureView
 from quant_agents.vote import Vote
 
-WEIGHTS = {
-    "return_1": 0.35,
-    "momentum_10": 0.35,
-    "macd": 0.3,
-}
+WEIGHTS = {"roc_10": 0.45, "trend_strength": 0.3, "relative_strength": 0.25}
+NOISE_Z_UP = 0.5
+NOISE_Z_DOWN = -0.5
+ADX_TREND = 20.0
 
 
 class MomentumAgent(BaseQuantAgent):
     agent_name = AgentName.MOMENTUM
-    required_features = ("return_1", "momentum_10", "macd")
-    optional_features = ("roc_10", "trend_strength_adx", "relative_strength_nifty", "volume_confirmation")
+    required_features = ("roc_10_z",)
+    optional_features = ("trend_strength_adx", "relative_strength_nifty")
 
     def interpret(self, view: FeatureView, extra_views: Mapping[str, FeatureView]) -> AgentDecision:
         votes: list[Vote] = []
-        ret = view.get("return_1")
-        if ret is not None:
-            if ret > 0:
-                votes.append(Vote("return_1", 1, WEIGHTS["return_1"]))
-            elif ret < 0:
-                votes.append(Vote("return_1", -1, WEIGHTS["return_1"]))
-            else:
-                votes.append(Vote("return_1", 0, WEIGHTS["return_1"]))
-        mom = view.get("momentum_10")
-        if mom is not None:
-            if mom > 0:
-                votes.append(Vote("momentum_10", 1, WEIGHTS["momentum_10"]))
-            elif mom < 0:
-                votes.append(Vote("momentum_10", -1, WEIGHTS["momentum_10"]))
-            else:
-                votes.append(Vote("momentum_10", 0, WEIGHTS["momentum_10"]))
-        macd = view.get("macd")
-        if macd is not None:
-            if macd > 0:
-                votes.append(Vote("macd", 1, WEIGHTS["macd"]))
-            elif macd < 0:
-                votes.append(Vote("macd", -1, WEIGHTS["macd"]))
-            else:
-                votes.append(Vote("macd", 0, WEIGHTS["macd"]))
+        z = view.get("roc_10_z")
+        direction = 0
+        if z is not None:
+            direction = 1 if z > NOISE_Z_UP else -1 if z < NOISE_Z_DOWN else 0
+            votes.append(Vote("roc_10", direction, WEIGHTS["roc_10"]))
+        adx = view.get("trend_strength_adx")
+        if adx is not None:
+            # A strong trend confirms the move's direction; a weak one abstains.
+            votes.append(Vote("trend_strength", direction if adx >= ADX_TREND else 0, WEIGHTS["trend_strength"]))
+        relative = view.get("relative_strength_nifty")
+        if relative is not None:
+            votes.append(Vote("relative_strength", 1 if relative > 0 else -1 if relative < 0 else 0, WEIGHTS["relative_strength"]))
         return AgentDecision(votes=tuple(votes))

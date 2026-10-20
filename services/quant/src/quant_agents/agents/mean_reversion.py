@@ -1,4 +1,9 @@
-"""Mean-reversion agent: price versus precomputed Bollinger bands."""
+"""Mean-reversion agent: fade only band extremes, and only when the trend is weak.
+
+The old "price below the middle band, so buy" vote bet against every trend all day and graded below a
+coin flip (47% over 10 days intraday). Now a vote needs a close outside a Bollinger band *and* a weak
+trend (ADX under ADX_WEAK); in a strong trend the agent abstains (signal 0, confidence 0).
+"""
 
 from __future__ import annotations
 
@@ -10,39 +15,25 @@ from quant_agents.base import AgentDecision, BaseQuantAgent
 from quant_agents.feature_view import FeatureView
 from quant_agents.vote import Vote
 
-WEIGHTS = {
-    "upper": 0.4,
-    "lower": 0.4,
-    "mid": 0.2,
-}
+WEIGHTS = {"lower": 0.5, "upper": 0.5}
+ADX_WEAK = 20.0
 
 
 class MeanReversionAgent(BaseQuantAgent):
     agent_name = AgentName.MEAN_REVERSION
-    required_features = ("last_close", "bollinger_upper", "bollinger_lower", "bollinger_mid")
-    optional_features = ("bollinger_pct_b", "distance_from_mean", "zscore_20", "reversion_half_life")
+    required_features = ("last_close", "bollinger_upper", "bollinger_lower")
+    optional_features = ("trend_strength_adx", "bollinger_pct_b", "zscore_20")
 
     def interpret(self, view: FeatureView, extra_views: Mapping[str, FeatureView]) -> AgentDecision:
-        votes: list[Vote] = []
         close = view.get("last_close")
         upper = view.get("bollinger_upper")
         lower = view.get("bollinger_lower")
-        mid = view.get("bollinger_mid")
-        if close is not None and upper is not None:
-            if close > upper:
-                votes.append(Vote("upper", -1, WEIGHTS["upper"]))
-            else:
-                votes.append(Vote("upper", 0, WEIGHTS["upper"]))
+        adx = view.get("trend_strength_adx")
+        weak_trend = adx is None or adx < ADX_WEAK
+        reasons = ["mean_reversion.weak_trend" if weak_trend else "mean_reversion.strong_trend_abstain"]
+        votes: list[Vote] = []
         if close is not None and lower is not None:
-            if close < lower:
-                votes.append(Vote("lower", 1, WEIGHTS["lower"]))
-            else:
-                votes.append(Vote("lower", 0, WEIGHTS["lower"]))
-        if close is not None and mid is not None:
-            if close > mid:
-                votes.append(Vote("mid", -1, WEIGHTS["mid"]))
-            elif close < mid:
-                votes.append(Vote("mid", 1, WEIGHTS["mid"]))
-            else:
-                votes.append(Vote("mid", 0, WEIGHTS["mid"]))
-        return AgentDecision(votes=tuple(votes))
+            votes.append(Vote("lower", 1 if (weak_trend and close < lower) else 0, WEIGHTS["lower"]))
+        if close is not None and upper is not None:
+            votes.append(Vote("upper", -1 if (weak_trend and close > upper) else 0, WEIGHTS["upper"]))
+        return AgentDecision(votes=tuple(votes), reason_codes=tuple(reasons))
