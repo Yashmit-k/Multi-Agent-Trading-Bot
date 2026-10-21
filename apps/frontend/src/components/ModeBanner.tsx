@@ -54,9 +54,9 @@ export function ModeBanner({
       }`}
     >
       <Link prefetch={false} href="/dashboard" className="flex min-w-0 items-center gap-2.5">
-        <span aria-hidden className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-[#22C55E] to-[#3B82F6] text-xs font-bold text-[#0B0F14]">
-          SX
-        </span>
+        {/* Decorative: the brand text beside it carries the name, so alt stays empty. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.svg" alt="" data-testid="brand-logo" width={28} height={28} className="h-7 w-7 shrink-0" />
         <span data-testid="brand-mark" className="text-base font-semibold tracking-[0.14em]">
           StockX
         </span>
