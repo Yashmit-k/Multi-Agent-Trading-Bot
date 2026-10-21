@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { fetchApi } from "@/lib/api";
 import { ErrorState } from "@/components/States";
 import { PageFrame } from "@/components/shell/PageFrame";
@@ -17,6 +18,9 @@ export default async function StrategiesPage() {
         title="Strategy lab"
         description="Build any rule strategy from 70+ indicators, candle patterns, market structure and session values, with AND/OR groups and higher-timeframe filters. Backtest it on stored NSE data with Zerodha charges, then apply it to paper trading."
       >
+        <Link prefetch={false} href="/strategies/guide" className="inline-block text-sm text-[#93C5FD] hover:underline">
+          How it works
+        </Link>
         <StrategyLab catalog={catalog} saved={saved} active={active.active} />
       </PageFrame>
     );
