@@ -9,8 +9,8 @@ import { PnlCalendar } from "@/components/dashboard/PnlCalendar";
 import { demoDashboard } from "@/lib/demo/dashboard-fixtures";
 import type { DailyPnlDay, DashboardSnapshot } from "@/lib/daily-pnl";
 import { loadRealDashboard } from "@/lib/load-real-dashboard";
-import { formatInr, formatPct, formatSignedInr } from "@/lib/money";
-import { formatDateKeyLong, formatIstInstant } from "@/lib/ist";
+import { formatInr, formatPct, formatSignedInr, parseDecimal } from "@/lib/money";
+import { formatDateKeyLong } from "@/lib/ist";
 import { visualState } from "@/lib/cell-state";
 import { ErrorState } from "@/components/States";
 
@@ -67,9 +67,6 @@ export function TradingDashboard() {
         <div>
           <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Overview</p>
           <h1 className="text-2xl font-semibold text-[#E6EDF3]">Trading Overview</h1>
-          <p className="text-sm text-[#94A3B8]">
-            PAPER TRADING · live_enabled={String(snapshot?.status.live_enabled ?? "—")} · read-only
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <label className="flex items-center gap-2 text-[#94A3B8]">
@@ -87,7 +84,7 @@ export function TradingDashboard() {
               {snapshot?.sessions.length ? (
                 snapshot.sessions.map((item) => (
                   <option key={item.session_id} value={item.session_id}>
-                    {item.label} ({item.status})
+                    {item.label}
                   </option>
                 ))
               ) : (
@@ -105,25 +102,11 @@ export function TradingDashboard() {
           >
             Refresh
           </button>
-          <button
-            type="button"
-            role="switch"
-            data-testid="demo-toggle"
-            aria-checked={demo}
-            aria-label="Show demonstration data"
-            className="flex items-center gap-2 rounded-md border border-[#26303C] bg-[#171F2A] px-3 py-1 text-[#E6EDF3]"
-            onClick={() => setDemo(!demo)}
-          >
-            <span className={demo ? "text-amber-200" : "text-[#94A3B8]"}>{demo ? "On" : "Off"}</span>
-            Demo data
-          </button>
+          <span data-testid="last-updated" className="text-xs text-[#94A3B8]">
+            Updated {lastRefresh ? istTime(lastRefresh) : "—"}
+          </span>
         </div>
       </header>
-      <p className="text-xs text-[#94A3B8]">
-        Last successful refresh {lastRefresh ? formatIstInstant(lastRefresh) : "—"}. Market as_of{" "}
-        {snapshot?.status.market_as_of ? formatIstInstant(snapshot.status.market_as_of) : "unavailable"}. Trading date{" "}
-        {endKey ?? "—"} ({snapshot?.trading_date_source ?? "—"}).
-      </p>
 
       {error && !demo ? <ErrorState message={error.message} /> : null}
       {!demo && !snapshot ? <CalendarSkeleton /> : null}
@@ -166,11 +149,7 @@ export function TradingDashboard() {
             day={sessionDays.find((item) => item.calendar_date_ist === selectedDay)}
             onClear={() => setSelectedDay(null)}
           />
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <MarketPanel snapshot={snapshot} />
-            <ActivityPanel snapshot={snapshot} />
-            <RiskPanel snapshot={snapshot} />
-          </div>
+          <RecentTrades snapshot={snapshot} />
         </>
       ) : null}
     </div>
@@ -198,57 +177,40 @@ function SummaryCards({
   const today = endKey ? snapshot.days.find((day) => day.calendar_date_ist === endKey) : undefined;
   const todayState = today ? visualState(today) : undefined;
   const openPositions = snapshot.positions.length;
-  const closedLabel = snapshot.win_rate.sample;
+
+  const realized = snapshot.portfolio.realized_pnl;
+  const unrealized = snapshot.portfolio.unrealized_pnl;
+  const showToday = today?.net_pnl_inr != null && todayState?.kind !== "missing" && todayState?.kind !== "market_closed";
 
   return (
     <div data-testid="kpi-row" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <Card title="Total P&L">
-        <p className="font-mono text-2xl tabular-nums text-[#E6EDF3]">{total === null ? "—" : formatSignedInr(total)}</p>
+        <Amount value={total} />
         <p className="text-sm text-[#94A3B8]">
-          Session return {formatPct(ret)} of starting cash {start === null ? "—" : formatInr(start)}
-        </p>
-        <p className="text-xs text-[#94A3B8]">{sessionLabel}</p>
-        <p className="text-xs text-[#94A3B8]">
-          Realized {snapshot.portfolio.realized_pnl === null ? "—" : formatSignedInr(snapshot.portfolio.realized_pnl)} ·
-          Unrealized {snapshot.portfolio.unrealized_pnl === null ? "—" : formatSignedInr(snapshot.portfolio.unrealized_pnl)}
+          {formatPct(ret)} of {start === null ? "—" : formatInr(start)}
         </p>
       </Card>
-      <Card title={snapshot.pnl_basis === "realized_only" ? "Today’s realized P&L" : "Today’s P&L"}>
-        <p className="font-mono text-2xl tabular-nums text-[#E6EDF3]">
-          {today?.net_pnl_inr == null || todayState?.kind === "missing" || todayState?.kind === "market_closed"
-            ? "—"
-            : formatSignedInr(today.net_pnl_inr)}
-        </p>
-        <p className="text-xs text-[#94A3B8]">
-          Date {endKey ?? "—"} · complete {today ? String(today.complete) : "n/a"} · {snapshot.pnl_basis}
-        </p>
-        {snapshot.mode === "real" ? (
-          <p className="text-xs text-[#94A3B8]">Shown only once Core stores a daily P&L figure. Total P&L above is cumulative, not today’s.</p>
-        ) : null}
+      <Card title="Today’s P&L">
+        <Amount value={showToday ? today!.net_pnl_inr! : null} />
+        <p className="text-sm text-[#94A3B8]">{endKey ? formatDateKeyLong(endKey) : "—"}</p>
       </Card>
-      <Card title="Win rate">
-        <p className="font-mono text-2xl tabular-nums text-[#E6EDF3]">
-          {!sessionBelongsToSeries || snapshot.win_rate.pct === null ? "—" : formatPct(snapshot.win_rate.pct)}
-        </p>
-        <p className="text-sm text-[#94A3B8]">n = {sessionBelongsToSeries ? (closedLabel ?? "—") : "—"}</p>
-        <p className="text-xs text-[#94A3B8]" title={snapshot.win_rate.definition}>
-          {snapshot.win_rate.definition}
-        </p>
+      <Card title="Realised">
+        <Amount value={realized} />
+        <p className="text-sm text-[#94A3B8]">from closed trades</p>
       </Card>
-      <Card title="Trades and positions">
-        <p className="font-mono text-2xl tabular-nums text-[#E6EDF3]">{openPositions} open</p>
+      <Card title="Unrealised">
+        <Amount value={unrealized} />
         <p className="text-sm text-[#94A3B8]">
-          Executions listed {snapshot.trades.length} · orders {snapshot.orders.length}. Unfilled orders are not completed trades.
+          on {openPositions} open position{openPositions === 1 ? "" : "s"}
         </p>
-        <Link prefetch={false} href="/positions" className="text-sm text-cyan-400 hover:underline">
-          Positions
-        </Link>{" "}
-        <Link prefetch={false} href="/orders" className="text-sm text-cyan-400 hover:underline">
-          Orders
-        </Link>
       </Card>
     </div>
   );
+}
+
+function Amount({ value }: { value: number | null }) {
+  const tone = value === null || value === 0 ? "text-[#E6EDF3]" : value > 0 ? "text-emerald-400" : "text-red-400";
+  return <p className={`font-mono text-2xl tabular-nums ${tone}`}>{value === null ? "—" : formatSignedInr(value)}</p>;
 }
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
@@ -281,101 +243,73 @@ function DayDetail({ dateKey, day, onClear }: { dateKey: string | null; day?: Da
   );
 }
 
-function MarketPanel({ snapshot }: { snapshot: DashboardSnapshot }) {
-  const market = snapshot.market;
-  return (
-    <section data-testid="market-panel" className="rounded-[12px] border border-[#26303C] bg-[#121922] p-4 text-sm">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">Market</h2>
-      {market == null ? (
-        <p className="text-[#94A3B8]">Market overview is unavailable.</p>
-      ) : (
-        <ul className="space-y-1 text-[#E6EDF3]">
-          <li>
-            Avg member close ₹{market.nifty_last ?? "—"}
-          </li>
-          <li>
-            Breadth {market.breadth_advancers ?? "—"}/{market.breadth_decliners ?? "—"}
-          </li>
-          <li className="text-[#94A3B8]">
-            as_of {market.as_of ? formatIstInstant(market.as_of) : "unavailable"}
-            {market.mode ? ` · mode ${market.mode}` : ""}
-          </li>
-          <li className="text-xs text-[#94A3B8]">Equal-weight average of the 50 constituents' last daily closes. This is not the NIFTY 50 index level.</li>
-        </ul>
-      )}
-    </section>
-  );
+const REASONS: Record<string, string> = {
+  entry: "entry",
+  stop: "stop loss",
+  target: "target",
+  signal: "agents turned bearish",
+  kill_switch: "kill switch",
+  manual: "manual",
+};
+
+function istTime(iso: string): string {
+  return new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso)) + " IST";
 }
 
-function ActivityPanel({ snapshot }: { snapshot: DashboardSnapshot }) {
-  const empty = snapshot.orders.length === 0 && snapshot.trades.length === 0;
+function istDayTime(iso: string): string {
+  return new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso));
+}
+
+function RecentTrades({ snapshot }: { snapshot: DashboardSnapshot }) {
+  const sideOf = new Map(snapshot.orders.map((order) => [String(order.order_id), String(order.side ?? "")]));
+  const rows = snapshot.trades
+    .map((row) => {
+      const meta = (row.metadata ?? {}) as Record<string, unknown>;
+      const when = String(row.executed_at ?? row.timestamp ?? "");
+      const reason = String(meta.reason ?? "");
+      const side = String(row.side ?? sideOf.get(String(row.order_id)) ?? (reason === "entry" ? "BUY" : reason ? "SELL" : ""));
+      return { id: String(row.execution_id), when, symbol: String(row.symbol), side, quantity: row.quantity, price: parseDecimal(row.price as string), reason };
+    })
+    .sort((a, b) => b.when.localeCompare(a.when))
+    .slice(0, 8);
   return (
-    <section data-testid="activity-panel" className="rounded-[12px] border border-[#26303C] bg-[#121922] p-4 text-sm">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">Activity</h2>
-      {empty ? (
-        <p className="text-[#94A3B8]">No recent orders or executions.</p>
-      ) : (
-        <>
-          {snapshot.trades.length === 0 ? (
-            <p className="text-[#94A3B8]">No executions.</p>
-          ) : (
-            <ul className="mb-3 space-y-1 font-mono tabular-nums">
-              {snapshot.trades.slice(0, 8).map((row, index) => (
-                <li key={String(row.execution_id ?? index)}>
-                  {String(row.symbol)} {String(row.side ?? "")} {String(row.quantity ?? "")}
-                </li>
-              ))}
-            </ul>
-          )}
-          {snapshot.orders.length === 0 ? (
-            <p className="text-[#94A3B8]">No orders.</p>
-          ) : (
-            <ul className="space-y-1">
-              {snapshot.orders.slice(0, 8).map((row) => {
-                const status = String(row.status ?? "");
-                const review = status === "legacy_order_requires_review";
-                return (
-                  <li key={String(row.order_id)}>
-                    {String(row.symbol)} {status}
-                    {review ? " — legacy review, not a pending fill" : ""}
-                    {status === "CANCELLED" ? " (cancelled; not a completed trade)" : ""}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </>
-      )}
-      <div className="mt-3 flex gap-3">
+    <section data-testid="recent-trades" className="rounded-[12px] border border-[#26303C] bg-[#121922] p-4 text-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">Recent trades</h2>
         <Link prefetch={false} href="/orders" className="text-sm text-cyan-400 hover:underline">
-          Orders
-        </Link>
-        <Link prefetch={false} href="/positions" className="text-sm text-cyan-400 hover:underline">
-          Positions
+          View all →
         </Link>
       </div>
-    </section>
-  );
-}
-
-function RiskPanel({ snapshot }: { snapshot: DashboardSnapshot }) {
-  const s = snapshot.status;
-  return (
-    <section data-testid="risk-panel" className="rounded-[12px] border border-[#26303C] bg-[#121922] p-4 text-sm">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">Risk</h2>
-      <ul className="space-y-1 text-[#E6EDF3]">
-        <li>
-          Kill switch {s.kill_switch ?? "—"}
-        </li>
-        <li>Paper running {s.paper_running === null ? "—" : String(s.paper_running)}</li>
-        <li>
-          Mode {s.trading_mode} · live_enabled {String(s.live_enabled)}
-        </li>
-        <li>Core API {s.core}</li>
-      </ul>
-      <Link prefetch={false} href="/risk" className="mt-3 inline-block text-sm text-cyan-400 hover:underline">
-        Open Risk controls
-      </Link>
+      {rows.length === 0 ? (
+        <p className="text-[#94A3B8]">No trades yet.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] text-left">
+            <thead className="text-xs text-[#94A3B8]">
+              <tr>
+                <th className="py-1 pr-3 font-normal">Time</th>
+                <th className="py-1 pr-3 font-normal">Stock</th>
+                <th className="py-1 pr-3 font-normal">Side</th>
+                <th className="py-1 pr-3 text-right font-normal">Qty</th>
+                <th className="py-1 pr-3 text-right font-normal">Price</th>
+                <th className="py-1 font-normal">Reason</th>
+              </tr>
+            </thead>
+            <tbody className="text-[#E6EDF3]">
+              {rows.map((row) => (
+                <tr key={row.id} className="border-t border-[#26303C]">
+                  <td className="py-1.5 pr-3 tabular-nums text-[#94A3B8]">{row.when ? istDayTime(row.when) : "—"}</td>
+                  <td className="py-1.5 pr-3 font-medium">{row.symbol}</td>
+                  <td className={`py-1.5 pr-3 ${row.side === "BUY" ? "text-emerald-400" : row.side === "SELL" ? "text-red-400" : ""}`}>{row.side || "—"}</td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums">{String(row.quantity ?? "—")}</td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums">{row.price === null ? "—" : formatInr(row.price)}</td>
+                  <td className="py-1.5 text-[#94A3B8]">{REASONS[row.reason] ?? (row.reason.replaceAll("_", " ") || "—")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }

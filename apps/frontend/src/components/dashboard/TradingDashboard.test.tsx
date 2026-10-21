@@ -85,12 +85,26 @@ describe("dashboard isolation", () => {
     expect(loader).toContain('"/api/v1/paper/daily-performance"');
   });
 
-  it("labels demo data and uses a working demo checkbox", () => {
+  it("labels demo data and keeps the header minimal", () => {
     render(<TradingDashboard />);
     expect(screen.getByTestId("demo-banner").textContent).toContain("DEMO DATA");
-    const toggle = screen.getByTestId("demo-toggle");
-    expect(toggle.getAttribute("aria-checked")).toBe("true");
-    expect(toggle.getAttribute("role")).toBe("switch");
+    expect(screen.queryByTestId("demo-toggle")).toBeNull();
+    expect(document.body.textContent).not.toContain("live_enabled=");
+    expect(document.body.textContent).not.toContain("Last successful refresh");
+    expect(screen.getByTestId("last-updated").textContent).toMatch(/Updated \d{2}:\d{2} IST/);
+    expect(screen.getByTestId("session-select").textContent).not.toContain("(active) (active)");
+  });
+
+  it("shows total, today, realised and unrealised cards and a recent-trades table", () => {
+    render(<TradingDashboard />);
+    const cards = screen.getByTestId("kpi-row").textContent ?? "";
+    for (const title of ["Total P&L", "Today’s P&L", "Realised", "Unrealised"]) expect(cards).toContain(title);
+    expect(cards).not.toContain("Win rate");
+    const trades = screen.getByTestId("recent-trades").textContent ?? "";
+    expect(trades).toContain("INFY");
+    expect(trades).toContain("BUY");
+    expect(screen.queryByTestId("market-panel")).toBeNull();
+    expect(screen.queryByTestId("activity-panel")).toBeNull();
   });
 
   it("shows an unavailable equity panel in real mode and a demo series in demo mode", () => {
@@ -113,7 +127,7 @@ describe("dashboard isolation", () => {
     render(<TradingDashboard />);
     expect(screen.queryByRole("button", { name: "Arm" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Disarm" })).toBeNull();
-    expect(screen.getByTestId("risk-panel").textContent).toContain("Open Risk controls");
+    expect(screen.queryByTestId("risk-panel")).toBeNull();
   });
 });
 
