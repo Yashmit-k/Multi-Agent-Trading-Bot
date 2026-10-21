@@ -1,0 +1,295 @@
+{
+  "definitions": "services/quant/docs/mentor-strategies.md",
+  "period": [
+    "2024-04-01",
+    "2026-10-05"
+  ],
+  "results": [
+    {
+      "strategy": "market_boom_momentum",
+      "stop": null,
+      "entries": 1087,
+      "closed_trades": 1634,
+      "closed_losing_trades": 0,
+      "closed_win_rate": 1.0,
+      "realised_net": 145146.04008092007,
+      "realised_by_year": {
+        "2024": 49163.87088518448,
+        "2025": 59251.50512686418,
+        "2026": 36730.66406887183
+      },
+      "open_positions_at_end": 12,
+      "open_unrealised": -10204.40487380081,
+      "open_losing": 12,
+      "oldest_open_days": 26,
+      "handed_off_after_30_days": 162,
+      "handed_off_unrealised": -165444.99068424775,
+      "total_net_including_open": -30503.355477128498,
+      "peak_capital_deployed": 361130.40496499994,
+      "return_on_peak_capital_pct": -8.446631758986015,
+      "max_drawdown": 47370.59504073165,
+      "exit_reasons": {
+        "eod_positive": 307,
+        "target_1": 721,
+        "target_2": 606
+      },
+      "worst_open": [
+        [
+          "INDUSINDBK",
+          -1684
+        ],
+        [
+          "M&M",
+          -1404
+        ],
+        [
+          "BPCL",
+          -1196
+        ],
+        [
+          "JSWSTEEL",
+          -1152
+        ],
+        [
+          "SBIN",
+          -841
+        ]
+      ]
+    },
+    {
+      "strategy": "market_boom_momentum",
+      "stop": 0.01,
+      "entries": 1511,
+      "closed_trades": 1997,
+      "closed_losing_trades": 797,
+      "closed_win_rate": 0.6009013520280421,
+      "realised_net": -87352.08480467068,
+      "realised_by_year": {
+        "2024": -24892.39819872419,
+        "2025": -28738.940326987806,
+        "2026": -33720.74627895857
+      },
+      "open_positions_at_end": 0,
+      "open_unrealised": 0.0,
+      "open_losing": 0,
+      "oldest_open_days": 0,
+      "handed_off_after_30_days": 0,
+      "handed_off_unrealised": 0.0,
+      "total_net_including_open": -87352.08480467068,
+      "peak_capital_deployed": 116504.94335999999,
+      "return_on_peak_capital_pct": -74.97714885346363,
+      "max_drawdown": 88093.33140530321,
+      "exit_reasons": {
+        "eod_positive": 393,
+        "stop": 797,
+        "target_1": 486,
+        "target_2": 321
+      },
+      "worst_open": []
+    },
+    {
+      "strategy": "new_pivotal",
+      "stop": null,
+      "entries": 1118,
+      "closed_trades": 1397,
+      "closed_losing_trades": 0,
+      "closed_win_rate": 1.0,
+      "realised_net": 275234.8395833708,
+      "realised_by_year": {
+        "2024": 94358.79338730867,
+        "2025": 104500.81907758334,
+        "2026": 76375.22711847872
+      },
+      "open_positions_at_end": 16,
+      "open_unrealised": -10554.667464616114,
+      "open_losing": 14,
+      "oldest_open_days": 19,
+      "handed_off_after_30_days": 282,
+      "handed_off_unrealised": -258800.61545726212,
+      "total_net_including_open": 5879.556661492534,
+      "peak_capital_deployed": 522682.71074999997,
+      "return_on_peak_capital_pct": 1.1248806475836803,
+      "max_drawdown": 57032.311175702744,
+      "exit_reasons": {
+        "eod_positive": 403,
+        "target_1": 577,
+        "target_2": 417
+      },
+      "worst_open": [
+        [
+          "INDUSINDBK",
+          -1602
+        ],
+        [
+          "M&M",
+          -1500
+        ],
+        [
+          "HCLTECH",
+          -1328
+        ],
+        [
+          "NESTLEIND",
+          -1265
+        ],
+        [
+          "BAJAJFINSV",
+          -1200
+        ]
+      ]
+    },
+    {
+      "strategy": "new_pivotal",
+      "stop": 0.02,
+      "entries": 1498,
+      "closed_trades": 1932,
+      "closed_losing_trades": 694,
+      "closed_win_rate": 0.6407867494824017,
+      "realised_net": -84776.76996874312,
+      "realised_by_year": {
+        "2024": -41912.12334779571,
+        "2025": -14493.645900821564,
+        "2026": -28371.00072012579
+      },
+      "open_positions_at_end": 5,
+      "open_unrealised": -466.35618673877576,
+      "open_losing": 4,
+      "oldest_open_days": 4,
+      "handed_off_after_30_days": 2,
+      "handed_off_unrealised": 319.3014558483632,
+      "total_net_including_open": -84923.82469963352,
+      "peak_capital_deployed": 230330.40765,
+      "return_on_peak_capital_pct": -36.87043563465578,
+      "max_drawdown": 84972.18918923385,
+      "exit_reasons": {
+        "eod_positive": 540,
+        "stop": 694,
+        "target_1": 441,
+        "target_2": 257
+      },
+      "worst_open": [
+        [
+          "TATACONSUM",
+          -246
+        ],
+        [
+          "ONGC",
+          -104
+        ],
+        [
+          "SHRIRAMFIN",
+          -96
+        ],
+        [
+          "LT",
+          -77
+        ],
+        [
+          "TCS",
+          56
+        ]
+      ]
+    },
+    {
+      "strategy": "ema_dip_reversion",
+      "stop": null,
+      "entries": 238,
+      "closed_trades": 316,
+      "closed_losing_trades": 101,
+      "closed_win_rate": 0.680379746835443,
+      "realised_net": 67234.41448567229,
+      "realised_by_year": {
+        "2024": 28198.197178954324,
+        "2025": 14812.335578854942,
+        "2026": 24223.881727863012
+      },
+      "open_positions_at_end": 16,
+      "open_unrealised": -8214.42549202118,
+      "open_losing": 10,
+      "oldest_open_days": 118,
+      "handed_off_after_30_days": 0,
+      "handed_off_unrealised": 0.0,
+      "total_net_including_open": 59019.9889936511,
+      "peak_capital_deployed": 855983.47785,
+      "return_on_peak_capital_pct": 6.894991611507901,
+      "max_drawdown": 67207.38112944858,
+      "exit_reasons": {
+        "target_ema": 224,
+        "target_ema_plus_3": 92
+      },
+      "worst_open": [
+        [
+          "ONGC",
+          -2313
+        ],
+        [
+          "M&M",
+          -1692
+        ],
+        [
+          "INDUSINDBK",
+          -1387
+        ],
+        [
+          "SHRIRAMFIN",
+          -1280
+        ],
+        [
+          "BRITANNIA",
+          -921
+        ]
+      ]
+    },
+    {
+      "strategy": "ema_dip_reversion",
+      "stop": 0.1,
+      "entries": 253,
+      "closed_trades": 314,
+      "closed_losing_trades": 91,
+      "closed_win_rate": 0.7101910828025477,
+      "realised_net": 29086.71504526005,
+      "realised_by_year": {
+        "2024": 11823.280165150727,
+        "2025": 24850.178844999096,
+        "2026": -7586.743964889777
+      },
+      "open_positions_at_end": 14,
+      "open_unrealised": -4209.6275314661625,
+      "open_losing": 8,
+      "oldest_open_days": 28,
+      "handed_off_after_30_days": 0,
+      "handed_off_unrealised": 0.0,
+      "total_net_including_open": 24877.08751379389,
+      "peak_capital_deployed": 702815.8323,
+      "return_on_peak_capital_pct": 3.5396310627184326,
+      "max_drawdown": 65449.66222710863,
+      "exit_reasons": {
+        "stop": 39,
+        "target_ema": 207,
+        "target_ema_plus_3": 68
+      },
+      "worst_open": [
+        [
+          "INDUSINDBK",
+          -1387
+        ],
+        [
+          "SHRIRAMFIN",
+          -1280
+        ],
+        [
+          "BRITANNIA",
+          -921
+        ],
+        [
+          "MARUTI",
+          -842
+        ],
+        [
+          "TRENT",
+          -706
+        ]
+      ]
+    }
+  ]
+}
