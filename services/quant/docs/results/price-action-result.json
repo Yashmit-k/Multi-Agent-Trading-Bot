@@ -1,0 +1,563 @@
+{
+  "protocol": "services/quant/docs/price-action-protocol.md",
+  "families": {
+    "intraday": {
+      "variants": {
+        "I1_or15_none": {
+          "train": {
+            "trades": 555,
+            "sessions": 307,
+            "active_day_share": 0.9641693811074918,
+            "trades_per_active_day": 1.875,
+            "win_rate": 0.36036036036036034,
+            "mean_gross_pct": -0.10450034837742363,
+            "mean_net_pct": -0.2938893061104189,
+            "total_net": -30068.369847059228,
+            "profit_factor": 0.5838525717522904,
+            "first_half_net": -16910.27549223887,
+            "second_half_net": -13158.094354820358,
+            "session_pnl_low": -139.7909416492407
+          },
+          "validate": {
+            "trades": 232,
+            "sessions": 125,
+            "active_day_share": 0.984,
+            "trades_per_active_day": 1.886178861788618,
+            "win_rate": 0.3620689655172414,
+            "mean_gross_pct": -0.1287925819029388,
+            "mean_net_pct": -0.3176563818605631,
+            "total_net": -13733.714426756655,
+            "profit_factor": 0.41419550772763847,
+            "first_half_net": -7871.917376671198,
+            "second_half_net": -5861.797050085457,
+            "session_pnl_low": -155.63537494109892
+          },
+          "test": {
+            "trades": 326,
+            "sessions": 184,
+            "active_day_share": 0.9456521739130435,
+            "trades_per_active_day": 1.8735632183908046,
+            "win_rate": 0.401840490797546,
+            "mean_gross_pct": -0.01527646450159581,
+            "mean_net_pct": -0.20431099322781696,
+            "total_net": -12410.174853655288,
+            "profit_factor": 0.6828639980060001,
+            "first_half_net": -3840.114773013126,
+            "second_half_net": -8570.06008064216,
+            "session_pnl_low": -117.96390387817578
+          }
+        },
+        "I1_or15_2R": {
+          "train": {
+            "trades": 555,
+            "sessions": 307,
+            "active_day_share": 0.9641693811074918,
+            "trades_per_active_day": 1.875,
+            "win_rate": 0.36036036036036034,
+            "mean_gross_pct": -0.11424111499039884,
+            "mean_net_pct": -0.303623824937244,
+            "total_net": -31143.741354628473,
+            "profit_factor": 0.5689693875437002,
+            "first_half_net": -17744.822115473224,
+            "second_half_net": -13398.91923915525,
+            "session_pnl_low": -141.5028568926637
+          },
+          "validate": {
+            "trades": 232,
+            "sessions": 125,
+            "active_day_share": 0.984,
+            "trades_per_active_day": 1.886178861788618,
+            "win_rate": 0.3620689655172414,
+            "mean_gross_pct": -0.12272052266568732,
+            "mean_net_pct": -0.31158821727853875,
+            "total_net": -13464.821606918595,
+            "profit_factor": 0.42566499201326147,
+            "first_half_net": -7738.070282100992,
+            "second_half_net": -5726.751324817603,
+            "session_pnl_low": -154.06921197170033
+          },
+          "test": {
+            "trades": 326,
+            "sessions": 184,
+            "active_day_share": 0.9456521739130435,
+            "trades_per_active_day": 1.8735632183908046,
+            "win_rate": 0.4049079754601227,
+            "mean_gross_pct": -0.015480509586117918,
+            "mean_net_pct": -0.20451490743659756,
+            "total_net": -12454.863801499097,
+            "profit_factor": 0.6813053120890776,
+            "first_half_net": -4336.487722085634,
+            "second_half_net": -8118.376079413463,
+            "session_pnl_low": -117.28050736834028
+          }
+        },
+        "I1_or30_none": {
+          "train": {
+            "trades": 523,
+            "sessions": 307,
+            "active_day_share": 0.9446254071661238,
+            "trades_per_active_day": 1.803448275862069,
+            "win_rate": 0.372848948374761,
+            "mean_gross_pct": -0.036535952775708126,
+            "mean_net_pct": -0.22612886950339517,
+            "total_net": -20978.847619988097,
+            "profit_factor": 0.6703879669610145,
+            "first_half_net": -9944.720187572919,
+            "second_half_net": -11034.127432415178,
+            "session_pnl_low": -111.91079452561524
+          },
+          "validate": {
+            "trades": 214,
+            "sessions": 125,
+            "active_day_share": 0.944,
+            "trades_per_active_day": 1.8135593220338984,
+            "win_rate": 0.35046728971962615,
+            "mean_gross_pct": -0.16754536770837372,
+            "mean_net_pct": -0.35588236803038964,
+            "total_net": -14284.23437763262,
+            "profit_factor": 0.3866958095832814,
+            "first_half_net": -8191.749004777776,
+            "second_half_net": -6092.485372854843,
+            "session_pnl_low": -160.74854523680978
+          },
+          "test": {
+            "trades": 298,
+            "sessions": 184,
+            "active_day_share": 0.8913043478260869,
+            "trades_per_active_day": 1.8170731707317074,
+            "win_rate": 0.3825503355704698,
+            "mean_gross_pct": -0.048673452984480635,
+            "mean_net_pct": -0.23783753082542272,
+            "total_net": -13183.505956661416,
+            "profit_factor": 0.6183307610628053,
+            "first_half_net": -4990.478684572184,
+            "second_half_net": -8193.027272089232,
+            "session_pnl_low": -117.69689807050655
+          }
+        },
+        "I1_or30_2R": {
+          "train": {
+            "trades": 523,
+            "sessions": 307,
+            "active_day_share": 0.9446254071661238,
+            "trades_per_active_day": 1.803448275862069,
+            "win_rate": 0.372848948374761,
+            "mean_gross_pct": -0.0567306821243274,
+            "mean_net_pct": -0.24631064583144185,
+            "total_net": -23012.77408505206,
+            "profit_factor": 0.6384316531850955,
+            "first_half_net": -11399.308482109169,
+            "second_half_net": -11613.465602942893,
+            "session_pnl_low": -115.60822266483437
+          },
+          "validate": {
+            "trades": 214,
+            "sessions": 125,
+            "active_day_share": 0.944,
+            "trades_per_active_day": 1.8135593220338984,
+            "win_rate": 0.35514018691588783,
+            "mean_gross_pct": -0.15690949907392976,
+            "mean_net_pct": -0.3452533213059029,
+            "total_net": -13884.391154077004,
+            "profit_factor": 0.4030194446187116,
+            "first_half_net": -8062.796318889616,
+            "second_half_net": -5821.594835187389,
+            "session_pnl_low": -158.3009965701724
+          },
+          "test": {
+            "trades": 298,
+            "sessions": 184,
+            "active_day_share": 0.8913043478260869,
+            "trades_per_active_day": 1.8170731707317074,
+            "win_rate": 0.3825503355704698,
+            "mean_gross_pct": -0.06136628116755528,
+            "mean_net_pct": -0.25052221775234373,
+            "total_net": -13921.612751681208,
+            "profit_factor": 0.5969621919101338,
+            "first_half_net": -5906.981681757922,
+            "second_half_net": -8014.631069923287,
+            "session_pnl_low": -119.33149194783373
+          }
+        },
+        "I2_gap1": {
+          "train": {
+            "trades": 131,
+            "sessions": 307,
+            "active_day_share": 0.31921824104234525,
+            "trades_per_active_day": 1.336734693877551,
+            "win_rate": 0.42748091603053434,
+            "mean_gross_pct": -0.016252836544433286,
+            "mean_net_pct": -0.20564228520634745,
+            "total_net": -4746.818218793753,
+            "profit_factor": 0.6260499083305375,
+            "first_half_net": -3085.778958394187,
+            "second_half_net": -1661.0392603995654,
+            "session_pnl_low": -31.667481120614497
+          },
+          "validate": {
+            "trades": 34,
+            "sessions": 125,
+            "active_day_share": 0.216,
+            "trades_per_active_day": 1.2592592592592593,
+            "win_rate": 0.4411764705882353,
+            "mean_gross_pct": -0.12851703209828758,
+            "mean_net_pct": -0.31550853748768165,
+            "total_net": -2026.7323455752523,
+            "profit_factor": 0.33642671944025754,
+            "first_half_net": -1714.9989174092595,
+            "second_half_net": -311.73342816599273,
+            "session_pnl_low": -31.50798641669105
+          },
+          "test": {
+            "trades": 119,
+            "sessions": 184,
+            "active_day_share": 0.44021739130434784,
+            "trades_per_active_day": 1.4691358024691359,
+            "win_rate": 0.453781512605042,
+            "mean_gross_pct": 0.05041378166321955,
+            "mean_net_pct": -0.1385410333290796,
+            "total_net": -3007.327577710605,
+            "profit_factor": 0.692037886192758,
+            "first_half_net": -1270.9561640995423,
+            "second_half_net": -1736.3714136110618,
+            "session_pnl_low": -40.18463934930031
+          }
+        },
+        "I2_gap2": {
+          "train": {
+            "trades": 53,
+            "sessions": 307,
+            "active_day_share": 0.13355048859934854,
+            "trades_per_active_day": 1.2926829268292683,
+            "win_rate": 0.4528301886792453,
+            "mean_gross_pct": 0.02607184549544485,
+            "mean_net_pct": -0.16244327976421027,
+            "total_net": -1265.9475435672505,
+            "profit_factor": 0.7942941143435673,
+            "first_half_net": -1268.048340671278,
+            "second_half_net": 2.100797104027947,
+            "session_pnl_low": -16.726563688239143
+          },
+          "validate": {
+            "trades": 13,
+            "sessions": 125,
+            "active_day_share": 0.088,
+            "trades_per_active_day": 1.1818181818181819,
+            "win_rate": 0.23076923076923078,
+            "mean_gross_pct": -0.3951880881518921,
+            "mean_net_pct": -0.5811545889800336,
+            "total_net": -1453.8285496582212,
+            "profit_factor": 0.15840283729161492,
+            "first_half_net": -1494.43120881404,
+            "second_half_net": 40.60265915581877,
+            "session_pnl_low": -23.339635835517278
+          },
+          "test": {
+            "trades": 44,
+            "sessions": 184,
+            "active_day_share": 0.16847826086956522,
+            "trades_per_active_day": 1.4193548387096775,
+            "win_rate": 0.4772727272727273,
+            "mean_gross_pct": 0.27655712570094665,
+            "mean_net_pct": 0.08852545556458445,
+            "total_net": 689.4765084141133,
+            "profit_factor": 1.1719028617406582,
+            "first_half_net": 429.0707157801089,
+            "second_half_net": 260.40579263400446,
+            "session_pnl_low": -15.811864373045786
+          }
+        },
+        "I3_always": {
+          "train": {
+            "trades": 614,
+            "sessions": 307,
+            "active_day_share": 1.0,
+            "trades_per_active_day": 2.0,
+            "win_rate": 0.24104234527687296,
+            "mean_gross_pct": -0.1288587784958991,
+            "mean_net_pct": -0.31763411242746264,
+            "total_net": -35873.86176235913,
+            "profit_factor": 0.25602815706641907,
+            "first_half_net": -16688.011805512117,
+            "second_half_net": -19185.849956847007,
+            "session_pnl_low": -137.13799544279752
+          },
+          "validate": {
+            "trades": 246,
+            "sessions": 125,
+            "active_day_share": 1.0,
+            "trades_per_active_day": 1.968,
+            "win_rate": 0.21544715447154472,
+            "mean_gross_pct": -0.1353223650068176,
+            "mean_net_pct": -0.3235023659172703,
+            "total_net": -14958.704932409097,
+            "profit_factor": 0.17470805703861372,
+            "first_half_net": -7984.073341962344,
+            "second_half_net": -6974.631590446752,
+            "session_pnl_low": -144.29952410038655
+          },
+          "test": {
+            "trades": 368,
+            "sessions": 184,
+            "active_day_share": 1.0,
+            "trades_per_active_day": 2.0,
+            "win_rate": 0.2608695652173913,
+            "mean_gross_pct": -0.08995389525935672,
+            "mean_net_pct": -0.2785483964052306,
+            "total_net": -19159.27485174063,
+            "profit_factor": 0.3048891291562109,
+            "first_half_net": -8963.17300611508,
+            "second_half_net": -10196.101845625552,
+            "session_pnl_low": -130.56921449421745
+          }
+        },
+        "I3_nifty_up": {
+          "train": {
+            "trades": 298,
+            "sessions": 307,
+            "active_day_share": 0.48534201954397393,
+            "trades_per_active_day": 2.0,
+            "win_rate": 0.2751677852348993,
+            "mean_gross_pct": -0.1085408087111396,
+            "mean_net_pct": -0.2965973103792904,
+            "total_net": -16588.691196330234,
+            "profit_factor": 0.28165144458423397,
+            "first_half_net": -7881.2150394808305,
+            "second_half_net": -8707.476156849403,
+            "session_pnl_low": -70.00182334260151
+          },
+          "validate": {
+            "trades": 120,
+            "sessions": 125,
+            "active_day_share": 0.488,
+            "trades_per_active_day": 1.9672131147540983,
+            "win_rate": 0.25833333333333336,
+            "mean_gross_pct": -0.12431893168061375,
+            "mean_net_pct": -0.3116215594472884,
+            "total_net": -7120.325431531911,
+            "profit_factor": 0.18159571294728022,
+            "first_half_net": -3003.84019513728,
+            "second_half_net": -4116.485236394631,
+            "session_pnl_low": -77.77135570719263
+          },
+          "test": {
+            "trades": 170,
+            "sessions": 184,
+            "active_day_share": 0.46195652173913043,
+            "trades_per_active_day": 2.0,
+            "win_rate": 0.27058823529411763,
+            "mean_gross_pct": -0.04881699944053004,
+            "mean_net_pct": -0.23664266145584936,
+            "total_net": -7574.333677405722,
+            "profit_factor": 0.35709861338487153,
+            "first_half_net": -2807.713261912895,
+            "second_half_net": -4766.620415492826,
+            "session_pnl_low": -60.244890684828334
+          }
+        }
+      },
+      "chosen": "I2_gap1",
+      "verdict": {
+        "checks": {
+          "validated": false,
+          "at_least_40_trades": true,
+          "mean_net_positive": false,
+          "session_pnl_lower_bound_positive": false,
+          "both_halves_profitable": false
+        },
+        "works": false
+      }
+    },
+    "swing": {
+      "variants": {
+        "S1_hold5": {
+          "train": {
+            "trades": 149,
+            "sessions": 307,
+            "active_day_share": 0.3550488599348534,
+            "trades_per_active_day": 1.3669724770642202,
+            "win_rate": 0.4228187919463087,
+            "mean_gross_pct": -0.32101468238380154,
+            "mean_net_pct": -0.6262917204071055,
+            "total_net": -18478.057924999714,
+            "profit_factor": 0.6273253205300166,
+            "first_half_net": -9798.387994999825,
+            "second_half_net": -8679.669929999889,
+            "session_pnl_low": -121.02437725325647
+          },
+          "validate": {
+            "trades": 50,
+            "sessions": 125,
+            "active_day_share": 0.336,
+            "trades_per_active_day": 1.1904761904761905,
+            "win_rate": 0.42,
+            "mean_gross_pct": -0.08214480995417019,
+            "mean_net_pct": -0.38607432003313696,
+            "total_net": -3923.340809999914,
+            "profit_factor": 0.7176557259733223,
+            "first_half_net": -677.3801449999686,
+            "second_half_net": -3245.960664999946,
+            "session_pnl_low": -93.89829087499923
+          },
+          "test": {
+            "trades": 75,
+            "sessions": 184,
+            "active_day_share": 0.30978260869565216,
+            "trades_per_active_day": 1.3157894736842106,
+            "win_rate": 0.37333333333333335,
+            "mean_gross_pct": -0.7353833034465328,
+            "mean_net_pct": -1.0422255570997014,
+            "total_net": -16092.057024999835,
+            "profit_factor": 0.37884801281607045,
+            "first_half_net": -9660.050174999893,
+            "second_half_net": -6432.006849999941,
+            "session_pnl_low": -153.67844548233577
+          }
+        },
+        "S1_hold10": {
+          "train": {
+            "trades": 141,
+            "sessions": 307,
+            "active_day_share": 0.33876221498371334,
+            "trades_per_active_day": 1.3557692307692308,
+            "win_rate": 0.3546099290780142,
+            "mean_gross_pct": -0.5579509815916914,
+            "mean_net_pct": -0.8627959211498809,
+            "total_net": -23591.408834999722,
+            "profit_factor": 0.638808013049179,
+            "first_half_net": -7190.921704999833,
+            "second_half_net": -16400.487129999885,
+            "session_pnl_low": -151.92457837459173
+          },
+          "validate": {
+            "trades": 49,
+            "sessions": 125,
+            "active_day_share": 0.336,
+            "trades_per_active_day": 1.1666666666666667,
+            "win_rate": 0.42857142857142855,
+            "mean_gross_pct": 0.3970796722479475,
+            "mean_net_pct": 0.0922801755989698,
+            "total_net": 343.2696000000881,
+            "profit_factor": 1.0204404372608458,
+            "first_half_net": 587.4844350000301,
+            "second_half_net": -244.2148349999419,
+            "session_pnl_low": -91.41495288799925
+          },
+          "test": {
+            "trades": 67,
+            "sessions": 184,
+            "active_day_share": 0.28804347826086957,
+            "trades_per_active_day": 1.2641509433962264,
+            "win_rate": 0.34328358208955223,
+            "mean_gross_pct": -0.446022056713927,
+            "mean_net_pct": -0.7524989565768229,
+            "total_net": -10937.304749999868,
+            "profit_factor": 0.6130451442365382,
+            "first_half_net": -7853.763099999916,
+            "second_half_net": -3083.541649999952,
+            "session_pnl_low": -134.41824586616775
+          }
+        },
+        "S2_hold3": {
+          "train": {
+            "trades": 9,
+            "sessions": 307,
+            "active_day_share": 0.02280130293159609,
+            "trades_per_active_day": 1.2857142857142858,
+            "win_rate": 0.6666666666666666,
+            "mean_gross_pct": 1.522764121140907,
+            "mean_net_pct": 1.2211518371948489,
+            "total_net": 2143.0843050000167,
+            "profit_factor": 1.9503927831492476,
+            "first_half_net": 1529.2116750000055,
+            "second_half_net": 613.8726300000112,
+            "session_pnl_low": -8.005109334690536
+          },
+          "validate": {
+            "trades": 2,
+            "sessions": 125,
+            "active_day_share": 0.016,
+            "trades_per_active_day": 1.0,
+            "win_rate": 0.5,
+            "mean_gross_pct": -0.3853955846022735,
+            "mean_net_pct": -0.6878095452740498,
+            "total_net": -261.1742499999946,
+            "profit_factor": 0.16522042774686452,
+            "first_half_net": -312.8661249999983,
+            "second_half_net": 51.691875000003705,
+            "session_pnl_low": -7.508786999999959
+          },
+          "test": {
+            "trades": 8,
+            "sessions": 184,
+            "active_day_share": 0.03260869565217391,
+            "trades_per_active_day": 1.3333333333333333,
+            "win_rate": 0.0,
+            "mean_gross_pct": -2.0649506134406184,
+            "mean_net_pct": -2.3661405449062416,
+            "total_net": -3624.407499999982,
+            "profit_factor": 0.0,
+            "first_half_net": -2604.856774999991,
+            "second_half_net": -1019.5507249999906,
+            "session_pnl_low": -36.387726056385695
+          }
+        },
+        "S2_hold5": {
+          "train": {
+            "trades": 9,
+            "sessions": 307,
+            "active_day_share": 0.02280130293159609,
+            "trades_per_active_day": 1.2857142857142858,
+            "win_rate": 0.5555555555555556,
+            "mean_gross_pct": 2.0986510675316006,
+            "mean_net_pct": 1.7953508707760726,
+            "total_net": 3179.514330000016,
+            "profit_factor": 2.4133935974323317,
+            "first_half_net": 972.0604000000056,
+            "second_half_net": 2207.4539300000106,
+            "session_pnl_low": -1.284278239413662
+          },
+          "validate": {
+            "trades": 2,
+            "sessions": 125,
+            "active_day_share": 0.016,
+            "trades_per_active_day": 1.0,
+            "win_rate": 0.5,
+            "mean_gross_pct": 0.7675409464980646,
+            "mean_net_pct": 0.4650762819455083,
+            "total_net": 193.5782500000068,
+            "profit_factor": 1.6187255012028159,
+            "first_half_net": -312.8661249999983,
+            "second_half_net": 506.4443750000051,
+            "session_pnl_low": -7.508786999999959
+          },
+          "test": {
+            "trades": 8,
+            "sessions": 184,
+            "active_day_share": 0.03260869565217391,
+            "trades_per_active_day": 1.3333333333333333,
+            "win_rate": 0.0,
+            "mean_gross_pct": -2.1938247867314726,
+            "mean_net_pct": -2.4950148626339015,
+            "total_net": -3828.8552249999802,
+            "profit_factor": 0.0,
+            "first_half_net": -2456.1411749999907,
+            "second_half_net": -1372.7140499999891,
+            "session_pnl_low": -39.15121843749977
+          }
+        }
+      },
+      "chosen": "S1_hold5",
+      "verdict": {
+        "checks": {
+          "validated": false,
+          "at_least_40_trades": true,
+          "mean_net_positive": false,
+          "session_pnl_lower_bound_positive": false,
+          "both_halves_profitable": false
+        },
+        "works": false
+      }
+    }
+  }
+}

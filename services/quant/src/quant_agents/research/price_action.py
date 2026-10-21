@@ -87,7 +87,8 @@ def build_grid(raw: dict[str, np.ndarray], sessions: np.ndarray) -> Grid:
         if s is None or not 0 <= b < BARS:
             continue
         o[s, b], h[s, b], l[s, b], c[s, b] = raw["open"][k], raw["high"][k], raw["low"][k], raw["close"][k]
-        v[s, b] = raw["last_volume"][k]
+        if "last_volume" in raw:  # indices (NIFTY) carry no traded volume, and no rule reads it
+            v[s, b] = raw["last_volume"][k]
     return Grid(sessions, o, h, l, c, v)
 
 
