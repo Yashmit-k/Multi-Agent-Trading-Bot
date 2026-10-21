@@ -816,6 +816,20 @@ def create_app(
         )
         return _active_view()
 
+    @app.get("/api/v1/strategies/{strategy_id}/preflight")
+    def strategy_preflight(strategy_id: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        """What would stop this strategy being applied, and which Settings will block or limit its entries."""
+        from core_paper.cycle import load_risk_settings
+        from core_paper.strategy_live import live_problems, live_warnings
+
+        found = repository.get_strategy(strategy_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail="strategy_not_found")
+        definition = _definition(found["definition"])
+        book = repository.active_paper_session()
+        starting = float(book.starting_cash) if book is not None and book.starting_cash is not None else float(resolved.paper_starting_cash)
+        return {"problems": live_problems(definition), "warnings": live_warnings(definition, load_risk_settings(repository), starting)}
+
     @app.get("/api/v1/strategies/{strategy_id}")
     def get_user_strategy(strategy_id: str, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
         found = repository.get_strategy(strategy_id)

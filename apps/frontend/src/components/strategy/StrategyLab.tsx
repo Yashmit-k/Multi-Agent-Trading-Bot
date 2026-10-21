@@ -42,8 +42,15 @@ const MODE_TEXT: Record<string, string> = {
   agents_agree: "Mode: agents agree. Only this strategy opens positions, and only when the agents' fused view on that stock is not bearish; the portfolio manager then reviews each entry.",
 };
 
-function ApplyDialog({ definition, catalog, onCancel, onConfirm, pending }: { definition: Definition; catalog: Catalog; onCancel: () => void; onConfirm: () => void; pending: boolean }) {
+function ApplyDialog({ definition, catalog, strategyId, onCancel, onConfirm, pending }: { definition: Definition; catalog: Catalog; strategyId: string | null; onCancel: () => void; onConfirm: () => void; pending: boolean }) {
   const [understood, setUnderstood] = useState(false);
+  const [preflight, setPreflight] = useState<{ problems: string[]; warnings: string[] } | null>(null);
+  useEffect(() => {
+    if (!strategyId) return;
+    fetchApi<{ problems: string[]; warnings: string[] }>(`/api/v1/strategies/${strategyId}/preflight`)
+      .then(setPreflight)
+      .catch(() => setPreflight(null));
+  }, [strategyId]);
   const [mode, setMode] = useState<string>("replace");
   useEffect(() => {
     fetchApi<{ settings: Record<string, unknown> }>("/api/v1/settings/risk")
@@ -51,7 +58,9 @@ function ApplyDialog({ definition, catalog, onCancel, onConfirm, pending }: { de
       .catch(() => undefined);
   }, []);
   const targets = definition.targets.length
-    ? definition.targets.map((t) => `${Math.round(t.fraction * 100)}% at ${t.value}${t.kind === "percent" ? "%" : t.kind === "atr" ? "× ATR" : "R"}`).join(", ")
+    ? definition.targets
+        .map((t) => `${Math.round(t.fraction * 100)}% at ${t.kind === "level" && t.level ? `${operandText(t.level, catalog.operands)} at the signal${t.value ? ` + ${t.value}%` : ""}` : `${t.value}${t.kind === "percent" ? "%" : t.kind === "atr" ? "× ATR" : "R"}`}`)
+        .join(", ")
     : "none";
   const stop =
     definition.stop.kind === "percent"
@@ -87,6 +96,7 @@ function ApplyDialog({ definition, catalog, onCancel, onConfirm, pending }: { de
           <dd>
             {definition.trailing ? `trail ${definition.trailing.value}${definition.trailing.kind === "percent" ? "%" : "× ATR"}` : "no trailing stop"}
             {definition.max_hold_bars ? `; max ${definition.max_hold_bars} bars` : ""}
+            {definition.add_on ? `; adds ₹${definition.add_on.notional.toLocaleString("en-IN")} once when ${ruleText(definition.add_on.when, catalog.operands)}` : ""}
             {definition.square_off_intraday ? "; squared off at 15:15" : ""}
           </dd>
           <dt className="text-[#94A3B8]">Size</dt>
@@ -101,6 +111,23 @@ function ApplyDialog({ definition, catalog, onCancel, onConfirm, pending }: { de
             <li>Paper money only. Nothing is sent to Zerodha. You can stop applying it at any time.</li>
           </ul>
         </div>
+        {preflight && (preflight.problems.length || preflight.warnings.length) ? (
+          <div className="mt-3 rounded border border-[#26303C] bg-[#0F141B] p-3 text-xs">
+            <p className="font-semibold text-[#E6EDF3]">Checked against your Settings</p>
+            <ul className="mt-1 list-disc space-y-1 pl-4">
+              {preflight.problems.map((item) => (
+                <li key={item} className="text-[#EF4444]">
+                  Cannot apply: {item}
+                </li>
+              ))}
+              {preflight.warnings.map((item) => (
+                <li key={item} className="text-[#CBD5E1]">
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <label className="mt-3 flex items-start gap-2 text-xs">
           <input type="checkbox" checked={understood} onChange={(event) => setUnderstood(event.target.checked)} />I understand how this strategy will trade in my paper account.
         </label>
@@ -422,12 +449,23 @@ export function StrategyLab({ catalog, saved: initialSaved, active: initialActiv
             {definition.targets.map((target, index) => (
               <div key={index} className="flex flex-wrap items-end gap-2">
                 <span className="w-14 pb-1 text-xs text-[#64748B]">Target {index + 1}</span>
-                <select className={box} value={target.kind} onChange={(event) => updateTarget(index, { kind: event.target.value as TargetSpec["kind"] })}>
+                <select
+                  className={box}
+                  value={target.kind}
+                  onChange={(event) => {
+                    const kind = event.target.value as TargetSpec["kind"];
+                    updateTarget(index, kind === "level" ? { kind, value: 0, level: target.level ?? { indicator: "ema", period: 20, offset: 1 } } : { kind, value: target.value || 1 });
+                  }}
+                >
                   <option value="r_multiple">R multiple (× stop distance)</option>
                   <option value="percent">% from entry</option>
                   <option value="atr">ATR multiple</option>
+                  <option value="level">A level frozen at the signal (e.g. the EMA then)</option>
                 </select>
-                <Num text="Value" value={target.value} onChange={(v) => updateTarget(index, { value: v ?? 1 })} width="w-20" />
+                {target.kind === "level" && target.level ? (
+                  <OperandPicker value={target.level} catalog={catalog.operands} timeframe={definition.timeframe} allowNumber={false} onChange={(level) => updateTarget(index, { level })} />
+                ) : null}
+                <Num text={target.kind === "level" ? "+ % above it" : "Value"} value={target.value} onChange={(v) => updateTarget(index, { value: v ?? (target.kind === "level" ? 0 : 1) })} width="w-20" />
                 <Num text="% of position" value={Math.round(target.fraction * 100)} step="1" onChange={(v) => updateTarget(index, { fraction: Math.max(1, Math.min(100, v ?? 100)) / 100 })} width="w-20" />
                 <button type="button" className="pb-1 text-xs text-[#94A3B8] hover:text-[#EF4444]" onClick={() => set("targets", definition.targets.filter((_, k) => k !== index))}>
                   Remove
@@ -444,6 +482,72 @@ export function StrategyLab({ catalog, saved: initialSaved, active: initialActiv
               </label>
               {definition.targets.reduce((sum, t) => sum + t.fraction, 0) > 1.0001 ? <span className="text-xs text-[#EF4444]">Targets add up to more than 100%.</span> : null}
             </div>
+          </div>
+
+          <div className="space-y-2 rounded border border-[#26303C] p-3">
+            <label className="flex items-center gap-2 text-xs text-[#94A3B8]">
+              <input
+                type="checkbox"
+                checked={Boolean(definition.add_on)}
+                disabled={definition.direction !== "long"}
+                onChange={(event) =>
+                  set(
+                    "add_on",
+                    event.target.checked
+                      ? { when: { logic: "all", items: [{ left: { indicator: "close" }, op: "<", right: { indicator: "ema", period: 20, offset: 1, scale: 0.92 } }] }, notional: 20000, target: null, restop_from_average: true }
+                      : null,
+                  )
+                }
+              />
+              Add to the position once (a second tranche), when this rule is true before any target is hit
+            </label>
+            {definition.add_on ? (
+              <div className="space-y-2">
+                <GroupEditor group={definition.add_on.when} catalog={catalog.operands} timeframe={definition.timeframe} onChange={(when) => set("add_on", { ...definition.add_on!, when })} />
+                <div className="flex flex-wrap items-end gap-3">
+                  <Num text="Add (₹)" value={definition.add_on.notional} step="1000" onChange={(v) => set("add_on", { ...definition.add_on!, notional: v ?? 20000 })} width="w-28" />
+                  <label className="flex flex-col gap-1">
+                    <span className={label}>Added shares sell</span>
+                    <select
+                      className={box}
+                      value={definition.add_on.target ? "own" : "last"}
+                      onChange={(event) =>
+                        set("add_on", { ...definition.add_on!, target: event.target.value === "own" ? { kind: "percent", value: 5, fraction: 1, period: 14 } : null })
+                      }
+                    >
+                      <option value="last">with the last target</option>
+                      <option value="own">at their own target</option>
+                    </select>
+                  </label>
+                  {definition.add_on.target ? (
+                    <>
+                      <select
+                        className={box}
+                        value={definition.add_on.target.kind}
+                        onChange={(event) => {
+                          const kind = event.target.value as TargetSpec["kind"];
+                          const target = definition.add_on!.target!;
+                          set("add_on", { ...definition.add_on!, target: kind === "level" ? { ...target, kind, value: 3, level: target.level ?? { indicator: "ema", period: 20, offset: 1 } } : { ...target, kind } });
+                        }}
+                      >
+                        <option value="percent">% from the original entry</option>
+                        <option value="r_multiple">R multiple</option>
+                        <option value="atr">ATR multiple</option>
+                        <option value="level">A level frozen at the original signal</option>
+                      </select>
+                      {definition.add_on.target.kind === "level" && definition.add_on.target.level ? (
+                        <OperandPicker value={definition.add_on.target.level} catalog={catalog.operands} timeframe={definition.timeframe} allowNumber={false} onChange={(level) => set("add_on", { ...definition.add_on!, target: { ...definition.add_on!.target!, level } })} />
+                      ) : null}
+                      <Num text={definition.add_on.target.kind === "level" ? "+ % above it" : "Value"} value={definition.add_on.target.value} onChange={(v) => set("add_on", { ...definition.add_on!, target: { ...definition.add_on!.target!, value: v ?? 0 } })} width="w-20" />
+                    </>
+                  ) : null}
+                  <label className="flex items-center gap-1 pb-1 text-xs text-[#94A3B8]">
+                    <input type="checkbox" checked={definition.add_on.restop_from_average !== false} onChange={(event) => set("add_on", { ...definition.add_on!, restop_from_average: event.target.checked })} />
+                    Re-measure a % stop from the new average cost
+                  </label>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap items-end gap-3">
@@ -570,7 +674,7 @@ export function StrategyLab({ catalog, saved: initialSaved, active: initialActiv
       ) : null}
 
       {result ? <LabResults result={result} /> : null}
-      {confirming ? <ApplyDialog definition={definition} catalog={catalog} pending={pending === "apply"} onCancel={() => setConfirming(false)} onConfirm={() => void act("apply")} /> : null}
+      {confirming ? <ApplyDialog definition={definition} catalog={catalog} strategyId={strategyId} pending={pending === "apply"} onCancel={() => setConfirming(false)} onConfirm={() => void act("apply")} /> : null}
     </div>
   );
 }

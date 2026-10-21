@@ -58,6 +58,7 @@ CATALOG: dict[str, tuple[str, str, bool, int | None, bool, bool]] = {
     "cci": ("CCI", "Momentum", True, 20, False, False),
     "return_pct": ("Return % over N bars", "Momentum", True, 10, False, False),
     "roc": ("Rate of change % (same as return)", "Momentum", True, 10, False, False),
+    "rel_return_pct": ("Return % over N bars minus NIFTY 50's", "Momentum", True, 5, False, False),
     # volatility and channels
     "atr": ("ATR", "Volatility", True, 14, False, False),
     "atr_pct": ("ATR % of close", "Volatility", True, 14, False, False),
@@ -135,6 +136,8 @@ class Operand(BaseModel):
                 raise ValueError(f"unknown indicator {self.indicator!r}")
             if CATALOG[self.indicator][2] and self.period is None:
                 self.period = CATALOG[self.indicator][3]
+            if self.indicator == "rel_return_pct" and self.timeframe:
+                raise ValueError("return vs NIFTY is computed on the strategy's own timeframe")
         return self
 
     def label(self) -> str:
@@ -207,10 +210,32 @@ class StopSpec(BaseModel):
 
 
 class TargetSpec(BaseModel):
-    kind: Literal["percent", "atr", "r_multiple"] = "percent"
-    value: float = Field(gt=0, le=200)
+    """percent / atr / r_multiple: a distance from the entry. level: a price read at the signal bar (e.g. the
+    EMA then, frozen), plus `value` percent. `fraction` is a share of the initial entry; the last target sells
+    whatever is left of it."""
+
+    kind: Literal["percent", "atr", "r_multiple", "level"] = "percent"
+    value: float = Field(ge=0, le=200)
     period: int = Field(default=14, ge=1, le=200)
     fraction: float = Field(default=1.0, gt=0, le=1)
+    level: Operand | None = None
+
+    @model_validator(mode="after")
+    def _kind(self) -> "TargetSpec":
+        if self.kind == "level" and self.level is None:
+            raise ValueError("a level target needs an operand, e.g. EMA(20) at the signal")
+        if self.kind != "level" and self.value <= 0:
+            raise ValueError("a target distance must be above 0")
+        return self
+
+
+class AddOnSpec(BaseModel):
+    """Add to an open position once, when `when` is true on a completed bar before any target is hit."""
+
+    when: Group
+    notional: float = Field(default=20000, ge=1000, le=100000)
+    target: TargetSpec | None = None  # exit for the added shares, fixed at the original signal; None = with the last target
+    restop_from_average: bool = True  # a percent stop is re-measured from the new average cost
 
 
 class TrailingSpec(BaseModel):
@@ -252,6 +277,7 @@ class StrategyDefinition(BaseModel):
     breakeven_after_first_target: bool = False
     trailing: TrailingSpec | None = None
     max_hold_bars: int | None = Field(default=None, ge=1, le=5000)
+    add_on: AddOnSpec | None = None
     square_off_intraday: bool = False
     last_entry_time: str | None = Field(default=None, pattern=r"^\d{2}:\d{2}$")
     sizing: Sizing = Field(default_factory=Sizing)
@@ -302,6 +328,11 @@ class StrategyDefinition(BaseModel):
                 raise ValueError("risk per trade is capped at 5% of starting cash")
         elif not 1000 <= self.sizing.value <= 100000:
             raise ValueError("money per trade must be between Rs 1,000 and Rs 1,00,000")
+        if self.add_on is not None:
+            if self.direction != "long":
+                raise ValueError("adding to a position is supported for long strategies only")
+            if self.add_on.when.depth() > 4:
+                raise ValueError("rules can nest at most 4 groups deep")
         if self.direction == "short" and not (self.timeframe in INTRADAY and self.square_off_intraday):
             raise ValueError("short selling is intraday only in Indian cash equities: use an intraday timeframe with square-off")
         if self.square_off_intraday and self.timeframe not in INTRADAY:
@@ -330,6 +361,11 @@ def operands(strategy: StrategyDefinition) -> list[Operand]:
 
     walk(strategy.entry)
     walk(strategy.exit)
+    if strategy.add_on is not None:
+        walk(strategy.add_on.when)
+    for target in [*strategy.targets, *([strategy.add_on.target] if strategy.add_on and strategy.add_on.target else [])]:
+        if target.level is not None:
+            found.append(target.level)
     if strategy.entry_order.price is not None:
         found.append(strategy.entry_order.price)
     if strategy.stop.level is not None:
@@ -594,6 +630,8 @@ def raw_indicator(bars: Bars, name: str, period: int | None, period2: int | None
     if key in cache:
         return cache[key]
     n = len(bars)
+    if name == "rel_return_pct":
+        return np.full(n, np.nan)  # needs NIFTY's bars: computed in operand_values from the context
     p = period or CATALOG[name][3] or 14
     o, h, l, c, v = bars.open, bars.high, bars.low, bars.close, bars.volume
     rng = h - l
@@ -746,6 +784,7 @@ class Context:
     timeframe: str
     higher: dict[str, Bars]
     cache: dict
+    index: "Bars | None" = None  # NIFTY 50 on the same timeframe, for rel_return_pct
 
     def aligned(self, timeframe: str) -> np.ndarray:
         """For each bar, the index of the last *completed* higher-timeframe bar (-1 if none)."""
@@ -773,11 +812,31 @@ def operand_values(context: Context, operand: Operand) -> np.ndarray:
             series = np.concatenate([np.full(operand.offset, np.nan), series[: -operand.offset]]) if operand.offset < len(series) else np.full(len(series), np.nan)
         index = context.aligned(operand.timeframe)
         values = np.where(index >= 0, series[np.clip(index, 0, None)], np.nan)
+    elif name == "rel_return_pct":
+        values = _relative_return(context, operand.period or 5)
+        if operand.offset:
+            values = np.concatenate([np.full(operand.offset, np.nan), values[: -operand.offset]]) if operand.offset < n else np.full(n, np.nan)
     else:
         values = raw_indicator(context.bars, name, operand.period, operand.period2, operand.param, context.timeframe in INTRADAY, context.cache)
         if operand.offset:
             values = np.concatenate([np.full(operand.offset, np.nan), values[: -operand.offset]]) if operand.offset < n else np.full(n, np.nan)
     return values * operand.scale + operand.shift
+
+
+def _relative_return(context: Context, period: int) -> np.ndarray:
+    """The stock's return % over N bars minus NIFTY 50's over the same N bars, matched by bar end. NaN without NIFTY."""
+    key = ("__rel_return__", period)
+    if key in context.cache:
+        return context.cache[key]
+    n = len(context.bars)
+    out = np.full(n, np.nan)
+    if context.index is not None and len(context.index) > period:
+        mine = raw_indicator(context.bars, "return_pct", period, None, None, context.timeframe in INTRADAY, context.cache)
+        theirs = raw_indicator(context.index, "return_pct", period, None, None, context.timeframe in INTRADAY, {})
+        by_end = {moment: float(value) for moment, value in zip(context.index.end, theirs)}
+        out = np.array([mine[k] - by_end[moment] if moment in by_end else np.nan for k, moment in enumerate(context.bars.end)])
+    context.cache[key] = out
+    return out
 
 
 def _condition(context: Context, condition: Condition) -> np.ndarray:
@@ -816,14 +875,19 @@ def evaluate(context: Context, group: Group | None) -> np.ndarray:
     return ~result if group.negate else result
 
 
-def context_for(strategy: StrategyDefinition, bars: Bars, higher_loader: Callable[[str], Bars | None]) -> Context:
+def uses_index(strategy: StrategyDefinition) -> bool:
+    return any(operand.indicator == "rel_return_pct" for operand in operands(strategy))
+
+
+def context_for(strategy: StrategyDefinition, bars: Bars, higher_loader: Callable[[str], Bars | None], index_loader: Callable[[], Bars | None] | None = None) -> Context:
     needed = sorted({operand.timeframe for operand in operands(strategy) if operand.timeframe})
     higher = {}
     for timeframe in needed:
         loaded = higher_loader(timeframe)
         if loaded is not None:
             higher[timeframe] = loaded
-    return Context(bars=bars, timeframe=strategy.timeframe, higher=higher, cache={})
+    index = index_loader() if index_loader is not None and uses_index(strategy) else None
+    return Context(bars=bars, timeframe=strategy.timeframe, higher=higher, cache={}, index=index)
 
 
 # --- order levels (shared by backtest and live) ---------------------------------------------------
@@ -863,6 +927,15 @@ def target_prices(strategy: StrategyDefinition, context: Context, signal_index: 
             if math.isnan(atr):
                 continue
             distance = spec.value * atr
+        elif spec.kind == "level":
+            level = float(operand_values(context, spec.level)[signal_index])  # type: ignore[arg-type]
+            if math.isnan(level):
+                continue
+            price = level * (1 + sign * spec.value / 100)
+            if (price - entry) * sign <= 0:
+                continue  # a level on the wrong side of the entry is not a target
+            out.append((price, spec.fraction))
+            continue
         else:
             if stop is None:
                 continue
@@ -870,6 +943,15 @@ def target_prices(strategy: StrategyDefinition, context: Context, signal_index: 
         out.append((entry + sign * distance, spec.fraction))
     out.sort(key=lambda item: item[0] * sign)
     return out
+
+
+def add_on_target(strategy: StrategyDefinition, context: Context, signal_index: int, entry: float, stop: float | None) -> float | None:
+    """The exit price for added shares, fixed at the original signal (None = they go with the last target)."""
+    if strategy.add_on is None or strategy.add_on.target is None:
+        return None
+    probe = strategy.model_copy(update={"targets": [strategy.add_on.target.model_copy(update={"fraction": 1.0})]})
+    prices = target_prices(probe, context, signal_index, entry, stop)
+    return prices[0][0] if prices else None
 
 
 def catalog() -> list[dict[str, object]]:

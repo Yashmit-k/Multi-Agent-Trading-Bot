@@ -45,6 +45,7 @@ from core_paper.strategy_engine import (  # noqa: F401 - re-exported for the API
     operand_values,
     raw_indicator,
     resample,
+    add_on_target,
     stop_price,
     target_prices,
 )
@@ -123,6 +124,23 @@ class Trade:
     charges: float = 0.0
     net_pnl: float = 0.0
     bars_held: int = 0
+    adds: list[Leg] = field(default_factory=list)  # shares added after the entry (add-on)
+
+    @property
+    def total_quantity(self) -> int:
+        return self.quantity + sum(leg.quantity for leg in self.adds)
+
+    @property
+    def cost(self) -> float:
+        return self.entry_price * self.quantity + sum(leg.quantity * leg.price for leg in self.adds)
+
+    def open_quantity(self, day: date) -> int:
+        """Shares held at the close of `day` (IST): bought by then minus sold by then."""
+        bought = (self.quantity if self.entry_at.astimezone(IST).date() <= day else 0) + sum(
+            leg.quantity for leg in self.adds if leg.at.astimezone(IST).date() <= day
+        )
+        sold = sum(leg.quantity for leg in self.legs if leg.at.astimezone(IST).date() <= day)
+        return bought - sold
 
     @property
     def exit_price(self) -> float:
@@ -132,6 +150,11 @@ class Trade:
     @property
     def reason(self) -> str:
         return self.legs[-1].reason if self.legs else "open"
+
+    @property
+    def average_cost(self) -> float:
+        shares = self.total_quantity
+        return self.cost / shares if shares else self.entry_price
 
     @property
     def risk_money(self) -> float | None:
@@ -160,6 +183,7 @@ def simulate_symbol(symbol: str, context: Context, strategy: StrategyDefinition,
     n = len(bars)
     entries = evaluate(context, strategy.entry)
     exits = evaluate(context, strategy.exit)
+    add_when = evaluate(context, strategy.add_on.when) if strategy.add_on is not None else None
     long = strategy.direction == "long"
     sign = 1.0 if long else -1.0
     clocks = [moment.astimezone(IST) for moment in bars.end]
@@ -223,14 +247,15 @@ def simulate_symbol(symbol: str, context: Context, strategy: StrategyDefinition,
             i = signal + 1
             continue
         targets = target_prices(strategy, context, signal, reference, stop)
-        trade = _manage(symbol, bars, strategy, fill, entry, stop, targets, quantity, exits, clocks, days)
+        extra = add_on_target(strategy, context, signal, reference, stop)
+        trade = _manage(symbol, bars, strategy, fill, entry, stop, targets, quantity, exits, clocks, days, add_when=add_when, add_target=extra)
         trades.append(trade)
         exit_index = next(k for k in range(fill, n) if bars.end[k] == trade.exit_at)
         i = exit_index + 1
     return trades
 
 
-def _manage(symbol, bars: Bars, strategy: StrategyDefinition, fill: int, entry: float, stop: float | None, targets, quantity: int, exits, clocks, days) -> Trade:  # type: ignore[no-untyped-def]
+def _manage(symbol, bars: Bars, strategy: StrategyDefinition, fill: int, entry: float, stop: float | None, targets, quantity: int, exits, clocks, days, *, add_when=None, add_target: float | None = None) -> Trade:  # type: ignore[no-untyped-def]
     n = len(bars)
     long = strategy.direction == "long"
     sign = 1.0 if long else -1.0
@@ -249,6 +274,9 @@ def _manage(symbol, bars: Bars, strategy: StrategyDefinition, fill: int, entry: 
             pending_targets.append([price, shares])
             allocated += shares
     hit_first = False
+    added = 0  # shares from the add-on still held
+    add_pending: float | None = None  # limit price of an add-on order waiting for the next bar
+    add_done = False
     trail = strategy.trailing
     trail_atr = None
     if trail is not None and trail.kind == "atr":
@@ -269,19 +297,42 @@ def _manage(symbol, bars: Bars, strategy: StrategyDefinition, fill: int, entry: 
             last = max(k, fill)
             break
         low, high, open_ = float(bars.low[j]), float(bars.high[j]), float(bars.open[j])
+        # 0. an add-on order from the previous bar fills here (live rule: limit at that close + 0.25%)
+        if add_pending is not None:
+            limit, add_pending = add_pending, None
+            if (low <= limit) if long else (high >= limit):
+                price = min(open_, limit) if long else max(open_, limit)
+                shares = int(strategy.add_on.notional // price)  # type: ignore[union-attr]
+                if shares >= 1:
+                    trade.adds.append(Leg(shares, price, "add_on", bars.end[j]))
+                    remaining += shares
+                    added += shares
+                    if strategy.add_on.restop_from_average and strategy.stop.kind == "percent" and not hit_first:  # type: ignore[union-attr]
+                        current_stop = trade.average_cost * (1 - strategy.stop.value / 100)
         # 1. stop (including a trailing or breakeven stop)
         if current_stop is not None and (low <= current_stop if long else high >= current_stop):
             price = current_stop if j == fill else (min(open_, current_stop) if long else max(open_, current_stop))
-            label = "stop" if not hit_first and current_stop == stop else ("breakeven" if current_stop == entry else "trailing_stop")
+            if current_stop == entry and hit_first:
+                label = "breakeven"
+            elif trail is not None and current_stop != stop and not (trade.adds and strategy.add_on and strategy.add_on.restop_from_average):
+                label = "trailing_stop"
+            else:
+                label = "stop"  # the original stop, or one re-measured from the average cost after an add-on
             close(remaining, price, label, j)
             last = j
             break
-        # 2. targets, from the bar after the fill
+        # 2. targets, from the bar after the fill. Initial targets sell the initial entry; added shares sell at
+        #    their own target, or with the last initial target when they have none.
         if j > fill:
             for target in list(pending_targets):
                 price, shares = target
                 if (high >= price if long else low <= price):
-                    close(min(shares, remaining), (max(open_, price) if long else min(open_, price)), "target", j)
+                    last_initial = len(pending_targets) == 1
+                    extra_shares = added if (last_initial and add_target is None) else 0
+                    sell = min(shares + extra_shares, remaining)
+                    close(sell, (max(open_, price) if long else min(open_, price)), "target", j)
+                    if extra_shares:
+                        added = 0
                     pending_targets.remove(target)
                     if not hit_first:
                         hit_first = True
@@ -289,9 +340,16 @@ def _manage(symbol, bars: Bars, strategy: StrategyDefinition, fill: int, entry: 
                             current_stop = entry if current_stop is None else (max(current_stop, entry) if long else min(current_stop, entry))
                             if remaining > 0 and (low <= entry if long else high >= entry):
                                 close(remaining, entry, "breakeven", j)  # same bar came back: order unknown, assume breakeven
+            if added and add_target is not None and (high >= add_target if long else low <= add_target) and trade.adds and trade.adds[-1].at < bars.end[j]:
+                close(min(added, remaining), max(open_, add_target) if long else min(open_, add_target), "add_on_target", j)
+                added = 0
             if remaining <= 0:
                 last = j
                 break
+        # 2b. add-on signal on this close, before any target (once)
+        if add_when is not None and not add_done and not hit_first and remaining > 0 and add_when[j] and j + 1 < n and j > fill:
+            add_done = True
+            add_pending = float(bars.close[j]) * (1 + sign * LIVE_LIMIT_PREMIUM)
         # 3. trailing stop update, from bars up to this one (applies from the next bar)
         if trail is not None:
             best = max(best, high) if long else min(best, low)
@@ -322,15 +380,33 @@ def _manage(symbol, bars: Bars, strategy: StrategyDefinition, fill: int, entry: 
         close(remaining, float(bars.close[last]), "end_of_data", last)
     trade.exit_at = bars.end[last]
     trade.bars_held = last - fill + 1
-    entry_notional = entry * quantity
+    trade.charges = _trade_charges(trade, strategy)
+    entry_notional = trade.cost
     exit_notional = sum(leg.quantity * leg.price for leg in trade.legs)
-    if long:
-        trade.charges = leg_charges(entry_notional, exit_notional, strategy.product)
-        trade.net_pnl = exit_notional - entry_notional - trade.charges
-    else:
-        trade.charges = leg_charges(exit_notional, entry_notional, strategy.product)
-        trade.net_pnl = entry_notional - exit_notional - trade.charges
+    trade.net_pnl = (exit_notional - entry_notional if long else entry_notional - exit_notional) - trade.charges
     return trade
+
+
+def _trade_charges(trade: Trade, strategy: StrategyDefinition) -> float:
+    """Charges per sell leg against the shares it closes (oldest first). A CNC leg sold in the session it was
+    bought is priced as intraday, as the paper engine reclassifies a same-day delivery round trip."""
+    lots = [[trade.quantity, trade.entry_price, trade.entry_at.astimezone(IST).date()]] + [
+        [leg.quantity, leg.price, leg.at.astimezone(IST).date()] for leg in trade.adds
+    ]
+    total = 0.0
+    for leg in trade.legs:
+        left, sold_day = leg.quantity, leg.at.astimezone(IST).date()
+        while left > 0 and lots:
+            lot = lots[0]
+            take = min(left, lot[0])
+            bought, sold = take * lot[1], take * leg.price
+            product = "MIS" if strategy.product == "MIS" or lot[2] == sold_day else "CNC"
+            total += leg_charges(bought, sold, product) if trade.direction == "long" else leg_charges(sold, bought, product)
+            lot[0] -= take
+            left -= take
+            if lot[0] == 0:
+                lots.pop(0)
+    return total
 
 
 def portfolio(trades: list[Trade], strategy: StrategyDefinition) -> tuple[list[Trade], list[Trade]]:
@@ -342,7 +418,7 @@ def portfolio(trades: list[Trade], strategy: StrategyDefinition) -> tuple[list[T
     for trade in sorted(trades, key=lambda item: (item.entry_at, item.symbol)):
         for item in [t for t in open_trades if t.exit_at <= trade.entry_at]:
             open_trades.remove(item)
-            cash += item.entry_price * item.quantity + item.net_pnl
+            cash += item.cost + item.net_pnl
         cost = trade.entry_price * trade.quantity
         if len(open_trades) >= strategy.max_open_positions or cost > cash:
             skipped.append(trade)
@@ -362,8 +438,12 @@ def equity_curve(taken: list[Trade], closes: dict[str, dict[date, float]], days:
         for t in taken:
             if t.entry_at.astimezone(IST).date() <= day < t.exit_at.astimezone(IST).date():
                 mark = closes.get(t.symbol, {}).get(day)
-                if mark is not None:
-                    unrealized += (mark - t.entry_price) * t.quantity * (1 if t.direction == "long" else -1)
+                held = t.open_quantity(day)
+                direction = 1 if t.direction == "long" else -1
+                if mark is not None and held > 0:
+                    unrealized += (mark - t.average_cost) * held * direction
+                # shares already sold (e.g. at target 1) count as realised before the trade's final exit
+                unrealized += sum((leg.price - t.average_cost) * leg.quantity * direction for leg in t.legs if leg.at.astimezone(IST).date() <= day)
         curve.append({"date": day.isoformat(), "equity": round(initial + realized + unrealized, 2)})
     return curve
 
@@ -414,6 +494,7 @@ def run_strategy(strategy: StrategyDefinition, request: BacktestRequest, load_ba
     end = datetime.combine(request.end, time(23, 59), IST).astimezone(timezone.utc)
     warmup = timedelta(days=400) if not intraday else timedelta(days=30)
     all_trades: list[Trade] = []
+    index_cache: dict[str, Bars | None] = {}
     closes: dict[str, dict[date, float]] = {}
     days: set[date] = set()
     for symbol in symbols:
@@ -429,7 +510,15 @@ def run_strategy(strategy: StrategyDefinition, request: BacktestRequest, load_ba
                 return load_bars(_symbol, "1d", start - timedelta(days=400), end)
             return resample(_base, {"15m": 15, "1h": 60}[timeframe])
 
-        context = context_for(strategy, bars, higher)
+        def index(_intraday=intraday):  # type: ignore[no-untyped-def]
+            if "bars" not in index_cache:  # NIFTY 50 is loaded once per backtest
+                loaded = load_bars("NIFTY50", "5m" if _intraday else "1d", start - warmup, end)
+                if loaded is not None and strategy.timeframe not in ("5m", "1d"):
+                    loaded = resample(loaded, {"15m": 15, "1h": 60}[strategy.timeframe])
+                index_cache["bars"] = loaded
+            return index_cache["bars"]
+
+        context = context_for(strategy, bars, higher, index)
         first = next((k for k, moment in enumerate(bars.end) if moment >= start), len(bars))
         all_trades += simulate_symbol(symbol, context, strategy, first)
         daily: dict[date, float] = {}
@@ -468,7 +557,8 @@ def run_strategy(strategy: StrategyDefinition, request: BacktestRequest, load_ba
     notes = [
         "In-sample: this is the data the rule was written against. Expect live results to be worse.",
         "Rules use each bar's close; entries fill on later bars, and higher-timeframe values come from completed bars only.",
-        f"Charges: Zerodha {'intraday rates (same-day square-off), plus one DP fee per sell as the paper engine charges' if strategy.product == 'MIS' else 'delivery (CNC)'} on every leg, plus {strategy.slippage_bps:g} bp slippage on each exit.",
+        f"Charges: Zerodha {'intraday rates (same-day square-off), plus one DP fee per sell as the paper engine charges' if strategy.product == 'MIS' else 'delivery (CNC); a leg sold in the session it was bought is priced as intraday, as the paper engine does'} on every leg, plus {strategy.slippage_bps:g} bp slippage on each exit.",
+        "Entries use the paper engine's rule: a limit at the signal close + 0.25%, next session only for daily bars, so a stock that gaps up past it is not bought.",
     ]
     if strategy.direction == "short":
         notes.append("Short side is a research backtest: the paper engine trades long only.")

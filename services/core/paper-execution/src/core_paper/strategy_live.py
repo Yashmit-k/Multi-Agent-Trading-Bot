@@ -16,7 +16,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import math
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 
 from contracts.enums import Horizon, OrderStatus, RiskStatus, Side, Timeframe, TradingMode
@@ -34,6 +34,7 @@ from core_paper.strategy_engine import (
     context_for,
     evaluate,
     operand_values,
+    add_on_target,
     resample,
     stop_price,
     target_prices,
@@ -75,6 +76,34 @@ def live_problems(definition: StrategyDefinition) -> list[str]:
     return problems
 
 
+def live_warnings(definition: StrategyDefinition, settings, starting_cash: float = 1_000_000) -> list[str]:  # type: ignore[no-untyped-def]
+    """Settings that will block or limit this strategy's paper entries (it can still be applied)."""
+    out: list[str] = []
+    per_trade = definition.sizing.value if definition.sizing.kind == "notional" else definition.sizing.max_notional
+    if per_trade > float(settings.max_order_notional):
+        out.append(f"each buy is cut to the per-order limit of ₹{float(settings.max_order_notional):,.0f} (the strategy asks for ₹{per_trade:,.0f})")
+    if definition.max_open_positions > settings.max_open_positions:
+        out.append(f"Settings allow {settings.max_open_positions} open positions in total, shared with the agents; the strategy allows {definition.max_open_positions}")
+    if definition.add_on is not None and per_trade + definition.add_on.notional > float(settings.max_per_stock):
+        out.append(f"an add-on would take a stock past the ₹{float(settings.max_per_stock):,.0f} per-stock limit, so it will be rejected")
+    stop = definition.stop
+    if stop.kind == "percent" and definition.sizing.kind == "notional":
+        risk_pct = per_trade * stop.value / starting_cash
+        if risk_pct > float(settings.max_risk_per_trade_pct):
+            out.append(f"a {stop.value:g}% stop on ₹{per_trade:,.0f} risks more than the {settings.max_risk_per_trade_pct}% per-trade limit")
+    first = definition.targets[0] if definition.targets else None
+    floor = float(settings.min_reward_risk)
+    if first is not None and floor > 0:
+        if first.kind == "level" or stop.kind in ("level", "atr"):
+            out.append(f"the risk engine rejects a buy whose first target is less than {floor:g}× its stop distance; with level or ATR exits that depends on each signal")
+        elif first.kind == "percent" and stop.kind == "percent" and first.value / stop.value < floor:
+            out.append(f"the first target ({first.value:g}%) is {first.value / stop.value:.2f}× the stop ({stop.value:g}%), below the {floor:g}× reward-to-risk floor: every entry will be rejected")
+    mode = getattr(settings, "strategy_mode", "replace")
+    out.append({"replace": "mode: the strategy replaces the agents' entries", "alongside": "mode: the strategy and the agents both trade",
+                "agents_agree": "mode: the strategy trades only when the agents agree, and the portfolio manager reviews each entry"}.get(mode, f"mode: {mode}"))
+    return out
+
+
 # --- bars from the database -----------------------------------------------------------------------
 
 
@@ -97,7 +126,13 @@ def strategy_context(repository: CoreRepository, definition: StrategyDefinition,
             return _load(repository, symbol, "1d", now - timedelta(days=700), now)
         return resample(base, TIMEFRAME_MINUTES[timeframe])
 
-    return context_for(definition, bars, higher)
+    def index() -> Bars | None:
+        loaded = _load(repository, "NIFTY50", "5m" if intraday else "1d", start, now)
+        if loaded is None or definition.timeframe in ("5m", "1d"):
+            return loaded
+        return resample(loaded, TIMEFRAME_MINUTES[definition.timeframe])
+
+    return context_for(definition, bars, higher, index)
 
 
 def latest_signal_bars(repository: CoreRepository, definition: StrategyDefinition, symbol: str, now: datetime) -> tuple[Context | None, bool]:
@@ -108,10 +143,26 @@ def latest_signal_bars(repository: CoreRepository, definition: StrategyDefinitio
     return context, bool(evaluate(context, definition.entry)[-1])
 
 
+def last_closed_session(now: datetime) -> date | None:
+    """The most recent NSE session that has closed by `now` (IST), from the trading calendar."""
+    from core_paper.trading_calendar import session_for
+
+    local = now.astimezone(IST)
+    day = local.date()
+    if not (session_for(day) is not None and local.time() >= time(15, 30)):
+        day -= timedelta(days=1)
+    for _ in range(14):
+        if session_for(day) is not None:
+            return day
+        day -= timedelta(days=1)
+    return None
+
+
 def _fresh(definition: StrategyDefinition, bar_end: datetime, now: datetime) -> bool:
-    """The latest bar is the one that just completed, not an old one (no entries on stale data)."""
+    """The latest bar is the one that just completed, not an old one (no entries on stale data). A daily bar is
+    fresh when it is the last session that has closed, so Friday's signal is still taken on Monday morning."""
     if definition.timeframe == "1d":
-        return (now - bar_end) < timedelta(hours=20)
+        return bar_end.astimezone(IST).date() == last_closed_session(now)
     return (now - bar_end) <= timedelta(minutes=TIMEFRAME_MINUTES[definition.timeframe]) + timedelta(minutes=3)
 
 
@@ -156,8 +207,17 @@ def strategy_entries(repository: CoreRepository, publisher, *, starting_cash: De
     symbols = sorted(members) if definition.symbols == ["ALL"] else [s for s in definition.symbols if s in members]
     pending = {order.symbol for order in repository.list_orders() if order.side == Side.BUY and order.status in _OPEN_ORDER}
     base_timeframe = Timeframe.M5 if definition.timeframe in INTRADAY else Timeframe.D1
+    # The strategy's own position limit, counting its holdings and its entries still waiting to fill.
+    held_by_strategy = {p.symbol for p in repository.list_positions() if p.quantity > 0 and entry_plan(repository, p.symbol) is not None}
+    waiting = {o.symbol for o in repository.list_orders() if o.side == Side.BUY and o.status in _OPEN_ORDER and _from_strategy(repository, o.proposal_id)}
+    slots = definition.max_open_positions - len(held_by_strategy | waiting)
     for symbol in symbols:
+        if symbol in held_by_strategy and symbol not in pending and definition.add_on is not None:
+            created += _maybe_add_on(repository, publisher, definition, meta, symbol, starting_cash=starting_cash, moment=moment, settings=settings, mode=mode)
+            continue
         if repository.held_quantity(symbol) > 0 or symbol in pending:
+            continue
+        if slots <= 0:
             continue
         newest = repository.latest_candle(symbol, base_timeframe)
         if newest is None:
@@ -238,6 +298,12 @@ def strategy_entries(repository: CoreRepository, publisher, *, starting_cash: De
                 "same_bar_exit": "stop_first",
                 "plan": {
                     "stop": round(stop, 4),
+                    "stop_percent": definition.stop.value if definition.stop.kind == "percent" else None,
+                    "add_on": None if definition.add_on is None else {
+                        "notional": definition.add_on.notional,
+                        "target": (lambda price: None if price is None else round(price, 4))(add_on_target(definition, context, last, entry, stop)),
+                        "restop_from_average": definition.add_on.restop_from_average,
+                    },
                     "targets": [{"price": round(price, 4), "fraction": fraction} for price, fraction in targets],
                     "breakeven_after_first_target": definition.breakeven_after_first_target,
                     "trailing": None if definition.trailing is None else definition.trailing.model_dump(),
@@ -248,7 +314,9 @@ def strategy_entries(repository: CoreRepository, publisher, *, starting_cash: De
         )
         if repository.insert_proposal(proposal):
             _publish(publisher, EventType.DECISION_CREATED, f"decision.created:{proposal_id}", bar_end, proposal_id, proposal)
-        created += _decide(repository, publisher, proposal, starting_cash=starting_cash, moment=moment, settings=settings, mode=mode, review=review)
+        opened = _decide(repository, publisher, proposal, starting_cash=starting_cash, moment=moment, settings=settings, mode=mode, review=review)
+        created += opened
+        slots -= 1 if (opened or review) else 0
     return created
 
 
@@ -308,19 +376,91 @@ def _decide(repository: CoreRepository, publisher, proposal: TradeProposal, *, s
 
 
 def entry_plan(repository: CoreRepository, symbol: str):  # type: ignore[no-untyped-def]
-    """(entry execution, entry proposal) for a holding opened by an applied strategy, else None."""
-    from core_paper.cycle import _entry_execution
+    """(entry execution, entry proposal) for a holding opened by an applied strategy, else None.
+    An add-on fill is part of the position, not its entry: the newest non-add-on entry is the one that counts."""
+    orders = {item.order_id: item for item in repository.list_orders() if item.symbol == symbol}
+    entries = [item for item in repository.list_executions() if item.symbol == symbol and item.metadata.get("reason") == "entry"]
+    for execution in reversed(entries):
+        order = orders.get(execution.order_id)
+        proposal = repository.get_proposal(order.proposal_id) if order is not None else None
+        if proposal is None:
+            continue
+        if proposal.metadata.get("add_on"):
+            continue
+        return (execution, proposal) if proposal.metadata.get("source") == SOURCE else None
+    return None
 
-    execution = _entry_execution(repository, symbol)
-    if execution is None:
-        return None
-    order = next((item for item in repository.list_orders() if item.order_id == execution.order_id), None)
-    if order is None:
-        return None
-    proposal = repository.get_proposal(order.proposal_id)
-    if proposal is None or proposal.metadata.get("source") != SOURCE:
-        return None
-    return execution, proposal
+
+def _from_strategy(repository: CoreRepository, proposal_id: str) -> bool:
+    proposal = repository.get_proposal(proposal_id)
+    return proposal is not None and proposal.metadata.get("source") == SOURCE and not proposal.metadata.get("add_on")
+
+
+def _add_on_state(repository: CoreRepository, symbol: str, filled_at: datetime) -> tuple[int, int, bool]:
+    """(added shares filled, added shares sold at their target, an add-on order exists) for the current position."""
+    orders = [item for item in repository.list_orders() if item.symbol == symbol and item.created_at >= filled_at]
+    executions = {item.order_id: item for item in repository.list_executions() if item.symbol == symbol}
+    added, sold, exists = 0, 0, False
+    for order in orders:
+        proposal = repository.get_proposal(order.proposal_id)
+        if order.side == Side.BUY and proposal is not None and proposal.metadata.get("add_on"):
+            if order.status not in (OrderStatus.CANCELLED, OrderStatus.REJECTED, OrderStatus.EXPIRED):
+                exists = True
+            if order.order_id in executions:
+                added += executions[order.order_id].quantity
+        if order.side == Side.SELL and order.metadata.get("reason") == "strategy_add_on_target" and order.order_id in executions:
+            sold += executions[order.order_id].quantity
+    return added, sold, exists
+
+
+def _maybe_add_on(repository: CoreRepository, publisher, definition: StrategyDefinition, meta: dict, symbol: str, *, starting_cash: Decimal, moment: datetime, settings, mode: TradingMode) -> int:  # type: ignore[no-untyped-def]
+    """Add to a strategy holding once, when its add-on rule is true on the latest completed bar and no target was hit."""
+    from core_paper.cycle import _publish
+
+    found = entry_plan(repository, symbol)
+    book = repository.active_paper_session()
+    if found is None or book is None or definition.add_on is None:
+        return 0
+    execution, entry_proposal = found
+    if entry_proposal.strategy_id != f"user:{meta['strategy_id']}":
+        return 0  # a holding from an earlier strategy keeps its own plan
+    filled_at = execution.executed_at
+    _, _, exists = _add_on_state(repository, symbol, filled_at)
+    targets_hit = any(
+        item.side == Side.SELL and item.symbol == symbol and item.created_at >= filled_at and str(item.metadata.get("reason", "")).startswith("strategy_target")
+        for item in repository.list_orders()
+    )
+    if exists or targets_hit:
+        return 0
+    context = strategy_context(repository, definition, symbol, moment)
+    if context is None:
+        return 0
+    bar_end = context.bars.end[-1]
+    if bar_end <= filled_at or not _fresh(definition, bar_end, moment) or not bool(evaluate(context, definition.add_on.when)[-1]):
+        return 0
+    close = float(context.bars.close[-1])
+    quantity = min(int(definition.add_on.notional // close), int(float(settings.max_order_notional) // close))
+    if quantity < 1:
+        return 0
+    proposal_id = f"strategy-addon-{_digest(book.session_id, entry_proposal.proposal_id, bar_end.isoformat())}"
+    if repository.get_proposal(proposal_id) is not None:
+        return 0
+    proposal = entry_proposal.model_copy(
+        update={
+            "proposal_id": proposal_id,
+            "timestamp": bar_end.astimezone(timezone.utc),
+            "quantity": quantity,
+            "entry_price": Decimal(str(round(close, 2))),
+            "stop_loss": min(entry_proposal.stop_loss, Decimal(str(round(close * 0.999, 2)))),
+            "take_profit": max(entry_proposal.take_profit, Decimal(str(round(close * 1.001, 2)))),
+            "supporting_signal_ids": [proposal_id],
+            "metadata": {"source": SOURCE, "add_on": True, "parent_proposal_id": entry_proposal.proposal_id, "strategy_name": definition.name,
+                         "decided_at": moment.isoformat(), "stops_monitored": True, "same_bar_exit": "stop_first", "limit_price": None, "needs_review": False},
+        }
+    )
+    if repository.insert_proposal(proposal):
+        _publish(publisher, EventType.DECISION_CREATED, f"decision.created:{proposal_id}", bar_end, proposal_id, proposal)
+    return _decide(repository, publisher, proposal, starting_cash=starting_cash, moment=moment, settings=settings, mode=mode, review=False)
 
 
 def is_strategy_position(repository: CoreRepository, symbol: str) -> bool:
@@ -352,7 +492,13 @@ def manage_strategy_positions(repository: CoreRepository, publisher, schedule, s
         taken = sum(1 for order in repository.list_orders() if order.side == Side.SELL and order.symbol == position.symbol
                     and str(order.metadata.get("reason", "")).startswith("strategy_target") and order.created_at >= filled_at
                     and order.status not in (OrderStatus.CANCELLED, OrderStatus.REJECTED, OrderStatus.EXPIRED))
+        added, added_sold, _ = _add_on_state(repository, position.symbol, filled_at)
+        added_left = max(0, added - added_sold)
+        add_plan = plan.get("add_on") or {}
+        add_target = add_plan.get("target")
         current_stop = stop
+        if added and not taken and plan.get("stop_percent") and add_plan.get("restop_from_average"):
+            current_stop = float(position.average_price) * (1 - float(plan["stop_percent"]) / 100)  # re-measured from the average cost
         if taken and plan.get("breakeven_after_first_target"):
             current_stop = max(current_stop, entry)
         trailing = plan.get("trailing")
@@ -370,14 +516,19 @@ def manage_strategy_positions(repository: CoreRepository, publisher, schedule, s
         low, high = float(bar.low), float(bar.high)
         local = bar.end.astimezone(IST)
         exit_quantity, reason, price, fill_at = 0, "", float(bar.close), "next_open"
+        # Added shares with their own target are kept out of the initial targets' quantity.
+        reserved = added_left if add_target is not None else 0
+        initial_left = position.quantity - reserved
         if low <= current_stop:
-            label = "strategy_stop" if current_stop == stop else ("strategy_breakeven" if math.isclose(current_stop, entry) else "strategy_trailing_stop")
+            label = "strategy_stop" if current_stop == stop or (added and not taken) else ("strategy_breakeven" if math.isclose(current_stop, entry) else "strategy_trailing_stop")
             exit_quantity, reason, price, fill_at = position.quantity, label, current_stop, "level"
-        elif taken < len(targets) and high >= float(targets[taken]["price"]):
+        elif taken < len(targets) and initial_left > 0 and high >= float(targets[taken]["price"]):
             share = int(math.floor(original * float(targets[taken]["fraction"]) + 1e-9))
             last_target = taken == len(targets) - 1
-            exit_quantity = position.quantity if last_target or share >= position.quantity else max(1, share)
+            exit_quantity = initial_left if last_target or share >= initial_left else max(1, share)
             reason, price, fill_at = f"strategy_target_{taken + 1}", float(targets[taken]["price"]), "level"
+        elif reserved > 0 and high >= float(add_target):
+            exit_quantity, reason, price, fill_at = reserved, "strategy_add_on_target", float(add_target), "level"
         elif plan.get("square_off_intraday") and (local.time() >= SQUARE_OFF or local.date() != filled_at.astimezone(IST).date()):
             exit_quantity, reason = position.quantity, "strategy_square_off"
         elif plan.get("max_hold_bars") and _bars_held(repository, proposal, position.symbol, filled_at, bar.end) >= int(plan["max_hold_bars"]):

@@ -218,3 +218,92 @@ def test_strategy_mode_setting_is_validated(repository: CoreRepository) -> None:
         assert "strategy_mode" in exc.errors
     else:
         raise AssertionError("bad mode accepted")
+
+
+def test_a_daily_signal_from_friday_is_still_fresh_on_monday_morning() -> None:
+    from core_paper.strategy_engine import StrategyDefinition
+    from core_paper.strategy_live import _fresh, last_closed_session
+
+    definition = StrategyDefinition.model_validate(STRATEGY)
+    friday_close = datetime(2026, 10, 9, 10, 0, tzinfo=UTC)
+    monday_morning = datetime(2026, 10, 12, 3, 55, tzinfo=UTC)  # 09:25 IST
+    assert last_closed_session(monday_morning).isoformat() == "2026-10-09"
+    assert _fresh(definition, friday_close, monday_morning)
+    assert not _fresh(definition, friday_close - timedelta(days=1), monday_morning)  # Thursday's bar is stale
+
+
+def test_the_strategys_own_position_limit_is_enforced_live(repository: CoreRepository) -> None:
+    client = _ready(repository)
+    _daily(repository, "RELIANCE", Decimal("442"))
+    _history(repository, "RELIANCE", days=30)
+    both = {**STRATEGY, "symbols": ["TCS", "RELIANCE"], "max_open_positions": 1}
+    saved = client.post("/api/v1/strategies", json={"definition": both}, headers=AUTH).json()
+    client.post(f"/api/v1/strategies/{saved['strategy_id']}/apply", json={"confirm": True}, headers=AUTH)
+    _cycle(repository, DECISION + timedelta(hours=1))
+    strategy_buys = [o for o in repository.list_orders() if o.side == Side.BUY and repository.get_proposal(o.proposal_id).metadata.get("source") == "strategy"]
+    assert len(strategy_buys) == 1
+
+
+def test_add_on_lifecycle_live(repository: CoreRepository) -> None:
+    from contracts.enums import Exchange, Timeframe
+    from contracts.schemas.market import Candle
+    from core_paper.strategy_live import entry_plan
+
+    client = _ready(repository)
+    repository.save_setting("risk", {"min_reward_risk": "0.5"}, updated_by="test", now=DECISION)
+    with_add = {
+        **STRATEGY,
+        "targets": [{"kind": "percent", "value": 5, "fraction": 1}],
+        "breakeven_after_first_target": False,
+        "add_on": {"when": {"items": [{"left": {"indicator": "close"}, "op": "<", "right": {"value": 390}}]}, "notional": 20000,
+                   "target": {"kind": "percent", "value": 10}},
+    }
+    saved = client.post("/api/v1/strategies", json={"definition": with_add}, headers=AUTH).json()
+    assert client.post(f"/api/v1/strategies/{saved['strategy_id']}/apply", json={"confirm": True}, headers=AUTH).status_code == 200
+    _cycle(repository, DECISION + timedelta(hours=1))  # entry order on Monday's close (400)
+    repository.upsert_candles([_bar(SESSION, open_=Decimal("400"), low=Decimal("399"), symbol="TCS")])
+    _cycle(repository, SESSION + timedelta(minutes=5))
+    first = repository.position_for("TCS")
+    assert first is not None and first.quantity > 0
+    initial = first.quantity
+    # Tuesday closes at 385: the add-on rule fires; it fills Wednesday morning at 385
+    tuesday_close = DECISION + timedelta(days=1)
+    repository.upsert_candles([Candle(symbol="TCS", exchange=Exchange.NSE, timeframe=Timeframe.D1, open=Decimal("399"), high=Decimal("400"), low=Decimal("384"),
+                                      close=Decimal("385"), volume=1000, start=tuesday_close - timedelta(hours=6, minutes=15), end=tuesday_close)])
+    repository.upsert_candles([_bar(tuesday_close - timedelta(minutes=5), open_=Decimal("385"), low=Decimal("384.5"), symbol="TCS")])
+    _cycle(repository, tuesday_close + timedelta(hours=1))
+    add_orders = [o for o in repository.list_orders() if o.side == Side.BUY and repository.get_proposal(o.proposal_id).metadata.get("add_on")]
+    assert len(add_orders) == 1
+    assert add_orders[0].quantity >= 50
+    wednesday = SESSION + timedelta(days=1)
+    repository.upsert_candles([_bar(wednesday, open_=Decimal("385"), low=Decimal("384.5"), symbol="TCS")])
+    _cycle(repository, wednesday + timedelta(minutes=5))
+    position = repository.position_for("TCS")
+    assert position.quantity == initial + add_orders[0].quantity
+    execution, proposal = entry_plan(repository, "TCS")
+    assert execution.quantity == initial and not proposal.metadata.get("add_on")  # the entry is still the first buy
+    # The stop is now 5% below the average (~392.4 -> ~372.8), not 5% below 400 (380): a dip to 378 does not stop it out
+    dip = wednesday + timedelta(minutes=5)
+    repository.upsert_candles([_bar(dip, open_=Decimal("380"), low=Decimal("378"), symbol="TCS")])
+    _cycle(repository, dip + timedelta(minutes=5))
+    assert [o for o in repository.list_orders() if o.side == Side.SELL] == []
+    # Target 1 (+5% on 400 = 420) sells only the initial shares; the added ones wait for their own target (+10% = 440)
+    up = dip + timedelta(minutes=5)
+    repository.upsert_candles([Candle(symbol="TCS", exchange=Exchange.NSE, timeframe=Timeframe.M5, open=Decimal("415"), high=Decimal("421"), low=Decimal("414"),
+                                      close=Decimal("420"), volume=100, start=up, end=up + timedelta(minutes=5))])
+    _cycle(repository, up + timedelta(minutes=5))
+    [sell] = [o for o in repository.list_orders() if o.side == Side.SELL]
+    assert sell.metadata["reason"] == "strategy_target_1" and sell.quantity == initial
+
+
+def test_preflight_warns_about_settings_that_will_block_entries(repository: CoreRepository) -> None:
+    client = _ready(repository)
+    tight = {**STRATEGY, "stop": {"kind": "percent", "value": 10}, "targets": [{"kind": "percent", "value": 5, "fraction": 1}], "breakeven_after_first_target": False,
+             "max_open_positions": 25}
+    saved = client.post("/api/v1/strategies", json={"definition": tight}, headers=AUTH).json()
+    body = client.get(f"/api/v1/strategies/{saved['strategy_id']}/preflight", headers=AUTH).json()
+    text = " ".join(body["warnings"])
+    assert body["problems"] == []
+    assert "every entry will be rejected" in text and "open positions in total" in text and "mode:" in text
+    no_stop = client.post("/api/v1/strategies", json={"definition": {**tight, "stop": {"kind": "none"}}}, headers=AUTH).json()
+    assert client.get(f"/api/v1/strategies/{no_stop['strategy_id']}/preflight", headers=AUTH).json()["problems"]

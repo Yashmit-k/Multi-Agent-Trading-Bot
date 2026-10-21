@@ -13,7 +13,8 @@ export type Condition = { left: Operand; op: string; right: Operand; for_bars?: 
 export type Group = { logic: "all" | "any"; negate?: boolean; items: Array<Group | Condition> };
 export type Timeframe = "5m" | "15m" | "1h" | "1d";
 export type StopSpec = { kind: "none" | "percent" | "atr" | "level"; value?: number; period?: number; level?: Operand | null; buffer_pct?: number };
-export type TargetSpec = { kind: "percent" | "atr" | "r_multiple"; value: number; period?: number; fraction: number };
+export type TargetSpec = { kind: "percent" | "atr" | "r_multiple" | "level"; value: number; period?: number; fraction: number; level?: Operand | null };
+export type AddOnSpec = { when: Group; notional: number; target?: TargetSpec | null; restop_from_average?: boolean };
 export type TrailingSpec = { kind: "percent" | "atr"; value: number; period?: number; activate_after_r?: number };
 export type EntryOrder = { type: "market" | "limit"; price?: Operand | null; valid_bars?: number };
 export type Sizing = { kind: "notional" | "risk_percent"; value: number; max_notional?: number };
@@ -32,6 +33,7 @@ export type Definition = {
   breakeven_after_first_target: boolean;
   trailing: TrailingSpec | null;
   max_hold_bars: number | null;
+  add_on?: AddOnSpec | null;
   square_off_intraday: boolean;
   last_entry_time: string | null;
   sizing: Sizing;
@@ -169,6 +171,7 @@ export function withDefaults(raw: Record<string, unknown>): Definition {
   merged.sizing = { ...BLANK.sizing, ...(merged.sizing ?? {}) };
   merged.targets = (merged.targets ?? []).map((target) => ({ ...target, period: target.period ?? 14, fraction: target.fraction ?? 1 }));
   if (merged.exit === undefined) merged.exit = null;
+  if (merged.add_on === undefined) merged.add_on = null;
   return merged;
 }
 
