@@ -9,7 +9,7 @@ function day(date: string, start: number, pnl: number): DailyPnlDay & { equity_i
     calendar_date_ist: date,
     snapshot_as_of: null,
     complete: true,
-    pnl_basis: "net",
+    pnl_basis: "net_equity",
     net_pnl_inr: pnl,
     start_of_day_equity_inr: start,
     realized_pnl_inr: pnl,
@@ -33,6 +33,16 @@ describe("EquityChart (real data)", () => {
     expect(chart).toContain("Start ₹10,00,000");
     expect(chart).toContain("Latest ₹10,00,250");
     expect(chart).toContain("15 Oct");
+  });
+
+  it("anchors the last date label to the end so it is not cut off", () => {
+    const days = [day("2026-10-13", 1_000_000, 300), day("2026-10-14", 1_000_300, -500), day("2026-10-15", 999_800, 450)];
+    render(<EquityChart mode="real" days={days} startingCash={1_000_000} />);
+    const labels = screen.getAllByTestId("equity-x-label");
+    const last = labels[labels.length - 1];
+    expect(last.textContent).toBe("15 Oct");
+    expect(last.getAttribute("text-anchor")).toBe("end");
+    expect(labels[0].getAttribute("text-anchor")).toBe("start");
   });
 
   it("says history starts later when there is only one day", () => {

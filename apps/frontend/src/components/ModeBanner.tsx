@@ -57,13 +57,13 @@ export function ModeBanner({
         {/* Decorative: the brand text beside it carries the name, so alt stays empty. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.svg" alt="" data-testid="brand-logo" width={28} height={28} className="h-7 w-7 shrink-0" />
-        <span data-testid="brand-mark" className="text-base font-semibold tracking-[0.14em]">
+        <span data-testid="brand-mark" className="shrink-0 whitespace-nowrap text-base font-semibold tracking-[0.14em]">
           StockX
         </span>
         <span className="hidden truncate text-xs text-[#64748B] sm:inline">NIFTY 50 · multi-agent paper trading</span>
       </Link>
       <div className="flex shrink-0 items-center gap-2 text-xs">
-        <span className={`rounded px-2 py-0.5 font-semibold ${live ? "bg-white text-red-800" : "bg-[#1E3A8A]/40 text-[#93C5FD]"}`}>
+        <span className={`whitespace-nowrap rounded px-2 py-0.5 font-semibold ${live ? "bg-white text-red-800" : "bg-[#1E3A8A]/40 text-[#93C5FD]"}`}>
           {live ? "LIVE TRADING IS ACTIVE" : "PAPER TRADING"}
         </span>
         <span className="hidden rounded border border-[#26303C] px-2 py-0.5 text-[#94A3B8] md:inline">mode {mode}</span>
@@ -75,11 +75,16 @@ export function ModeBanner({
         ) : null}
         <span
           data-testid="kill-chip"
-          className={`rounded px-2 py-0.5 font-medium ${armed ? "bg-[#7F1D1D] text-[#FCA5A5]" : "bg-[#171F2A] text-[#94A3B8]"}`}
+          className={`whitespace-nowrap rounded px-2 py-0.5 font-medium ${armed ? "bg-[#7F1D1D] text-[#FCA5A5]" : "bg-[#171F2A] text-[#94A3B8]"}`}
         >
-          Kill switch: {killSwitch}
+          <span className="sm:hidden">Kill: </span>
+          <span className="hidden sm:inline">Kill switch: </span>
+          {killSwitch}
         </span>
-        <OperatorChip />
+        {/* Sign-in is also reachable at /login; the phone header keeps room for the PAPER/LIVE badge. */}
+        <span className="hidden sm:contents">
+          <OperatorChip />
+        </span>
         {clock ? <span className="hidden tabular-nums text-[#64748B] sm:inline">{clock} IST</span> : null}
       </div>
     </header>

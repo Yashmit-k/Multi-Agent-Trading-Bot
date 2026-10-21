@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 import type { TradingMode } from "@/contracts/generated/vocab";
 import { ModeBanner } from "@/components/ModeBanner";
 
@@ -28,6 +29,11 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const activeTab = useRef<HTMLAnchorElement | null>(null);
+  useEffect(() => {
+    // The phone tab bar scrolls sideways; bring the current page's tab into view.
+    activeTab.current?.scrollIntoView?.({ inline: "center", block: "nearest" });
+  }, [pathname]);
   return (
     <div className="min-h-screen bg-[#0B0F14] text-[#E6EDF3]">
       <ModeBanner mode={mode} killSwitch={killSwitch} market={market} />
@@ -61,20 +67,25 @@ export function AppShell({
           </nav>
         </aside>
         <div className="min-w-0 flex-1">
-          <nav className="flex gap-1 overflow-x-auto border-b border-[#26303C] px-3 py-2 text-xs md:hidden">
-            {LINKS.map(([href, label]) => {
-              const active = pathname === href || pathname.startsWith(`${href}/`);
-              return (
-                <Link prefetch={false}
-                  key={href}
-                  href={href}
-                  className={`shrink-0 rounded px-2 py-1 ${active ? "bg-[#171F2A] text-[#E6EDF3]" : "text-[#94A3B8]"}`}
-                >
-                  {label}
-                </Link>
-              );
-            })}
-          </nav>
+          <div className="relative md:hidden">
+            <nav className="flex gap-1 overflow-x-auto border-b border-[#26303C] px-3 py-2 text-xs">
+              {LINKS.map(([href, label]) => {
+                const active = pathname === href || pathname.startsWith(`${href}/`);
+                return (
+                  <Link prefetch={false}
+                    key={href}
+                    href={href}
+                    ref={active ? activeTab : undefined}
+                    className={`shrink-0 rounded px-2 py-1 ${active ? "bg-[#171F2A] text-[#E6EDF3]" : "text-[#94A3B8]"}`}
+                  >
+                    {label}
+                  </Link>
+                );
+              })}
+            </nav>
+            {/* Fade on the right edge hints that the tabs scroll; it never blocks taps. */}
+            <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#0B0F14] to-transparent" />
+          </div>
           <main className="w-full max-w-none p-4">{children}</main>
         </div>
       </div>
