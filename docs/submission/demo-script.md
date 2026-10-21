@@ -1,6 +1,6 @@
 # Demo script (live demo and the optional 2–3 minute video)
 
-Sign in as the operator first (header → Sign in). If possible, record or present between 09:20 and 10:30 IST, when real agent BUYs go through the portfolio manager. Outside that window, use **Ask the portfolio manager**, which runs the same agent on a hypothetical trade.
+Sign in as the operator first (header → Sign in). If possible, record or present between 09:20 and 15:15 IST on a trading day, when real agent BUYs go through the portfolio manager (Settings → strategy mode must be "alongside" or no strategy applied; in "replace" mode the agents open no new trades). Outside that window, use **Ask the portfolio manager**, which runs the same agent on a hypothetical trade.
 
 | Time | Screen | Say |
 |---|---|---|

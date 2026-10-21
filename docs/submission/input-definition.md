@@ -4,7 +4,7 @@ The system takes four kinds of input. Every schema is defined once in `packages/
 
 ## 1. Market data — Zerodha Kite candles
 
-Source: the Kite Connect historical-data API, polled every 60 s by the Core collector for the 50 NIFTY 50 constituents. Stored as the `Candle` schema ([`Candle.json`](../contracts/schemas/Candle.json)).
+Source: the Kite Connect historical-data API, read by the Core collector in one pass every 20 s (`MARKET_DATA_POLL_SECONDS`) for the 50 NIFTY 50 constituents plus the NIFTY 50 index and India VIX. Stored as the `Candle` schema ([`Candle.json`](../contracts/schemas/Candle.json)).
 
 | Field | Type | Notes |
 |---|---|---|

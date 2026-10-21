@@ -12,7 +12,7 @@ None of these are backtest results or fabricated examples. The forward paper run
 
 ## 1. `TradeProposal` — Decision Engine output
 
-Created when the fused signal for a symbol and horizon has |signal| ≥ 0.2 and confidence ≥ 0.3.
+Created when the fused signal for a symbol and horizon has |signal| ≥ 0.2 and confidence ≥ 0.3. An agent BUY must also reach the Settings minimums: fused signal ≥ 0.35 and confidence ≥ 0.4. SELLs keep the lower bar, so exits are not delayed.
 
 | Field | Meaning |
 |---|---|
@@ -95,7 +95,7 @@ For each review the manager produces a stream of `ReviewStep` messages (`review.
  "timestamp": "2026-10-20T13:22:51.712033Z"}
 ```
 
-How a pipeline verdict changes the trade: VETO fails the risk check `portfolio_manager`, so the decision is REJECTED with `"portfolio manager vetoed: <critique>"`. REDUCE lowers `approved_quantity` and the order quantity. The first pipeline reviews run in the 09:20–10:30 IST entry window, and their chains appear on the Agent trace and Portfolio manager pages.
+How a pipeline verdict changes the trade: VETO fails the risk check `portfolio_manager`, so the decision is REJECTED with `"portfolio manager vetoed: <critique>"`. REDUCE lowers `approved_quantity` and the order quantity. Pipeline reviews run in the 09:20–15:15 IST entry window, and their chains appear on the Agent trace and Portfolio manager pages. A complete real chain (REDUCE 16 → 8 shares, then the fill) is in [`agent-trace/20261021-jswsteel-trade.md`](agent-trace/20261021-jswsteel-trade.md).
 
 ## 3. `RiskDecision` — Risk Engine output
 
@@ -154,7 +154,7 @@ Since migration 0006, orders follow the current policy:
 - filled only on a later 5-minute bar;
 - Zerodha equity-delivery charges applied;
 - at most 6 new entries per IST day;
-- entries only from 09:20 to 10:30 IST.
+- entries only from 09:20 to 15:15 IST (`PAPER_ENTRY_END=15:15` in the deployment; the code default is 10:30).
 
 ## 5. Portfolio — `GET /api/v1/portfolio`
 
