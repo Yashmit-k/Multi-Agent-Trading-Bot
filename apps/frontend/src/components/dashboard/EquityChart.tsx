@@ -119,7 +119,16 @@ export function EquityChart({
           ))}
           {series.map((item, index) =>
             labelled.has(index) ? (
-              <text key={item.key} x={x(index)} y={PLOT.height - 8} textAnchor="middle" fontSize="12" fill="#94A3B8">
+              <text
+                key={item.key}
+                data-testid="equity-x-label"
+                x={x(index)}
+                y={PLOT.height - 8}
+                // Edge labels hang inward so the first and last dates are not clipped by the svg edge.
+                textAnchor={index === 0 ? "start" : index === series.length - 1 ? "end" : "middle"}
+                fontSize="12"
+                fill="#94A3B8"
+              >
                 {formatDay(item.key)}
               </text>
             ) : null,
