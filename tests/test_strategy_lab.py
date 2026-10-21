@@ -47,7 +47,7 @@ def test_market_entry_uses_the_live_limit_rule_and_target_exits() -> None:
     bars = _bars([99, 100, 100.1, 104, 108], [99.5, 100.5, 101, 105, 111], [98.5, 99.5, 99.8, 103, 107], [99, 100, 100.5, 104, 110])
     [trade] = _run(bars, _flag_strategy())
     assert trade.entry_at == bars.end[2] and trade.entry_price == pytest.approx(100.1)
-    assert trade.reason == "target" and trade.exit_price == pytest.approx(110.0)  # +10% from the 100 reference
+    assert trade.reason == "target" and trade.exit_price == pytest.approx(100.1 * 1.10)  # +10% from the 100.1 fill
 
 
 def test_a_gap_above_the_live_limit_does_not_fill() -> None:

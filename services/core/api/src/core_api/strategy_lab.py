@@ -238,16 +238,22 @@ def simulate_symbol(symbol: str, context: Context, strategy: StrategyDefinition,
             i = signal + 1
             continue
         entry = raw  # no slippage on a limit fill, as live; exits keep the slippage setting
-        stop = stop_price(strategy, context, signal, reference)
-        if stop is not None and (math.isnan(stop) or (stop >= entry if long else stop <= entry)):
-            i = signal + 1  # stop undefined or on the wrong side: no trade
+        # The order is sized before it fills, from the signal price. Once filled, the stop and the targets are
+        # measured from the price actually paid, so a 10% stop is 10% of the money spent on the stock.
+        planned_stop = stop_price(strategy, context, signal, reference)
+        if planned_stop is not None and math.isnan(planned_stop):
+            i = signal + 1
             continue
-        quantity = _quantity(strategy, reference, stop)
+        quantity = _quantity(strategy, reference, planned_stop)
         if quantity < 1:
             i = signal + 1
             continue
-        targets = target_prices(strategy, context, signal, reference, stop)
-        extra = add_on_target(strategy, context, signal, reference, stop)
+        stop = stop_price(strategy, context, signal, entry)
+        if stop is not None and (math.isnan(stop) or (stop >= entry if long else stop <= entry)):
+            i = signal + 1  # stop undefined or on the wrong side of the fill: no trade
+            continue
+        targets = target_prices(strategy, context, signal, entry, stop)
+        extra = add_on_target(strategy, context, signal, entry, stop)
         trade = _manage(symbol, bars, strategy, fill, entry, stop, targets, quantity, exits, clocks, days, add_when=add_when, add_target=extra)
         trades.append(trade)
         exit_index = next(k for k in range(fill, n) if bars.end[k] == trade.exit_at)
@@ -559,6 +565,7 @@ def run_strategy(strategy: StrategyDefinition, request: BacktestRequest, load_ba
         "Rules use each bar's close; entries fill on later bars, and higher-timeframe values come from completed bars only.",
         f"Charges: Zerodha {'intraday rates (same-day square-off), plus one DP fee per sell as the paper engine charges' if strategy.product == 'MIS' else 'delivery (CNC); a leg sold in the session it was bought is priced as intraday, as the paper engine does'} on every leg, plus {strategy.slippage_bps:g} bp slippage on each exit.",
         "Entries use the paper engine's rule: a limit at the signal close + 0.25%, next session only for daily bars, so a stock that gaps up past it is not bought.",
+        "Stops and targets are measured from the price actually paid (fixed levels such as a swing low stay where they are); the quantity is sized from the signal price, before the fill.",
     ]
     if strategy.direction == "short":
         notes.append("Short side is a research backtest: the paper engine trades long only.")

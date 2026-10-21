@@ -945,6 +945,45 @@ def target_prices(strategy: StrategyDefinition, context: Context, signal_index: 
     return out
 
 
+def planned_targets(strategy: StrategyDefinition, context: Context, signal_index: int, entry: float, stop: float | None) -> list[dict]:
+    """Each target's price plus how it was defined, so live trading can re-base it onto the fill price."""
+    out = []
+    for spec in strategy.targets:
+        prices = target_prices(strategy.model_copy(update={"targets": [spec]}), context, signal_index, entry, stop)
+        if prices:
+            out.append({"price": prices[0][0], "fraction": spec.fraction, "kind": spec.kind, "value": spec.value})
+    out.sort(key=lambda item: item["price"] * (1 if strategy.direction == "long" else -1))
+    return out
+
+
+def rebase_level(kind: str | None, value: float | None, planned: float, reference: float, fill: float, stop: float | None = None) -> float:
+    """Move a level planned from `reference` onto the actual `fill`. Percent levels scale with the price, ATR levels
+    keep their rupee distance, R-multiple targets are re-measured from the re-based stop, fixed levels stay put."""
+    if kind == "percent":
+        return planned * fill / reference
+    if kind == "atr":
+        return fill + (planned - reference)
+    if kind == "r_multiple" and stop is not None and value is not None:
+        return fill + value * (fill - stop)
+    return planned  # "level" or anything fixed
+
+
+def rebase_plan(plan: dict, fill: float) -> tuple[float | None, list[dict], float | None]:
+    """(stop, targets, add-on target) re-based onto the fill. A plan from before re-basing existed is used as stored."""
+    reference = plan.get("reference")
+    stop = plan.get("stop")
+    targets = list(plan.get("targets") or [])
+    add_plan = plan.get("add_on") or {}
+    add_target = add_plan.get("target")
+    if not reference or fill <= 0:
+        return stop, targets, add_target
+    spec = plan.get("stop_spec") or {}
+    new_stop = None if stop is None else rebase_level(spec.get("kind"), spec.get("value"), float(stop), float(reference), fill)
+    new_targets = [{**item, "price": rebase_level(item.get("kind"), item.get("value"), float(item["price"]), float(reference), fill, new_stop)} for item in targets]
+    new_add = None if add_target is None else rebase_level(add_plan.get("target_kind"), add_plan.get("target_value"), float(add_target), float(reference), fill, new_stop)
+    return new_stop, new_targets, new_add
+
+
 def add_on_target(strategy: StrategyDefinition, context: Context, signal_index: int, entry: float, stop: float | None) -> float | None:
     """The exit price for added shares, fixed at the original signal (None = they go with the last target)."""
     if strategy.add_on is None or strategy.add_on.target is None:

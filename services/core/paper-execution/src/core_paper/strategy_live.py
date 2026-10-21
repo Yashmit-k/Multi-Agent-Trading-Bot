@@ -35,6 +35,8 @@ from core_paper.strategy_engine import (
     evaluate,
     operand_values,
     add_on_target,
+    planned_targets,
+    rebase_plan,
     resample,
     stop_price,
     target_prices,
@@ -297,14 +299,19 @@ def strategy_entries(repository: CoreRepository, publisher, *, starting_cash: De
                 "stops_monitored": True,
                 "same_bar_exit": "stop_first",
                 "plan": {
+                    # Planned from the signal price; re-based onto the actual fill when the position is managed.
+                    "reference": round(entry, 4),
                     "stop": round(stop, 4),
+                    "stop_spec": {"kind": definition.stop.kind, "value": definition.stop.value},
                     "stop_percent": definition.stop.value if definition.stop.kind == "percent" else None,
                     "add_on": None if definition.add_on is None else {
                         "notional": definition.add_on.notional,
                         "target": (lambda price: None if price is None else round(price, 4))(add_on_target(definition, context, last, entry, stop)),
+                        "target_kind": definition.add_on.target.kind if definition.add_on.target else None,
+                        "target_value": definition.add_on.target.value if definition.add_on.target else None,
                         "restop_from_average": definition.add_on.restop_from_average,
                     },
-                    "targets": [{"price": round(price, 4), "fraction": fraction} for price, fraction in targets],
+                    "targets": [{**item, "price": round(item["price"], 4)} for item in planned_targets(definition, context, last, entry, stop)],
                     "breakeven_after_first_target": definition.breakeven_after_first_target,
                     "trailing": None if definition.trailing is None else definition.trailing.model_dump(),
                     "max_hold_bars": definition.max_hold_bars,
@@ -484,8 +491,9 @@ def manage_strategy_positions(repository: CoreRepository, publisher, schedule, s
             continue
         entry = float(execution.price)
         filled_at = execution.executed_at
-        stop = float(plan.get("stop") or proposal.stop_loss)
-        targets = plan.get("targets") or []
+        # Stops and targets are measured from the price actually paid (planned levels re-based onto the fill).
+        rebased_stop, targets, rebased_add_target = rebase_plan(plan, entry)
+        stop = float(rebased_stop if rebased_stop is not None else proposal.stop_loss)
         original = execution.quantity
         sold = original - position.quantity
         # Targets already taken = target sells recorded for this entry.
@@ -495,7 +503,7 @@ def manage_strategy_positions(repository: CoreRepository, publisher, schedule, s
         added, added_sold, _ = _add_on_state(repository, position.symbol, filled_at)
         added_left = max(0, added - added_sold)
         add_plan = plan.get("add_on") or {}
-        add_target = add_plan.get("target")
+        add_target = rebased_add_target
         current_stop = stop
         if added and not taken and plan.get("stop_percent") and add_plan.get("restop_from_average"):
             current_stop = float(position.average_price) * (1 - float(plan["stop_percent"]) / 100)  # re-measured from the average cost
