@@ -234,3 +234,13 @@ Only sessions that appear in the single 5-minute response, and only from 2024-01
 
 RV is not annualised. There is no second download if 2024 is only partly covered. Outcomes with fewer than two event sessions or fewer than two non-event sessions in a split are undefined: the difference is null and the p-value is 1. They stay in the Holm family.
 
+## Comparison: all other sessions
+
+Inside one split, the statistic for an outcome is:
+
+`mean(outcome | event session) - mean(outcome | every other session in the split with a finite outcome)`
+
+"Other" means not an event session for **that category**. Other categories' event sessions stay in the control group. The study does not build a day that is quiet in every category.
+
+This unmatched difference is the statistic the pass rule uses.
+
