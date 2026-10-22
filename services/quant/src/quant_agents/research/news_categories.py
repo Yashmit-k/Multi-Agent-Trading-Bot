@@ -1289,21 +1289,21 @@ def load_gdelt_days(
     request_end = end if end > start else end + timedelta(days=1)
     url = gdelt_request_url(query, mode, start.strftime("%Y%m%d") + "000000", request_end.strftime("%Y%m%d") + "000000")
     span = (end - start).days
-    # Long windows are refused outright. Medium windows get one retry. Short windows wait out the rate limit.
-    if span > 120:
+    # Long windows are refused outright. Anything shorter gets one retry, then a split or a recorded gap.
+    if span > 120 or mode == "timelinetone":
         attempts = 1
-    elif span > 45:
-        attempts = 2
     else:
-        attempts = 5
+        attempts = 2
     try:
         payload, _ = fetch_json(url, cache, client, sleeper, attempts=attempts)
     except RuntimeError as exc:
         if "429" not in str(exc):
             raise
         if span < 30:
-            sleeper(60.0)
-            payload, _ = fetch_json(url, cache, client, sleeper, attempts=3)
+            # A day GDELT will not answer is missing. Volume later becomes 0; tone stays missing.
+            print(f"unanswered {label} {mode} {start.isoformat()} {end.isoformat()}", flush=True)
+            remember_coverage(cache, query, mode, start, end)
+            return {}
         else:
             mid = start + timedelta(days=span // 2)
             print(f"split {label} {mode} {start.isoformat()} {end.isoformat()} at {mid.isoformat()}", flush=True)

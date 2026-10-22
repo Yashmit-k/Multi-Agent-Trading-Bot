@@ -242,6 +242,26 @@ def test_a_429_on_a_wide_window_is_split(tmp_path: Path) -> None:
     assert any(pause == 15.0 for pause in slept)
 
 
+def test_a_short_window_that_stays_429_is_recorded_and_not_retried_forever(tmp_path: Path) -> None:
+    from quant_agents.research.news_categories import coverage_days, load_gdelt_days
+
+    class _AlwaysBusy:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def get(self, url: str) -> _StatusResponse:
+            self.calls += 1
+            return _StatusResponse("busy", 429)
+
+    client = _AlwaysBusy()
+    slept: list[float] = []
+    days = load_gdelt_days("(war)", "timelinevolraw", date(2020, 10, 20), date(2020, 10, 20), tmp_path, client, slept.append, "geopolitics_war")
+    assert days == {}
+    assert date(2020, 10, 20) in coverage_days(tmp_path)[("(war)", "timelinevolraw")]
+    assert client.calls == 2
+    assert 60.0 not in slept
+
+
 def test_a_short_window_counts_omitted_days_as_answered(tmp_path: Path) -> None:
     from quant_agents.research.news_categories import coverage_days, covered_dates, load_gdelt_days
 
