@@ -43,3 +43,25 @@ Use the unadjusted `Close` (`auto_adjust` false). Yahoo's row date is the sessio
 
 Where a session has both an API close and a Yahoo close, the study uses the **API** close. It still compares them. A session is a **mismatch** when `abs(yahoo / api - 1) > 0.005` (half of one percent). Every mismatch is listed in the result (date, Yahoo close, API close, absolute percent gap). Mismatched sessions are not dropped and are not a reason to switch the rule. If the public URL fails or returns no bars, say so, use Yahoo for that series, and do not call the URL again.
 
+## News history: GDELT 2.0 DOC API
+
+Source: `https://api.gdeltproject.org/api/v2/doc/doc`. No key.
+
+For each query below, two calls:
+
+- `mode=timelinevolraw` (article counts)
+- `mode=timelinetone` (average tone)
+
+Frozen parameters: `format=json`, `startdatetime=20170101000000`, `enddatetime` = the UTC calendar date of the single study run at `000000`. No other mode, no `timespan`, no source-country filter.
+
+Rate limit: at least **5 seconds** between GDELT HTTP calls. A cache hit does not sleep and is not a new call. Cache every response body under `services/quant/.cache/news-categories/`, which is gitignored. The cache is not a committed artefact.
+
+Parsing, frozen now:
+
+- Read `timeline[0].data` entries of `date` and `value`.
+- Accept `YYYYMMDDHHMMSS` and ISO-like `YYYYMMDDTHHMMSSZ`.
+- Bucket by the UTC date of that stamp. Sum volume inside the UTC date. Average tone inside the UTC date with weights equal to that query's volume (if volume is missing, equal weights).
+- Build a calendar-day series from 2017-01-01 through the last returned date. Missing volume is **0**. Missing tone stays missing. Tone is never filled with 0.
+
+Tone is descriptive. It is stored and may be quoted. It is not an outcome in the test family.
+
