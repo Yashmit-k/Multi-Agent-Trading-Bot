@@ -1534,6 +1534,72 @@ def remaining_volume_windows(cache: Path, end_day: date, *, span_days: int = 150
     return windows
 
 
+def _missing_ranges(have: set[date], start: date, end: date) -> list[list[str]]:
+    return [
+        [start_day.isoformat(), stop_day.isoformat()]
+        for start_day, stop_day in gap_windows(have, start, end, span_days=100000)
+    ]
+
+
+def coverage_report(cache: Path, end_day: date) -> dict[str, object]:
+    """Per-query volume and tone coverage. This does not call GDELT."""
+    cached = read_cached_gdelt(cache)
+    categories: list[dict[str, object]] = []
+    for category_id, _name, queries in CATEGORIES:
+        query_rows: list[dict[str, object]] = []
+        complete = True
+        for index, query in enumerate(queries):
+            modes: dict[str, object] = {}
+            for mode in ("timelinevolraw", "timelinetone"):
+                days = {day for day in cached.get((query, mode), {}) if VOLUME_START <= day <= end_day}
+                missing = _missing_ranges(days, VOLUME_START, end_day)
+                if missing:
+                    complete = False
+                modes[mode] = {
+                    "observed_days": len(days),
+                    "first": min(days).isoformat() if days else None,
+                    "last": max(days).isoformat() if days else None,
+                    "missing_ranges": missing,
+                }
+            query_rows.append({"index": index, "modes": modes})
+        categories.append({"id": category_id, "complete": complete, "queries": query_rows})
+    return {"start": VOLUME_START.isoformat(), "end": end_day.isoformat(), "categories": categories}
+
+
+def resume_volume(
+    cache: Path,
+    client: object,
+    sleeper: Callable[[float], None],
+    end_day: date,
+    *,
+    max_windows: int = 1,
+) -> dict[str, object]:
+    """Fetch at most `max_windows` missing volume windows. A 429 stops the run."""
+    if max_windows < 1:
+        raise ValueError("max_windows must be positive")
+    windows = remaining_volume_windows(cache, end_day)
+    attempted = 0
+    blocked: dict[str, object] | None = None
+    for category_id, query, start_day, stop_day in windows:
+        if attempted >= max_windows:
+            break
+        attempted += 1
+        try:
+            load_gdelt_days(query, "timelinevolraw", start_day, stop_day, cache, client, sleeper, category_id, split=False)
+        except RuntimeError as exc:
+            if "429" not in str(exc) and "payload rejected" not in str(exc):
+                raise
+            blocked = {
+                "category": category_id,
+                "window": [start_day.isoformat(), stop_day.isoformat()],
+                "error": str(exc)[:180],
+            }
+            break
+    remaining = len(remaining_volume_windows(cache, end_day))
+    status = "BLOCKED" if blocked else ("COMPLETE" if remaining == 0 else "INCOMPLETE")
+    return {"status": status, "attempted": attempted, "remaining_windows": remaining, "blocked": blocked}
+
+
 def category_event_days(cache: Path, client: object, sleeper: Callable[[float], None], end_day: date) -> dict[str, list[tuple[date, bool]]]:
     """Pull each frozen query for the days not already cached, then flag event days.
 
@@ -1762,14 +1828,33 @@ def main(argv: Sequence[str] | None = None) -> None:
     import httpx
 
     args = list(sys.argv[1:] if argv is None else argv)
-    if len(args) != 1 or args[0] not in {"train", "validate", "plan"}:
-        raise SystemExit("usage: python -m quant_agents.research.news_categories train|validate|plan")
+    if len(args) != 1 or args[0] not in {"train", "validate", "plan", "resume", "coverage"}:
+        raise SystemExit("usage: python -m quant_agents.research.news_categories train|validate|plan|resume|coverage")
     root = repo_root()
+    if args[0] == "coverage":
+        print(json.dumps(coverage_report(cache_directory(root), date.today())))
+        return
     if args[0] == "plan":
         windows = remaining_volume_windows(cache_directory(root), date.today())
         print(f"remaining_volume_windows {len(windows)}")
         for category_id, _query, start_day, stop_day in windows:
             print(f"{category_id} {start_day.isoformat()} {stop_day.isoformat()}")
+        return
+    if args[0] == "resume":
+        client = httpx.Client(timeout=25.0, follow_redirects=True, headers={"User-Agent": "stockx-research/1.0"})
+        try:
+            outcome = resume_volume(
+                cache_directory(root),
+                client,
+                lambda seconds: __import__("time").sleep(seconds),
+                date.today(),
+                max_windows=1,
+            )
+        finally:
+            client.close()
+        print(json.dumps(json_ready(outcome)))
+        if outcome["status"] == "BLOCKED":
+            raise SystemExit(2)
         return
     if args[0] == "train":
         client = httpx.Client(timeout=25.0, follow_redirects=True, headers={"User-Agent": "stockx-research/1.0"})

@@ -788,6 +788,47 @@ def test_cached_file_fills_only_its_own_interior_gap(tmp_path: Path) -> None:
     assert windows[0][2] == date(2017, 1, 4)
 
 
+def test_coverage_report_names_the_missing_query_and_mode(tmp_path: Path) -> None:
+    import json
+
+    from quant_agents.research.news_categories import CATEGORIES, coverage_report
+
+    query = CATEGORIES[0][2][0]
+    body = {
+        "query_details": {"title": query},
+        "timeline": [{"series": "Article Count", "data": [{"date": "20170101000000", "value": 2}, {"date": "20170103000000", "value": 2}]}],
+    }
+    (tmp_path / "one.json").write_text(json.dumps(body), encoding="utf-8")
+    report = coverage_report(tmp_path, date(2017, 1, 3))
+    first = report["categories"][0]
+    assert first["id"] == "geopolitics_war"
+    assert first["complete"] is False
+    volume = first["queries"][0]["modes"]["timelinevolraw"]
+    assert volume["observed_days"] == 3
+    assert volume["missing_ranges"] == []
+    assert first["queries"][0]["modes"]["timelinetone"]["missing_ranges"] == [["2017-01-01", "2017-01-03"]]
+    assert first["queries"][2]["modes"]["timelinevolraw"]["observed_days"] == 0
+
+
+def test_resume_stops_on_the_first_429(tmp_path: Path) -> None:
+    from quant_agents.research.news_categories import resume_volume
+
+    class _Busy:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def get(self, url: str) -> _StatusResponse:
+            self.calls += 1
+            return _StatusResponse("busy", 429)
+
+    client = _Busy()
+    outcome = resume_volume(tmp_path, client, lambda _seconds: None, date(2017, 1, 3), max_windows=1)
+    assert outcome["status"] == "BLOCKED"
+    assert outcome["attempted"] == 1
+    assert client.calls == 4
+    assert not (tmp_path / "train.json").exists()
+
+
 def test_result_note_quotes_the_negative_conclusion_when_nothing_passes() -> None:
     sessions, closes = _weekday_closes(date(2022, 11, 1), 80)
     vix = {day: 12.0 + (index % 5) for index, day in enumerate(sessions)}
