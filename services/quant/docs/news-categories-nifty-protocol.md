@@ -286,3 +286,9 @@ The event rule may use 2022 volume when it labels a 2023 session, because those 
 
 No query, threshold, window, holiday, or pass rule is chosen from validate. Nothing is chosen from train either, beyond what this file already fixes. Seeing the train table is allowed. Editing this file after that table exists is not.
 
+## What may be chosen on train
+
+Nothing. The trailing window stays 60. The threshold stays 2 standard deviations. The twelve outcomes stay the family. The control stays "all other sessions in the split". There is no model to fit and no variant table to pick from.
+
+The sentence in the task that train is where we explore and choose is satisfied by writing the choices here, before either split is scored, and by refusing any later choice. A train table that looks strong is not a reason to drop a weak outcome from Holm or to add one.
+
