@@ -1143,7 +1143,7 @@ def render_markdown(result: dict[str, object]) -> str:
             "",
             "## Limits",
             "",
-            "GDELT refuses the full 2017-to-today call, so each query was fetched in non-overlapping windows of at most 700 days and concatenated. GDELT's crawl is global, not an Indian newspaper. A spike is a count of articles, not a measure of how important the news was. Average tone was downloaded into the local cache and is not part of the pass rule. A difference between event days and other days is not a cause, and it is not a trading rule. The daily GDELT bucket has no clock, so the study assigns it to the next NSE session. The 5-minute volatility window is only as long as one public API call. Stored RSS headlines from October 2026 are too short to test and were not used as evidence.",
+            "GDELT refuses the full 2017-to-today call, so each query was fetched in non-overlapping windows of at most 700 days and concatenated. Some tone calls still returned 429 after those splits; tone is not in the pass rule, and those windows were left out of the tone cache. GDELT's crawl is global, not an Indian newspaper. A spike is a count of articles, not a measure of how important the news was. Average tone was downloaded into the local cache and is not part of the pass rule. A difference between event days and other days is not a cause, and it is not a trading rule. The daily GDELT bucket has no clock, so the study assigns it to the next NSE session. The 5-minute volatility window is only as long as one public API call. Stored RSS headlines from October 2026 are too short to test and were not used as evidence.",
             "",
         ]
     )
@@ -1268,7 +1268,13 @@ def category_event_days(cache: Path, client: object, sleeper: Callable[[float], 
                 start_day = date(int(start_stamp[0:4]), int(start_stamp[4:6]), int(start_stamp[6:8]))
                 end_bound = date(int(end_stamp[0:4]), int(end_stamp[4:6]), int(end_stamp[6:8]))
                 piece = load_gdelt_days(query, "timelinevolraw", start_day, end_bound, cache, client, sleeper, category_id)
-                load_gdelt_days(query, "timelinetone", start_day, end_bound, cache, client, sleeper, category_id)
+                try:
+                    load_gdelt_days(query, "timelinetone", start_day, end_bound, cache, client, sleeper, category_id)
+                except RuntimeError as exc:
+                    # Tone is cached when GDELT allows it. It is not an outcome, so a stuck 429 does not stop the study.
+                    if "429" not in str(exc):
+                        raise
+                    print(f"tone skipped {category_id} {start_day.isoformat()} {end_bound.isoformat()}", flush=True)
                 for day, value in piece.items():
                     if day in merged:
                         raise RuntimeError(f"GDELT window overlap on {day.isoformat()}")
