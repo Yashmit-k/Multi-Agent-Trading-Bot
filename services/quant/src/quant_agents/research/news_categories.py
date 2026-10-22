@@ -1295,28 +1295,34 @@ def load_gdelt_days(
     else:
         attempts = 2
     try:
-        payload, _ = fetch_json(url, cache, client, sleeper, attempts=attempts, pause=8.0)
+        payload, _ = fetch_json(url, cache, client, sleeper, attempts=attempts, pause=12.0)
     except RuntimeError as exc:
         if "429" not in str(exc):
             raise
         if span < 30:
             if mode == "timelinevolraw":
                 sleeper(45.0)
-                payload, _ = fetch_json(url, cache, client, sleeper, attempts=2, pause=8.0)
+                payload, _ = fetch_json(url, cache, client, sleeper, attempts=2, pause=12.0)
             else:
                 print(f"unanswered {label} {mode} {start.isoformat()} {end.isoformat()}", flush=True)
                 remember_coverage(cache, query, mode, start, end)
                 return {}
         else:
-            mid = start + timedelta(days=span // 2)
-            print(f"split {label} {mode} {start.isoformat()} {end.isoformat()} at {mid.isoformat()}", flush=True)
-            left = load_gdelt_days(query, mode, start, mid, cache, client, sleeper, label)
-            right = load_gdelt_days(query, mode, mid + timedelta(days=1), end, cache, client, sleeper, label)
-            shared = set(left) & set(right)
-            if shared:
-                raise RuntimeError(f"GDELT window overlap on {min(shared).isoformat()}") from exc
-            left.update(right)
-            return left
+            sleeper(30.0)
+            try:
+                payload, _ = fetch_json(url, cache, client, sleeper, attempts=1, pause=12.0)
+            except RuntimeError as exc2:
+                if "429" not in str(exc2):
+                    raise
+                mid = start + timedelta(days=span // 2)
+                print(f"split {label} {mode} {start.isoformat()} {end.isoformat()} at {mid.isoformat()}", flush=True)
+                left = load_gdelt_days(query, mode, start, mid, cache, client, sleeper, label)
+                right = load_gdelt_days(query, mode, mid + timedelta(days=1), end, cache, client, sleeper, label)
+                shared = set(left) & set(right)
+                if shared:
+                    raise RuntimeError(f"GDELT window overlap on {min(shared).isoformat()}") from exc2
+                left.update(right)
+                return left
     present = volume_by_day(parse_stamped(payload))
     answered = covered_dates(start, end, present)
     if answered is not None:
