@@ -65,3 +65,7 @@ Parsing, frozen now:
 
 Tone is descriptive. It is stored and may be quoted. It is not an outcome in the test family.
 
+## Stored RSS is not a sample
+
+`/api/v1/stocks/{symbol}/news` on the live site holds our own headlines from about 14 Oct 2026. That window is too short to test anything. It is not an outcome series, not a robustness check, and not a way to pick a category. It is used only later, if at all, to show that forward capture is wired. It cannot confirm or reject a category.
+
