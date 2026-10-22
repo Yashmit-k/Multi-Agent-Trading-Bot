@@ -302,3 +302,11 @@ A category **matters** only if at least one of its 12 outcomes does all of the f
 
 One passing outcome is enough for the category. The matched-weekday statistic is printed beside it and is not required. A category that fails this rule is a miss, including a category that is significant on train and flips sign or loses the validate p-value.
 
+## If nothing passes
+
+Write this conclusion, and stop:
+
+> Under this pre-registered design, no news category has a volume spike that lines up with the NIFTY 50 index on 2017–2022 and then again, in the same direction, on 2023 onward. That is a negative result. It does not support adding a market-wide news vote, changing fusion, or loosening the 2 standard-deviation rule. The forward capture switch stays off unless someone turns it on for storage only.
+
+Do not replace the threshold with 1.5, do not drop RV from Holm after the fact, do not restrict the family to the outcome that looked closest, and do not run a second validate. A near miss is still a miss.
+
