@@ -798,3 +798,44 @@ def strata_for(
     return labels
 
 
+
+API_URLS = {
+    "nifty_daily": PUBLIC_DAILY_NIFTY,
+    "vix_daily": PUBLIC_DAILY_VIX,
+    "nifty_5m": PUBLIC_INTRADAY_NIFTY,
+}
+
+
+def load_yahoo_closes(symbol: str, start: str, end: str) -> dict[date, float]:
+    import yfinance as yf
+
+    frame = yf.download(symbol, start=start, end=end, auto_adjust=False, progress=False, threads=False)
+    if frame is None or len(frame) == 0:
+        return {}
+    close = frame["Close"]
+    if hasattr(close, "columns"):
+        close = close.iloc[:, 0]
+    out: dict[date, float] = {}
+    for stamp, value in close.items():
+        number = float(value)
+        if not math.isfinite(number):
+            continue
+        day = stamp.date() if hasattr(stamp, "date") else stamp
+        out[day] = number
+    return out
+
+
+def fetch_public_json(url: str, cache_dir: Path, client: object) -> object:
+    """One public-API GET. A cache hit does not call the network again."""
+    payload, _did_http = fetch_json(url, cache_dir, client, lambda _seconds: None, pause=0.0)
+    return payload
+
+
+def coverage(payload: object) -> dict[str, str | int | None]:
+    if not isinstance(payload, list) or not payload:
+        return {"bars": 0, "first": None, "last": None}
+    first = str(payload[0].get("start") or payload[0].get("end"))
+    last = str(payload[-1].get("end") or payload[-1].get("start"))
+    return {"bars": len(payload), "first": first, "last": last}
+
+
