@@ -226,3 +226,50 @@ def test_gdelt_url_freezes_mode_and_dates() -> None:
     assert "format=json" in url
 
 
+
+from pathlib import Path
+
+import pytest
+
+from quant_agents.research.news_categories import cache_file, fetch_json
+
+
+class _Response:
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def raise_for_status(self) -> None:
+        return None
+
+
+class _Client:
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.calls = 0
+
+    def get(self, url: str) -> _Response:
+        self.calls += 1
+        return _Response(self.text)
+
+
+def test_fetch_sleeps_only_on_a_cache_miss(tmp_path: Path) -> None:
+    client = _Client('{"timeline":[]}')
+    slept: list[float] = []
+    url = "https://api.gdeltproject.org/api/v2/doc/doc?query=war"
+    first, did_http = fetch_json(url, tmp_path, client, slept.append)
+    second, did_http_again = fetch_json(url, tmp_path, client, slept.append)
+    assert first == {"timeline": []}
+    assert second == first
+    assert did_http is True
+    assert did_http_again is False
+    assert slept == [5.0]
+    assert client.calls == 1
+    assert cache_file(tmp_path, url).exists()
+
+
+def test_fetch_rejects_a_non_json_body(tmp_path: Path) -> None:
+    client = _Client("please slow down")
+    with pytest.raises(RuntimeError, match="GDELT"):
+        fetch_json("https://example.test/gdelt", tmp_path, client, lambda _seconds: None)
+
+
