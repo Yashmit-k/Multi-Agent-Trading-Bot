@@ -434,3 +434,80 @@ import json
 from quant_agents.research.news_categories import NOTHING_PASSES, assemble_study, render_markdown
 
 
+
+import json
+from datetime import timedelta
+
+from quant_agents.research.news_categories import CATEGORIES, run_train, run_validate
+
+
+class _Body:
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def raise_for_status(self) -> None:
+        return None
+
+
+class _StudyClient:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def get(self, url: str) -> _Body:
+        self.calls += 1
+        if "gdeltproject" in url:
+            data = []
+            day = date(2017, 1, 1)
+            for index in range(70):
+                data.append({"date": day.strftime("%Y%m%d") + "000000", "value": 1 + (index % 3)})
+                day += timedelta(days=1)
+            data.append({"date": "20170320000000", "value": 400})
+            return _Body(json.dumps({"timeline": [{"data": data}]}))
+        return _Body("[]")
+
+
+def test_train_process_does_not_score_validate_and_validate_runs_once(tmp_path: Path) -> None:
+    def yahoo(_symbol: str, _start: str, _end: str) -> dict[date, float]:
+        closes: dict[date, float] = {}
+        day = date(2022, 11, 1)
+        while day <= date(2023, 3, 31):
+            if day.weekday() < 5:
+                closes[day] = 100.0 + (day - date(2022, 11, 1)).days
+            day += timedelta(days=1)
+        return closes
+
+    slept: list[float] = []
+    train_path = run_train(
+        tmp_path,
+        today=date(2023, 3, 31),
+        client=_StudyClient(),
+        sleeper=slept.append,
+        yahoo=yahoo,
+        n_boot=8,
+        protocol_commit="feedface",
+    )
+    trained = json.loads(train_path.read_text(encoding="utf-8"))
+    assert "validate" not in trained["categories"][0]
+    assert slept  # GDELT misses pause; the public candle cache miss also pauses only for GDELT
+    result = run_validate(tmp_path, n_boot=8)
+    assert result["protocol_commit"] == "feedface"
+    assert len(result["categories"]) == len(CATEGORIES)
+    try:
+        run_validate(tmp_path, n_boot=8)
+    except RuntimeError as exc:
+        assert "already scored" in str(exc)
+    else:
+        raise AssertionError("validate ran twice")
+
+
+def test_result_note_quotes_the_negative_conclusion_when_nothing_passes() -> None:
+    sessions, closes = _weekday_closes(date(2022, 11, 1), 80)
+    vix = {day: 12.0 + (index % 5) for index, day in enumerate(sessions)}
+    days = [(day - timedelta(days=1), False) for day in sessions]
+    category_days = {item[0]: days for item in CATEGORIES}
+    result = assemble_study(sessions, closes, vix, {}, category_days, protocol_commit="deadbeef", n_boot=15)
+    text = render_markdown(result)
+    assert "deadbeef" in text
+    assert NOTHING_PASSES in text
+    assert "Matters: **False**" in text
+    json.dumps(result)
