@@ -55,6 +55,8 @@ class IntelligenceSettings:
     # Empty: they share the News agent's model as before.
     llm_context_model: str = ""
     llm_context_reasoning_effort: str = ""
+    # Off by default. When true, headlines that name no company are stored as NIFTY50.
+    news_keep_market_wide: bool = False
 
     @classmethod
     def from_env(cls) -> IntelligenceSettings:
@@ -111,6 +113,7 @@ class IntelligenceSettings:
             llm_context_model=os.environ.get("LLM_CONTEXT_MODEL", "").strip(),
             llm_context_reasoning_effort=os.environ.get("LLM_CONTEXT_REASONING_EFFORT", "").strip().lower(),
             llm_fallback_models=tuple(item.strip() for item in os.environ.get("LLM_FALLBACK_MODELS", "").split(",") if item.strip()),
+            news_keep_market_wide=os.environ.get("NEWS_KEEP_MARKET_WIDE", "false").strip().lower() == "true",
         )
         settings.validate()
         return settings
