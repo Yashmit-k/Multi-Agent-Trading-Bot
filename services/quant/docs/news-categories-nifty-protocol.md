@@ -69,3 +69,15 @@ Tone is descriptive. It is stored and may be quoted. It is not an outcome in the
 
 `/api/v1/stocks/{symbol}/news` on the live site holds our own headlines from about 14 Oct 2026. That window is too short to test anything. It is not an outcome series, not a robustness check, and not a way to pick a category. It is used only later, if at all, to show that forward capture is wired. It cannot confirm or reject a category.
 
+## Categories
+
+There are ten categories. A category that has more than one query is one category: its volume that day is the **sum** of its queries' daily volumes. An event is defined on that sum, not on each query. Queries are copied below exactly, including parentheses, and are the strings sent to GDELT.
+
+### 1. Geopolitics and war
+
+Global wars, missile strikes, military escalation, and terror attacks, plus India–Pakistan and India–China as their own queries.
+
+1. `(war OR warfare OR invasion OR bombardment OR "missile strike" OR "missile strikes" OR "military escalation" OR "terror attack" OR "terrorist attack")`
+2. `("India Pakistan" OR "India-Pakistan" OR "Line of Control") AND (strike OR attack OR shelling OR ceasefire OR tension OR conflict)`
+3. `("India China" OR "India-China" OR Galwan OR Ladakh OR "Line of Actual Control") AND (clash OR standoff OR incursion OR tension OR border)`
+
