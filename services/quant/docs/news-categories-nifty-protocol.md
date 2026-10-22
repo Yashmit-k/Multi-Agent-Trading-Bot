@@ -222,3 +222,15 @@ For an event session `t`:
 
 If `t-1`, `t+1`, or `t+5` does not exist, or a VIX close is missing, that outcome is missing for that session. Missing values are left out of the mean. They are not filled with zero.
 
+## Intraday realised volatility
+
+Only sessions that appear in the single 5-minute response, and only from 2024-01-01 onward. For session `t`, realised variance is the sum of squared 5-minute log returns of the bars that belong to that session (see the price section). The first bar of the session has no return. If the session has fewer than two usable bars, RV is missing.
+
+| Name | Definition |
+|---|---|
+| `rv_0` | RV of session `t` |
+| `rv_1` | RV of session `t+1` |
+| `rv_1_5` | mean of RV on `t+1` through `t+5`, and missing if any of those five is missing |
+
+RV is not annualised. There is no second download if 2024 is only partly covered. Outcomes with fewer than two event sessions or fewer than two non-event sessions in a split are undefined: the difference is null and the p-value is 1. They stay in the Holm family.
+
