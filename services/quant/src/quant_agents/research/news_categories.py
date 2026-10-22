@@ -351,3 +351,84 @@ def session_realised_variance(bars: Sequence[tuple[datetime, float]]) -> dict[da
     return out
 
 
+
+
+def gdelt_request_url(query: str, mode: str, start: str, end: str) -> str:
+    params = {
+        "query": query,
+        "mode": mode,
+        "format": "json",
+        "startdatetime": start,
+        "enddatetime": end,
+    }
+    return GDELT_DOC + "?" + urllib.parse.urlencode(params)
+
+
+def parse_stamped(payload: object) -> list[tuple[str, date, float]]:
+    if not isinstance(payload, dict):
+        raise ValueError("GDELT payload is not an object")
+    timeline = payload.get("timeline") or []
+    if not timeline:
+        return []
+    data = timeline[0].get("data") or []
+    points: list[tuple[str, date, float]] = []
+    for row in data:
+        stamp = str(row["date"])
+        digits = "".join(ch for ch in stamp if ch.isdigit())
+        if len(digits) < 8:
+            raise ValueError(f"bad GDELT date {stamp}")
+        day = date(int(digits[0:4]), int(digits[4:6]), int(digits[6:8]))
+        points.append((stamp, day, float(row["value"])))
+    return points
+
+
+def volume_by_day(points: Sequence[tuple[str, date, float]]) -> dict[date, float]:
+    totals: dict[date, float] = {}
+    for _stamp, day, value in points:
+        totals[day] = totals.get(day, 0.0) + value
+    return totals
+
+
+def tone_by_day(
+    tone_points: Sequence[tuple[str, date, float]],
+    volume_points: Sequence[tuple[str, date, float]],
+) -> dict[date, float]:
+    """Volume-weighted tone inside each UTC date. Equal weights when volume is missing."""
+    weights: dict[str, float] = {}
+    for stamp, _day, value in volume_points:
+        weights[stamp] = weights.get(stamp, 0.0) + value
+    buckets: dict[date, list[tuple[float, float | None]]] = {}
+    for stamp, day, tone in tone_points:
+        weight = weights.get(stamp)
+        buckets.setdefault(day, []).append((tone, weight))
+    out: dict[date, float] = {}
+    for day, rows in buckets.items():
+        weighted = [(tone, weight) for tone, weight in rows if weight]
+        denom = sum(weight for _, weight in weighted)
+        if denom > 0:
+            out[day] = sum(tone * weight for tone, weight in weighted) / denom
+        else:
+            out[day] = sum(tone for tone, _ in rows) / len(rows)
+    return out
+
+
+def filled_volume(daily: Mapping[date, float], start: date, end: date) -> list[tuple[date, float]]:
+    """Calendar days from start through end. A day GDELT did not return is volume 0."""
+    if end < start:
+        return []
+    rows: list[tuple[date, float]] = []
+    day = start
+    while day <= end:
+        rows.append((day, float(daily.get(day, 0.0))))
+        day += timedelta(days=1)
+    return rows
+
+
+def sum_category_volume(parts: Sequence[Mapping[date, float]], start: date, end: date) -> list[tuple[date, float]]:
+    combined: dict[date, float] = {}
+    for part in parts:
+        for day, value in part.items():
+            combined[day] = combined.get(day, 0.0) + float(value)
+    return filled_volume(combined, start, end)
+
+
