@@ -840,6 +840,19 @@ def test_coverage_report_names_the_missing_query_and_mode(tmp_path: Path) -> Non
     assert first["queries"][2]["modes"]["timelinevolraw"]["observed_days"] == 0
 
 
+def test_resume_stops_cleanly_when_the_body_is_not_json(tmp_path: Path) -> None:
+    from quant_agents.research.news_categories import resume_volume
+
+    class _Text:
+        def get(self, url: str) -> _StatusResponse:
+            return _StatusResponse("Invalid query start date.", 200)
+
+    outcome = resume_volume(tmp_path, _Text(), lambda _seconds: None, date(2017, 1, 3), max_windows=1)
+    assert outcome["status"] == "BLOCKED"
+    assert outcome["attempted"] == 1
+    assert not list(tmp_path.glob("*.json"))
+
+
 def test_resume_stops_on_the_first_429(tmp_path: Path) -> None:
     from quant_agents.research.news_categories import resume_volume
 

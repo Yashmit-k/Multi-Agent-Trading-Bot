@@ -1581,6 +1581,11 @@ def coverage_report(cache: Path, end_day: date) -> dict[str, object]:
     return {"start": VOLUME_START.isoformat(), "end": end_day.isoformat(), "categories": categories}
 
 
+def utc_study_day() -> date:
+    """The protocol's study end is the UTC calendar date, not the machine's local date."""
+    return datetime.now(timezone.utc).date()
+
+
 def resume_volume(
     cache: Path,
     client: object,
@@ -1602,8 +1607,6 @@ def resume_volume(
         try:
             load_gdelt_days(query, "timelinevolraw", start_day, stop_day, cache, client, sleeper, category_id, split=False)
         except RuntimeError as exc:
-            if "429" not in str(exc) and "payload rejected" not in str(exc):
-                raise
             blocked = {
                 "category": category_id,
                 "window": [start_day.isoformat(), stop_day.isoformat()],
@@ -1847,10 +1850,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         raise SystemExit("usage: python -m quant_agents.research.news_categories train|validate|plan|resume|coverage")
     root = repo_root()
     if args[0] == "coverage":
-        print(json.dumps(coverage_report(cache_directory(root), date.today())))
+        print(json.dumps(coverage_report(cache_directory(root), utc_study_day())))
         return
     if args[0] == "plan":
-        windows = remaining_volume_windows(cache_directory(root), date.today())
+        windows = remaining_volume_windows(cache_directory(root), utc_study_day())
         print(f"remaining_volume_windows {len(windows)}")
         for category_id, _query, start_day, stop_day in windows:
             print(f"{category_id} {start_day.isoformat()} {stop_day.isoformat()}")
@@ -1862,7 +1865,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 cache_directory(root),
                 client,
                 lambda seconds: __import__("time").sleep(seconds),
-                date.today(),
+                utc_study_day(),
                 max_windows=1,
             )
         finally:
@@ -1874,7 +1877,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     if args[0] == "train":
         client = httpx.Client(timeout=25.0, follow_redirects=True, headers={"User-Agent": "stockx-research/1.0"})
         try:
-            path = run_train(root, today=date.today(), client=client, sleeper=lambda seconds: __import__("time").sleep(seconds), yahoo=load_yahoo_closes)
+            path = run_train(root, today=utc_study_day(), client=client, sleeper=lambda seconds: __import__("time").sleep(seconds), yahoo=load_yahoo_closes)
         except IncompleteCoverage as exc:
             blocked = write_blocked(root, exc.missing_days, git_protocol_commit(root))
             print(blocked)
