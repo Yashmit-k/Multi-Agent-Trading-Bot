@@ -133,3 +133,16 @@ Pandemics are global. Storms, quakes, and floods have to mention India.
 
 No eleventh category will be added after seeing prices. No query above will be widened or narrowed after seeing train.
 
+## Event definition
+
+A category's **event day** is a calendar day whose summed GDELT volume is at least two sample standard deviations above its own trailing 60-day mean.
+
+Using only days strictly before day `t`:
+
+- Need 60 earlier calendar days. Otherwise day `t` is not an event.
+- Mean and sample standard deviation (`ddof=1`) of those 60 volumes.
+- If the standard deviation is 0, day `t` is not an event.
+- Otherwise day `t` is an event when `volume[t] >= mean + 2 * std`.
+
+The test at `t` does not use volume after `t`, and does not use any price. Two event days that map to the same trading session (below) produce one event session, not two.
+
