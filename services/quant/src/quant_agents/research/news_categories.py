@@ -695,3 +695,106 @@ def stratified_diff(
     return numerator / denominator
 
 
+
+
+def _mean_ratio(event_mean: float | None, other_mean: float | None) -> float | None:
+    if event_mean is None or other_mean is None or other_mean == 0:
+        return None
+    return event_mean / other_mean
+
+
+def score_mask(
+    values: Sequence[float],
+    event: Sequence[bool],
+    strata: Sequence[tuple[int, int] | None],
+    *,
+    n_boot: int = N_BOOT,
+) -> dict[str, object]:
+    result = block_bootstrap_diff(values, event, n_boot=n_boot)
+    return {
+        "diff": result.diff,
+        "p": result.p,
+        "event_mean": result.event_mean,
+        "other_mean": result.other_mean,
+        "mean_ratio": _mean_ratio(result.event_mean, result.other_mean),
+        "n_event": result.n_event,
+        "n_other": result.n_other,
+        "matched_diff": stratified_diff(values, event, strata),
+    }
+
+
+def score_category(
+    sessions: Sequence[date],
+    outcomes: dict[str, list[float]],
+    is_event: Sequence[bool],
+    strata: Sequence[tuple[int, int] | None],
+    in_split: Sequence[bool],
+    *,
+    n_boot: int = N_BOOT,
+) -> dict[str, object]:
+    indexes = [index for index, flag in enumerate(in_split) if flag]
+    event = [bool(is_event[index]) for index in indexes]
+    split_strata = [strata[index] for index in indexes]
+    scored = {
+        name: score_mask([outcomes[name][index] for index in indexes], event, split_strata, n_boot=n_boot)
+        for name in OUTCOMES
+    }
+    return {"n_event_sessions": int(sum(event)), "outcomes": scored}
+
+
+def apply_holm(train_categories: list[dict[str, object]]) -> None:
+    flat: list[float] = []
+    for category in train_categories:
+        outcomes = category["outcomes"]
+        assert isinstance(outcomes, dict)
+        for name in OUTCOMES:
+            flat.append(float(outcomes[name]["p"]))
+    adjusted = holm_adjust(flat)
+    cursor = 0
+    for category in train_categories:
+        outcomes = category["outcomes"]
+        assert isinstance(outcomes, dict)
+        for name in OUTCOMES:
+            outcomes[name]["holm_p"] = adjusted[cursor]
+            cursor += 1
+
+
+def category_matters(train: dict[str, object], validate: dict[str, object]) -> list[str]:
+    """Outcomes that clear the pre-registered train Holm gate and the validate gate."""
+    passing: list[str] = []
+    train_outcomes = train["outcomes"]
+    validate_outcomes = validate["outcomes"]
+    assert isinstance(train_outcomes, dict) and isinstance(validate_outcomes, dict)
+    for name in OUTCOMES:
+        left = train_outcomes[name]
+        right = validate_outcomes[name]
+        holm_p = left.get("holm_p")
+        train_diff = left.get("diff")
+        validate_diff = right.get("diff")
+        if holm_p is None or train_diff is None or validate_diff is None:
+            continue
+        if float(holm_p) >= 0.05 or float(right["p"]) >= 0.05:
+            continue
+        if float(train_diff) == 0 or float(validate_diff) == 0:
+            continue
+        if (float(train_diff) > 0) != (float(validate_diff) > 0):
+            continue
+        passing.append(name)
+    return passing
+
+
+def strata_for(
+    sessions: Sequence[date],
+    previous: Sequence[float],
+    edges: tuple[float, float],
+) -> list[tuple[int, int] | None]:
+    labels: list[tuple[int, int] | None] = []
+    for day, value in zip(sessions, previous):
+        bucket = vix_tercile(value, edges)
+        if bucket is None:
+            labels.append(None)
+        else:
+            labels.append((day.weekday(), bucket))
+    return labels
+
+
