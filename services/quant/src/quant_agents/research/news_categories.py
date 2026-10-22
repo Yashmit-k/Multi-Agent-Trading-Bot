@@ -625,3 +625,16 @@ def build_outcomes(
     return columns
 
 
+def split_flags(sessions: Sequence[date], start: date, end: date | None) -> list[bool]:
+    """True for sessions inside the inclusive start and optional inclusive end."""
+    flags = []
+    for day in sessions:
+        if day < start:
+            flags.append(False)
+        elif end is not None and day > end:
+            flags.append(False)
+        else:
+            flags.append(True)
+    return flags
+
+
