@@ -149,6 +149,20 @@ def test_cross_check_flags_only_gaps_above_half_a_percent() -> None:
     merged = prefer_api(yahoo, api)
     assert merged[day] == 100.0
     assert merged[date(2024, 6, 4)] == 100.0
+    from quant_agents.research.news_categories import alignment_report, parse_api_daily
+
+    report = alignment_report(yahoo, api)
+    assert report["overlap"] == 2
+    assert report["yahoo_only"] == 0
+    assert report["mismatch_count"] == 1
+    assert report["preferred_on_overlap"] == "api"
+    duplicate = parse_api_daily(
+        [
+            {"close": "10", "end": "2024-06-03T10:00:00+00:00"},
+            {"close": "12", "end": "2024-06-03T10:00:00+00:00"},
+        ]
+    )
+    assert duplicate == {date(2024, 6, 3): 12.0}
 
 
 def test_api_daily_and_intraday_parsers_use_ist() -> None:
@@ -786,6 +800,22 @@ def test_cached_file_fills_only_its_own_interior_gap(tmp_path: Path) -> None:
     windows = remaining_volume_windows(tmp_path, date(2017, 1, 5), span_days=150)
     assert windows
     assert windows[0][2] == date(2017, 1, 4)
+
+
+def test_committed_blocked_result_has_no_scores() -> None:
+    import json
+
+    docs = Path(__file__).resolve().parents[2] / "docs"
+    payload = json.loads((docs / "results" / "news-categories-nifty-result.json").read_text(encoding="utf-8"))
+    text = (docs / "news-categories-nifty-result.md").read_text(encoding="utf-8")
+    assert payload["status"] == "BLOCKED"
+    assert payload["categories_scored"] is False
+    assert payload["validation_runs"] == 0
+    assert payload["train_freeze_commit"] is None
+    assert payload["pass_fail"] is None
+    assert "p_value" not in json.dumps(payload)
+    assert "BLOCKED" in text
+    assert "was not scored" in text
 
 
 def test_coverage_report_names_the_missing_query_and_mode(tmp_path: Path) -> None:

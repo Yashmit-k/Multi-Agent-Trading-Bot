@@ -283,6 +283,21 @@ def close_mismatches(
     return rows
 
 
+def alignment_report(yahoo: Mapping[date, float], api: Mapping[date, float]) -> dict[str, object]:
+    """Compare two close series. On an overlap the API close is the one kept."""
+    yahoo_days = set(yahoo)
+    api_days = set(api)
+    mismatches = close_mismatches(yahoo, api)
+    return {
+        "overlap": len(yahoo_days & api_days),
+        "yahoo_only": len(yahoo_days - api_days),
+        "api_only": len(api_days - yahoo_days),
+        "mismatch_count": len(mismatches),
+        "mismatches": mismatches,
+        "preferred_on_overlap": "api",
+    }
+
+
 def prefer_api(yahoo: Mapping[date, float], api: Mapping[date, float]) -> dict[date, float]:
     """API close wins on overlap. Yahoo fills dates the API does not have."""
     merged = {day: float(value) for day, value in yahoo.items()}
