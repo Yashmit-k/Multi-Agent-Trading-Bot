@@ -46,6 +46,9 @@ class ValuationAgent(BaseIntelligenceAgent):
             return self._insufficient(symbol, as_of, context, payload)
         pe = Decimal(quote.last_price) / eps
         peer = latest.get("peer_median_pe")
+        count = latest.get("peer_count")
+        if count is not None and count.value == 0 and (peer is None or count.available_at >= peer.available_at):
+            peer = None  # the nightly fetch found no comparable peers; an older median in the append-only file is stale
         if peer is not None and peer.value > 0:
             # Cheaper than sector peers -> positive, richer -> negative; 50% below/above the median saturates.
             anchor, base_confidence, basis = peer.value, 0.48, "sector_peers"

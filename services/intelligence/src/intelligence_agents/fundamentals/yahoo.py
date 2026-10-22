@@ -6,7 +6,7 @@ Writes, per NSE symbol, point-in-time rows for the Fundamental, Valuation and Ea
   pe_at_fetch     trailing P/E at fetch time (information; Valuation recomputes P/E from the live price)
   peer_median_pe  median trailing P/E of the stock's NIFTY 50 peers, never the stock itself: its Yahoo industry
                   when that has >= 3 other members, else its Yahoo sector (>= 3 others), else all the others
-  peer_count      how many peers stand behind peer_median_pe
+  peer_count      how many peers stand behind peer_median_pe; 0 for a stock in NO_COMPARABLE_PEERS
   profit_growth   year-on-year quarterly earnings growth, fraction
   revenue_growth  year-on-year quarterly revenue growth, fraction
   margin          trailing net profit margin, fraction
@@ -40,6 +40,13 @@ SOURCE = "yahoo-finance"
 FIELDS = ["symbol", "metric", "value", "unit", "period", "announced_at", "available_at", "source", "source_id"]
 MAX_QUARTER_AGE_DAYS = 200
 MIN_PEERS = 3
+# NIFTY 50 stocks with no comparable NIFTY 50 peer group, checked against Yahoo industries, Yahoo sectors and the
+# NSE sectoral indices on 2026-10-22. They get peer_count 0 and no peer median, so the Valuation agent uses its
+# fixed P/E basis (at lower confidence) instead of a comparison that pins the score at -1 or +1.
+NO_COMPARABLE_PEERS: dict[str, str] = {
+    "RELIANCE": "a conglomerate (refining, retail, telecom): its sector and NIFTY ENERGY peers are state-run energy names at 6-10x",
+    "ITC": "earns most of its profit from cigarettes: its only NIFTY 50 group, FMCG, trades at 40-55x",
+}
 # NSE symbol -> Yahoo ticker when it is not simply "<symbol>.NS".
 YAHOO_TICKER: dict[str, str] = {}
 
@@ -107,6 +114,8 @@ def peer_groups(snapshots: Iterable[Snapshot]) -> dict[str, PeerGroup]:
     items = [item for item in snapshots if item.pe is not None and item.pe > 0]
     out: dict[str, PeerGroup] = {}
     for item in items:
+        if item.symbol in NO_COMPARABLE_PEERS:
+            continue  # still a peer for others; it just has no fair comparison of its own
         others = [other for other in items if other.symbol != item.symbol]
         for basis in ("industry", "sector"):
             label = getattr(item, basis)
@@ -277,7 +286,7 @@ def run(symbols: list[str], out: Path, *, now: datetime | None = None, factory: 
             moment,
             today,
             ranks.get(item.symbol),
-            groups[item.symbol].count if item.symbol in groups else None,
+            groups[item.symbol].count if item.symbol in groups else (0 if item.symbol in NO_COMPARABLE_PEERS else None),
         )
     ]
     older, newest = older_quarter_count(snapshots, today)

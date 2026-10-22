@@ -46,8 +46,8 @@ def test_peer_median_never_includes_the_stock_itself() -> None:
 
 def test_peer_group_prefers_industry_then_sector_then_all() -> None:
     rows = [
-        # Oil & Gas Refining: only two members, so RELIANCE falls back to its broad sector
-        ("RELIANCE", 22, "Energy", "Oil & Gas Refining & Marketing"),
+        # Oil & Gas Refining: only two members, so REFINER falls back to its broad sector
+        ("REFINER", 22, "Energy", "Oil & Gas Refining & Marketing"),
         ("BPCL", 8, "Energy", "Oil & Gas Refining & Marketing"),
         ("ONGC", 7, "Energy", "Oil & Gas E&P"),
         ("COALINDIA", 9, "Energy", "Thermal Coal"),
@@ -62,7 +62,7 @@ def test_peer_group_prefers_industry_then_sector_then_all() -> None:
     snaps = [snapshot_from_info(name, _info(trailingPE=pe, sector=sector, industry=industry)) for name, pe, sector, industry in rows]
     groups = peer_groups(snaps)
     assert (groups["TCS"].basis, groups["TCS"].count, groups["TCS"].median_pe) == ("industry", 3, 24)  # INFY, WIPRO, HCLTECH
-    assert (groups["RELIANCE"].basis, groups["RELIANCE"].count, groups["RELIANCE"].median_pe) == ("sector", 3, 8)  # BPCL, ONGC, COALINDIA
+    assert (groups["REFINER"].basis, groups["REFINER"].count, groups["REFINER"].median_pe) == ("sector", 3, 8)  # BPCL, ONGC, COALINDIA
     assert groups["TITAN"].basis == "all" and groups["TITAN"].count == 9  # alone in its sector: every other stock
     assert all(group.count <= len(snaps) - 1 for group in groups.values())  # a stock is never one of its own peers
 
@@ -156,3 +156,23 @@ def test_percentile_ranks_are_relative_and_lower_debt_ranks_higher() -> None:
     assert parts == {"profit_growth": 1.0, "roe": -1.0} and score == 0.0
     rows = rows_for(snaps[3], 20.0, NOW, NOW.date(), ranks["S3"])
     assert {row["metric"] for row in rows} >= {"rank_profit_growth", "rank_debt_to_equity"}
+
+
+def test_stocks_without_comparable_peers_get_no_median_but_still_count_for_others(tmp_path: Path) -> None:
+    from intelligence_agents.fundamentals.yahoo import NO_COMPARABLE_PEERS
+
+    assert set(NO_COMPARABLE_PEERS) == {"RELIANCE", "ITC"}
+    energy = [("RELIANCE", 21.5), ("BPCL", 7.2), ("ONGC", 6.5), ("COALINDIA", 8.0)]
+    snaps = [snapshot_from_info(name, _info(trailingPE=pe, sector="Energy", industry=name)) for name, pe in energy]
+    groups = peer_groups(snaps)
+    assert "RELIANCE" not in groups
+    assert groups["BPCL"].count == 3 and groups["BPCL"].median_pe == 8.0  # RELIANCE, ONGC, COALINDIA
+
+    class Ticker:
+        def __init__(self, name: str) -> None:
+            self.info = _info(trailingPE=dict(energy)[name.removesuffix(".NS")], sector="Energy", industry=name)
+
+    out = tmp_path / "fundamentals.csv"
+    run([name for name, _ in energy], out, now=NOW, factory=Ticker, pause=0)
+    reliance = {row["metric"]: row["value"] for row in read_csv(out) if row["symbol"] == "RELIANCE"}
+    assert reliance["peer_count"] == "0" and "peer_median_pe" not in reliance
