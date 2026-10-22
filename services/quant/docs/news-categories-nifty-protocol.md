@@ -108,3 +108,10 @@ India CPI, GDP, and IIP only. A global CPI print that does not mention India is 
 1. `("Lok Sabha" OR "assembly election" OR "general election" OR "vote counting") AND (India OR Indian)`
 2. `("political crisis" OR "no-confidence" OR "coalition" OR resignation) AND (India OR "prime minister" OR "chief minister")`
 
+### 7. Global market sell-offs
+
+United States and China, as separate queries summed into one category.
+
+1. `("S&P 500" OR Nasdaq OR "Dow Jones" OR "Wall Street") AND (plunge OR selloff OR "sell-off" OR crash OR tumble OR slump)`
+2. `(Shanghai OR "Hong Kong stocks" OR "China stocks" OR "CSI 300") AND (plunge OR selloff OR crash OR tumble OR slump)`
+
