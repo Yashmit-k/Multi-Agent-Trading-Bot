@@ -396,3 +396,35 @@ def test_public_urls_are_the_single_polite_calls() -> None:
     assert coverage([{"start": "a", "end": "b"}])["bars"] == 1
 
 
+
+import json
+from datetime import timedelta
+
+import pytest
+
+from quant_agents.research.news_categories import CATEGORIES, assemble_study
+
+
+def test_assemble_scores_each_category_without_a_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    sessions, closes = _weekday_closes(date(2017, 1, 2), 40)
+    # Push the last sessions into 2023 by rebuilding a longer calendar from late 2022.
+    sessions, closes = _weekday_closes(date(2022, 11, 1), 80, price=100.0)
+    vix = {day: 12.0 + (index % 5) for index, day in enumerate(sessions)}
+    days = [(day - timedelta(days=1), index % 17 == 0) for index, day in enumerate(sessions)]
+    category_days = {item[0]: days for item in CATEGORIES}
+    result = assemble_study(
+        sessions,
+        closes,
+        vix,
+        {},
+        category_days,
+        protocol_commit="abc",
+        n_boot=20,
+    )
+    assert result["protocol_commit"] == "abc"
+    assert len(result["categories"]) == 10
+    assert "conclusion" in result
+    assert all("holm_p" in item["train"]["outcomes"]["ret_0"] for item in result["categories"])
+    assert "holm_p" not in result["categories"][0]["validate"]["outcomes"]["ret_0"]
+
+
