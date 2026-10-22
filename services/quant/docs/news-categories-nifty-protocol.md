@@ -335,3 +335,28 @@ Do not replace the threshold with 1.5, do not drop RV from Holm after the fact, 
 The JSON holds category ids, event counts, mean differences, ratios of mean absolute moves, VIX differences, p-values, Holm p-values, and the pass flag. It does not hold the raw daily series. The markdown holds one table per category and the conclusion in plain sentences, including the limits above.
 
 The protocol commit is the evidence that these rules existed before the result. The result note will quote that commit.
+
+## Amendment A — before any train table
+
+No train table has been computed. The sentences below replace the conflicting sentence "Missing volume is **0**" for days that were never successfully fetched. They do not change the ten queries, the 60-day window, the 2 standard-deviation threshold, the outcomes, the Holm family, or the pass rule.
+
+### A day that was never fetched is not a zero
+
+- A calendar day is **observed** for a query only when a successful `timelinevolraw` response covers it.
+- Inside one successful response, a date the timeline omits between its first and last returned date has volume **0**. The API answered that span.
+- A date outside every successful response is **missing**. It is not stored as 0, it is not an event, and it is not a control day.
+- A category day is observed only when every query in that category is observed. The category volume is the sum of those queries. If any query is missing, the category day is missing.
+- The trailing 60 days are the previous 60 calendar days. If any of them is missing, that day is not eligible for an event test. The threshold is not computed from a shorter window and not from zeros standing in for failed calls.
+- HTTP 429, a dropped connection, a non-JSON body, and an empty body that is not a successful timeline are failures. They do not create volume.
+
+### Article counts cannot be de-duplicated
+
+`timelinevolraw` returns a count per day, not article identifiers. The same story can match two queries in one category and be counted twice in the sum. That double count stays in the volume. It is a limit of this API mode, not a second event rule. Tone stays descriptive and is still not in the Holm family.
+
+### Interval, not only a p-value
+
+The bootstrap draws already defined above also supply a 95% percentile interval: the 2.5 and 97.5 percentiles of the resampled differences, seed 0, same block length. The p-value stays the recentered two-sided test. The interval is reported beside it. A low p-value is not a cause.
+
+### No table until coverage is complete
+
+Train is not scored while any category is missing volume days inside 2017-01-01 through the study end date. The run writes the missing ranges and stops. It does not fill them with zero and it does not print a pass or a fail. Validate is not opened. A later resume uses the cache and does not repeat a request whose body is already stored.
