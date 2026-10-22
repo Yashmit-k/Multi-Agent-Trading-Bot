@@ -321,3 +321,15 @@ Do not replace the threshold with 1.5, do not drop RV from Holm after the fact, 
 - The 5-minute realised-volatility window is only as long as one polite API call. A miss on RV does not get a second download.
 - Our RSS store is too short to test, as already stated.
 
+## Run order and committed outputs
+
+1. Commit this protocol.
+2. Implement the detector, the clock rule, and the bootstrap, with unit tests on synthetic series. Those tests do not download GDELT or prices.
+3. Run **train** only. If the code needs a bugfix that does not change a frozen choice, commit the fix and rerun train. Do not open validate in that same process.
+4. Commit a one-line freeze: no specification change after train.
+5. Run **validate** once in a later process.
+6. Write `services/quant/docs/news-categories-nifty-result.md` and `services/quant/docs/results/news-categories-nifty-result.json`.
+
+The JSON holds category ids, event counts, mean differences, ratios of mean absolute moves, VIX differences, p-values, Holm p-values, and the pass flag. It does not hold the raw daily series. The markdown holds one table per category and the conclusion in plain sentences, including the limits above.
+
+The protocol commit is the evidence that these rules existed before the result. The result note will quote that commit.
