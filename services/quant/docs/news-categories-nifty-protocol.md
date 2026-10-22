@@ -120,3 +120,10 @@ United States and China, as separate queries summed into one category.
 1. `(FII OR FPI OR "foreign institutional" OR "foreign portfolio") AND (outflow OR inflow OR selling OR buying OR selloff)`
 2. `(rupee) AND (slide OR slump OR "record low" OR "all-time low" OR depreciation OR weakens OR tumbles)`
 
+### 9. Disasters and pandemics
+
+Pandemics are global. Storms, quakes, and floods have to mention India.
+
+1. `(pandemic OR COVID OR COVID-19 OR coronavirus OR lockdown)`
+2. `(earthquake OR cyclone OR flood OR landslide) AND (India OR Indian)`
+
