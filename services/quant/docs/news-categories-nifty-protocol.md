@@ -127,3 +127,9 @@ Pandemics are global. Storms, quakes, and floods have to mention India.
 1. `(pandemic OR COVID OR COVID-19 OR coronavirus OR lockdown)`
 2. `(earthquake OR cyclone OR flood OR landslide) AND (India OR Indian)`
 
+### 10. Trade wars, tariffs, and sanctions
+
+1. `("trade war" OR tariff OR tariffs OR sanctions OR "trade dispute") AND (China OR India OR "United States" OR US OR Trump OR Biden)`
+
+No eleventh category will be added after seeing prices. No query above will be widened or narrowed after seeing train.
+
