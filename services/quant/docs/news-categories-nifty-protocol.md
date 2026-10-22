@@ -310,3 +310,14 @@ Write this conclusion, and stop:
 
 Do not replace the threshold with 1.5, do not drop RV from Holm after the fact, do not restrict the family to the outcome that looked closest, and do not run a second validate. A near miss is still a miss.
 
+## Limits, written before the run
+
+- GDELT's news crawl is global. A spike can be driven by outlets that Indian markets never read. There is no India-source filter except where a query already requires the word India.
+- Article counts are not importance. A duplicated wire story and a policy shock can both clear 2 standard deviations.
+- A busy day mixes categories. The control group is not a news-free day.
+- The daily bucket has no clock, so the study gives the whole UTC day to the next Indian session. That avoids same-day look-ahead and it can also lag a morning story by one session.
+- The holiday list can still disagree with a special NSE circular. The calendar audit reports that. It does not get patched between train and validate.
+- A difference in means is not a cause. Nothing here is a trading rule.
+- The 5-minute realised-volatility window is only as long as one polite API call. A miss on RV does not get a second download.
+- Our RSS store is too short to test, as already stated.
+
