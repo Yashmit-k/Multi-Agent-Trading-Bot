@@ -218,6 +218,26 @@ def test_gdelt_daily_volume_sums_subdaily_buckets_and_tones_are_weighted() -> No
     assert combined[-1] == (date(2017, 1, 2), 3.0)
 
 
+def test_gdelt_windows_cover_every_day_once() -> None:
+    from datetime import date, timedelta
+
+    from quant_agents.research.news_categories import gdelt_windows
+
+    windows = gdelt_windows(date(2017, 1, 1), date(2026, 10, 22))
+    covered: list[date] = []
+    for start_stamp, end_stamp in windows:
+        start = date(int(start_stamp[0:4]), int(start_stamp[4:6]), int(start_stamp[6:8]))
+        end = date(int(end_stamp[0:4]), int(end_stamp[4:6]), int(end_stamp[6:8]))
+        assert (end - start).days < 700
+        day = start
+        while day <= end:
+            covered.append(day)
+            day += timedelta(days=1)
+    assert covered[0] == date(2017, 1, 1)
+    assert covered[-1] == date(2026, 10, 22)
+    assert len(covered) == len(set(covered))
+
+
 def test_gdelt_url_freezes_mode_and_dates() -> None:
     url = gdelt_request_url("(war)", "timelinevolraw", "20170101000000", "20261022000000")
     assert url.startswith("https://api.gdeltproject.org/api/v2/doc/doc?")

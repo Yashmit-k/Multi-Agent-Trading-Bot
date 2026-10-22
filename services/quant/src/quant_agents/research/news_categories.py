@@ -353,6 +353,24 @@ def session_realised_variance(bars: Sequence[tuple[datetime, float]]) -> dict[da
 
 
 
+def gdelt_windows(start: date, end: date, *, span_days: int = 700) -> list[tuple[str, str]]:
+    """Inclusive UTC windows. GDELT 429s the full 2017-to-today call, so the span is sliced.
+
+    The queries, modes, and covered dates stay the ones in the protocol.
+    """
+    if span_days < 1:
+        raise ValueError("span_days must be positive")
+    if end < start:
+        raise ValueError("end before start")
+    windows: list[tuple[str, str]] = []
+    cursor = start
+    while cursor <= end:
+        stop = min(end, cursor + timedelta(days=span_days - 1))
+        windows.append((cursor.strftime("%Y%m%d") + "000000", stop.strftime("%Y%m%d") + "000000"))
+        cursor = stop + timedelta(days=1)
+    return windows
+
+
 def gdelt_request_url(query: str, mode: str, start: str, end: str) -> str:
     params = {
         "query": query,
@@ -1111,7 +1129,7 @@ def render_markdown(result: dict[str, object]) -> str:
             "",
             "## Limits",
             "",
-            "GDELT's crawl is global, not an Indian newspaper. A spike is a count of articles, not a measure of how important the news was. Average tone was downloaded into the local cache and is not part of the pass rule. A difference between event days and other days is not a cause, and it is not a trading rule. The daily GDELT bucket has no clock, so the study assigns it to the next NSE session. The 5-minute volatility window is only as long as one public API call. Stored RSS headlines from October 2026 are too short to test and were not used as evidence.",
+            "GDELT refuses the full 2017-to-today call, so each query was fetched in non-overlapping windows of at most 700 days and concatenated. GDELT's crawl is global, not an Indian newspaper. A spike is a count of articles, not a measure of how important the news was. Average tone was downloaded into the local cache and is not part of the pass rule. A difference between event days and other days is not a cause, and it is not a trading rule. The daily GDELT bucket has no clock, so the study assigns it to the next NSE session. The 5-minute volatility window is only as long as one public API call. Stored RSS headlines from October 2026 are too short to test and were not used as evidence.",
             "",
         ]
     )
@@ -1177,17 +1195,28 @@ def git_protocol_commit(root: Path) -> str:
 
 
 def category_event_days(cache: Path, client: object, sleeper: Callable[[float], None], end_day: date) -> dict[str, list[tuple[date, bool]]]:
-    """Pull each frozen query once (or read the cache) and flag event days."""
-    end_stamp = end_day.strftime("%Y%m%d") + "000000"
+    """Pull each frozen query in protocol windows (or read the cache) and flag event days."""
+    windows = gdelt_windows(VOLUME_START, end_day)
     flagged: dict[str, list[tuple[date, bool]]] = {}
     for category_id, _name, queries in CATEGORIES:
         parts: list[dict[date, float]] = []
         for query in queries:
-            volume_url = gdelt_request_url(query, "timelinevolraw", "20170101000000", end_stamp)
-            tone_url = gdelt_request_url(query, "timelinetone", "20170101000000", end_stamp)
-            volume_payload, _ = fetch_json(volume_url, cache, client, sleeper)
-            fetch_json(tone_url, cache, client, sleeper)
-            parts.append(volume_by_day(parse_stamped(volume_payload)))
+            merged: dict[date, float] = {}
+            for start_stamp, end_stamp in windows:
+                print(f"gdelt {category_id} {start_stamp[:8]}-{end_stamp[:8]}", flush=True)
+                start_day = date(int(start_stamp[0:4]), int(start_stamp[4:6]), int(start_stamp[6:8]))
+                end_bound = date(int(end_stamp[0:4]), int(end_stamp[4:6]), int(end_stamp[6:8]))
+                volume_url = gdelt_request_url(query, "timelinevolraw", start_stamp, end_stamp)
+                tone_url = gdelt_request_url(query, "timelinetone", start_stamp, end_stamp)
+                volume_payload, _ = fetch_json(volume_url, cache, client, sleeper)
+                fetch_json(tone_url, cache, client, sleeper)
+                for day, value in volume_by_day(parse_stamped(volume_payload)).items():
+                    if day < start_day or day > end_bound:
+                        continue
+                    if day in merged:
+                        raise RuntimeError(f"GDELT window overlap on {day.isoformat()}")
+                    merged[day] = value
+            parts.append(merged)
         series = sum_category_volume(parts, VOLUME_START, end_day)
         bits = event_flags([value for _day, value in series])
         flagged[category_id] = [(day, flag) for (day, _value), flag in zip(series, bits)]
