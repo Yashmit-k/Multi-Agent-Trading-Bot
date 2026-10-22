@@ -552,3 +552,76 @@ def holm_adjust(p_values: Sequence[float]) -> list[float]:
     return adjusted
 
 
+
+
+def _pct(curr: float | None, prev: float | None) -> float:
+    if curr is None or prev is None or prev == 0 or not math.isfinite(curr) or not math.isfinite(prev):
+        return math.nan
+    return curr / prev - 1.0
+
+
+def build_outcomes(
+    sessions: Sequence[date],
+    nifty: Mapping[date, float],
+    vix: Mapping[date, float],
+    rv: Mapping[date, float],
+    in_split: Sequence[bool],
+) -> dict[str, list[float]]:
+    """Outcome rows for sessions inside the split.
+
+    A forward window that would read a session outside the split is missing.
+    The previous close used by a session's own return may sit just before the split.
+    """
+    if len(sessions) != len(in_split):
+        raise ValueError("split mask length")
+    n = len(sessions)
+    close = [float(nifty[day]) if day in nifty else math.nan for day in sessions]
+    vix_close = [float(vix[day]) if day in vix else math.nan for day in sessions]
+    ret = [math.nan] * n
+    vix_chg = [math.nan] * n
+    for index in range(1, n):
+        ret[index] = _pct(close[index], close[index - 1])
+        vix_chg[index] = _pct(vix_close[index], vix_close[index - 1])
+    columns = {name: [math.nan] * n for name in OUTCOMES}
+
+    def inside(index: int) -> bool:
+        return 0 <= index < n and bool(in_split[index])
+
+    for index in range(n):
+        if not in_split[index]:
+            continue
+        if math.isfinite(ret[index]):
+            columns["ret_0"][index] = ret[index]
+            columns["abs_0"][index] = abs(ret[index])
+        if math.isfinite(vix_chg[index]):
+            columns["vix_0"][index] = vix_chg[index]
+        rv_0 = rv.get(sessions[index])
+        if rv_0 is not None and sessions[index] >= RV_START:
+            columns["rv_0"][index] = float(rv_0)
+        if inside(index + 1) and math.isfinite(ret[index + 1]):
+            columns["ret_1"][index] = ret[index + 1]
+            columns["abs_1"][index] = abs(ret[index + 1])
+        if inside(index + 1) and math.isfinite(vix_chg[index + 1]):
+            columns["vix_1"][index] = vix_chg[index + 1]
+        nxt = rv.get(sessions[index + 1]) if inside(index + 1) else None
+        if nxt is not None and sessions[index + 1] >= RV_START:
+            columns["rv_1"][index] = float(nxt)
+        if inside(index + 5) and all(inside(index + step) for step in range(1, 6)):
+            if math.isfinite(close[index]) and math.isfinite(close[index + 5]) and close[index] != 0:
+                cumulative = close[index + 5] / close[index] - 1.0
+                columns["ret_1_5"][index] = cumulative
+                columns["abs_1_5"][index] = abs(cumulative)
+            if math.isfinite(vix_close[index]) and math.isfinite(vix_close[index + 5]) and vix_close[index] != 0:
+                columns["vix_1_5"][index] = vix_close[index + 5] / vix_close[index] - 1.0
+            window = []
+            for step in range(1, 6):
+                value = rv.get(sessions[index + step])
+                if value is None or sessions[index + step] < RV_START:
+                    window = []
+                    break
+                window.append(float(value))
+            if len(window) == 5:
+                columns["rv_1_5"][index] = sum(window) / 5.0
+    return columns
+
+
