@@ -173,3 +173,56 @@ def test_api_daily_and_intraday_parsers_use_ist() -> None:
     assert variance[date(2024, 6, 3)] > 0
 
 
+
+import pytest
+
+from quant_agents.research.news_categories import (
+    filled_volume,
+    gdelt_request_url,
+    parse_stamped,
+    sum_category_volume,
+    tone_by_day,
+    volume_by_day,
+)
+
+
+def test_gdelt_daily_volume_sums_subdaily_buckets_and_tones_are_weighted() -> None:
+    payload = {
+        "timeline": [
+            {
+                "data": [
+                    {"date": "20170101000000", "value": 2},
+                    {"date": "20170101001500", "value": 4},
+                    {"date": "20170102T000000Z", "value": 5},
+                ]
+            }
+        ]
+    }
+    points = parse_stamped(payload)
+    assert volume_by_day(points)[date(2017, 1, 1)] == 6
+    tone = {
+        "timeline": [
+            {
+                "data": [
+                    {"date": "20170101000000", "value": 0},
+                    {"date": "20170101001500", "value": 6},
+                ]
+            }
+        ]
+    }
+    weighted = tone_by_day(parse_stamped(tone), points)
+    assert weighted[date(2017, 1, 1)] == pytest.approx((0 * 2 + 6 * 4) / 6)
+    filled = filled_volume({date(2017, 1, 1): 6}, date(2017, 1, 1), date(2017, 1, 3))
+    assert filled == [(date(2017, 1, 1), 6.0), (date(2017, 1, 2), 0.0), (date(2017, 1, 3), 0.0)]
+    combined = sum_category_volume([{date(2017, 1, 2): 1.0}, {date(2017, 1, 2): 2.0}], date(2017, 1, 1), date(2017, 1, 2))
+    assert combined[-1] == (date(2017, 1, 2), 3.0)
+
+
+def test_gdelt_url_freezes_mode_and_dates() -> None:
+    url = gdelt_request_url("(war)", "timelinevolraw", "20170101000000", "20261022000000")
+    assert url.startswith("https://api.gdeltproject.org/api/v2/doc/doc?")
+    assert "mode=timelinevolraw" in url
+    assert "startdatetime=20170101000000" in url
+    assert "format=json" in url
+
+
