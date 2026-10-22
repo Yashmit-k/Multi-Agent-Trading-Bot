@@ -1256,30 +1256,81 @@ def load_gdelt_days(
     return out
 
 
+def gap_windows(have: set[date], start: date, end: date, *, span_days: int = 45) -> list[tuple[date, date]]:
+    """Dates still missing, in short inclusive windows. Days already cached are not requested again."""
+    if span_days < 1:
+        raise ValueError("span_days must be positive")
+    windows: list[tuple[date, date]] = []
+    cursor = start
+    while cursor <= end:
+        if cursor in have:
+            cursor += timedelta(days=1)
+            continue
+        stop = cursor
+        while stop < end and (stop - cursor).days + 1 < span_days and (stop + timedelta(days=1)) not in have:
+            stop += timedelta(days=1)
+        windows.append((cursor, stop))
+        cursor = stop + timedelta(days=1)
+    return windows
+
+
+def read_cached_gdelt(cache: Path) -> dict[tuple[str, str], dict[date, float]]:
+    """Reuse every cached GDELT body. The file name is a hash, so the query is read from the body."""
+    found: dict[tuple[str, str], dict[date, float]] = {}
+    if not cache.exists():
+        return found
+    for path in cache.glob("*.json"):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        timeline = payload.get("timeline") or []
+        if not timeline:
+            continue
+        title = str((payload.get("query_details") or {}).get("title") or "")
+        series = str(timeline[0].get("series") or "")
+        if series == "Article Count":
+            mode = "timelinevolraw"
+        elif series == "Average Tone":
+            mode = "timelinetone"
+        else:
+            continue
+        if not title:
+            continue
+        bucket = found.setdefault((title, mode), {})
+        try:
+            points = volume_by_day(parse_stamped(payload))
+        except (KeyError, TypeError, ValueError):
+            continue
+        for day, value in points.items():
+            bucket.setdefault(day, value)
+    return found
+
+
 def category_event_days(cache: Path, client: object, sleeper: Callable[[float], None], end_day: date) -> dict[str, list[tuple[date, bool]]]:
-    """Pull each frozen query in protocol windows (or read the cache) and flag event days."""
-    windows = gdelt_windows(VOLUME_START, end_day)
+    """Pull each frozen query for the days not already cached, then flag event days."""
+    cached = read_cached_gdelt(cache)
     flagged: dict[str, list[tuple[date, bool]]] = {}
     for category_id, _name, queries in CATEGORIES:
         parts: list[dict[date, float]] = []
         for query in queries:
-            merged: dict[date, float] = {}
-            for start_stamp, end_stamp in windows:
-                start_day = date(int(start_stamp[0:4]), int(start_stamp[4:6]), int(start_stamp[6:8]))
-                end_bound = date(int(end_stamp[0:4]), int(end_stamp[4:6]), int(end_stamp[6:8]))
+            merged = dict(cached.get((query, "timelinevolraw"), {}))
+            for start_day, end_bound in gap_windows(set(merged), VOLUME_START, end_day):
                 piece = load_gdelt_days(query, "timelinevolraw", start_day, end_bound, cache, client, sleeper, category_id)
+                for day, value in piece.items():
+                    merged.setdefault(day, value)
+            tone = set(cached.get((query, "timelinetone"), {}))
+            for start_day, end_bound in gap_windows(tone, VOLUME_START, end_day):
                 try:
                     load_gdelt_days(query, "timelinetone", start_day, end_bound, cache, client, sleeper, category_id)
                 except RuntimeError as exc:
-                    # Tone is cached when GDELT allows it. It is not an outcome, so a stuck 429 does not stop the study.
                     if "429" not in str(exc):
                         raise
                     print(f"tone skipped {category_id} {start_day.isoformat()} {end_bound.isoformat()}", flush=True)
-                for day, value in piece.items():
-                    if day in merged:
-                        raise RuntimeError(f"GDELT window overlap on {day.isoformat()}")
-                    merged[day] = value
-            parts.append(merged)
+                    break
+            parts.append({day: value for day, value in merged.items() if VOLUME_START <= day <= end_day})
         series = sum_category_volume(parts, VOLUME_START, end_day)
         bits = event_flags([value for _day, value in series])
         flagged[category_id] = [(day, flag) for (day, _value), flag in zip(series, bits)]

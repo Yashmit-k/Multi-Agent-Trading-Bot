@@ -242,6 +242,19 @@ def test_a_429_on_a_wide_window_is_split(tmp_path: Path) -> None:
     assert any(pause == 15.0 for pause in slept)
 
 
+def test_gap_windows_skip_days_already_in_hand() -> None:
+    from datetime import date
+
+    from quant_agents.research.news_categories import gap_windows
+
+    have = {date(2017, 1, 3)}
+    assert gap_windows(have, date(2017, 1, 1), date(2017, 1, 6), span_days=2) == [
+        (date(2017, 1, 1), date(2017, 1, 2)),
+        (date(2017, 1, 4), date(2017, 1, 5)),
+        (date(2017, 1, 6), date(2017, 1, 6)),
+    ]
+
+
 def test_gdelt_windows_cover_every_day_once() -> None:
     from datetime import date, timedelta
 
