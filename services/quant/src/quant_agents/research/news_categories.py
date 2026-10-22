@@ -638,3 +638,60 @@ def split_flags(sessions: Sequence[date], start: date, end: date | None) -> list
     return flags
 
 
+
+
+def tercile_edges(previous_vix: Sequence[float]) -> tuple[float, float]:
+    values = np.asarray([float(item) for item in previous_vix if math.isfinite(float(item))], dtype=float)
+    if len(values) < 3:
+        raise ValueError("need at least three train VIX observations for terciles")
+    low, high = np.quantile(values, [1.0 / 3.0, 2.0 / 3.0])
+    return float(low), float(high)
+
+
+def vix_tercile(value: float, edges: tuple[float, float]) -> int | None:
+    if not math.isfinite(value):
+        return None
+    low, high = edges
+    if value <= low:
+        return 0
+    if value <= high:
+        return 1
+    return 2
+
+
+def previous_vix(sessions: Sequence[date], vix: Mapping[date, float]) -> list[float]:
+    out = [math.nan] * len(sessions)
+    for index in range(1, len(sessions)):
+        value = vix.get(sessions[index - 1])
+        out[index] = float(value) if value is not None else math.nan
+    return out
+
+
+def stratified_diff(
+    values: Sequence[float],
+    event: Sequence[bool],
+    strata: Sequence[tuple[int, int] | None],
+) -> float | None:
+    """Event-weighted average of within-stratum differences of means."""
+    if not (len(values) == len(event) == len(strata)):
+        raise ValueError("stratified inputs differ in length")
+    buckets: dict[tuple[int, int], list[tuple[float, bool]]] = {}
+    for value, flag, stratum in zip(values, event, strata):
+        if stratum is None or not math.isfinite(float(value)):
+            continue
+        buckets.setdefault(stratum, []).append((float(value), bool(flag)))
+    numerator = 0.0
+    denominator = 0
+    for rows in buckets.values():
+        event_vals = [value for value, flag in rows if flag]
+        other_vals = [value for value, flag in rows if not flag]
+        if not event_vals or not other_vals:
+            continue
+        difference = sum(event_vals) / len(event_vals) - sum(other_vals) / len(other_vals)
+        numerator += len(event_vals) * difference
+        denominator += len(event_vals)
+    if denominator == 0:
+        return None
+    return numerator / denominator
+
+
