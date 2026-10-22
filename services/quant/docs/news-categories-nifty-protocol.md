@@ -146,3 +146,17 @@ Using only days strictly before day `t`:
 
 The test at `t` does not use volume after `t`, and does not use any price. Two event days that map to the same trading session (below) produce one event session, not two.
 
+## Timing: clocks
+
+Everything is judged in `Asia/Kolkata` (IST, UTC+05:30).
+
+The cash session closes at 15:30 IST. A timestamp at or after 15:30 is after the close. The calendar in this repo already treats 15:30:00 as closed. This study uses that boundary.
+
+For a news timestamp:
+
+- Convert it to IST.
+- If that IST date is a trading session and the IST time is **strictly before** 15:30, the news belongs to that session.
+- Otherwise it belongs to the next trading session after that IST date.
+
+So a headline at 15:30:00 or 15:30:01 IST belongs to the next session, and so does a headline at 09:00 IST on a holiday or a weekend.
+
