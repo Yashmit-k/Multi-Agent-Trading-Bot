@@ -1008,3 +1008,25 @@ def _event_tone(tone: Mapping[date, float], is_event: Sequence[bool], sessions: 
     return {"event": _avg(event_vals), "other": _avg(other_vals)}
 
 
+NOTHING_PASSES = (
+    "Under this pre-registered design, no news category has a volume spike that lines up with "
+    "the NIFTY 50 index on 2017-2022 and then again, in the same direction, on 2023 onward. "
+    "That is a negative result. It does not support adding a market-wide news vote, changing fusion, "
+    "or loosening the 2 standard-deviation rule. The forward capture switch stays off unless someone "
+    "turns it on for storage only."
+)
+
+
+def conclude(categories: Sequence[Mapping[str, object]]) -> str:
+    passed = [str(item["name"]) for item in categories if item.get("matters")]
+    if not passed:
+        return NOTHING_PASSES
+    names = ", ".join(passed)
+    return (
+        f"Under this pre-registered design, {names} mattered: at least one outcome had a "
+        "Holm-adjusted train p below 0.05 and the same sign on validate with an unadjusted p below 0.05. "
+        "That is an association with the NIFTY 50 index, not a cause and not a trading rule. "
+        "Fusion, risk, and agent scores were not changed. The capture switch stays off by default."
+    )
+
+
