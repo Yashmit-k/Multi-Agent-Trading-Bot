@@ -106,3 +106,27 @@ def test_naive_timestamp_is_rejected() -> None:
         assign_timestamp(datetime(2024, 1, 8, 10, 0), SESSIONS)
 
 
+
+from quant_agents.calendar.static_nse import HOLIDAYS_2024, HOLIDAYS_2025, HOLIDAYS_2026
+from quant_agents.research.news_categories import CASH_HOLIDAYS, calendar_audit, trading_sessions
+
+
+def test_listed_holiday_is_not_a_session_even_with_a_close() -> None:
+    closes = {
+        date(2024, 1, 25): 100.0,
+        date(2024, 1, 26): 101.0,  # Republic Day, frozen holiday
+        date(2024, 1, 27): 102.0,  # Saturday
+        date(2024, 1, 29): 103.0,
+    }
+    assert trading_sessions(closes) == [date(2024, 1, 25), date(2024, 1, 29)]
+    audit = calendar_audit(closes)
+    assert audit["holiday_closes_dropped"] == 1
+    assert audit["weekend_closes_dropped"] == 1
+
+
+def test_cash_holidays_copy_the_static_nse_list() -> None:
+    assert HOLIDAYS_2024 | HOLIDAYS_2025 | HOLIDAYS_2026 <= CASH_HOLIDAYS
+    assert date(2017, 10, 19) in CASH_HOLIDAYS  # Muhurat, treated as closed
+    assert date(2023, 11, 12) in CASH_HOLIDAYS
+
+
