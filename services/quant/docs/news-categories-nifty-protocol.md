@@ -267,3 +267,11 @@ For each category, outcome, and split, on the unmatched difference:
 
 The unit test must show that two calls with seed 0 return the same p-value and the same bootstrap draws.
 
+## Statistics: Holm
+
+The family is the 10 categories times these 12 outcomes: `ret_0`, `ret_1`, `ret_1_5`, `abs_0`, `abs_1`, `abs_1_5`, `vix_0`, `vix_1`, `vix_1_5`, `rv_0`, `rv_1`, `rv_1_5`. That is 120 train tests. Validate p-values are not put through Holm again.
+
+Sort train p-values from smallest to largest. For rank `i` starting at 1, the Holm step is `(120 - i + 1) * p`. The adjusted p-value is the running maximum of those steps, capped at 1, so the adjusted values stay ordered.
+
+A train test with p = 1 (too few observations, including RV outside the 5-minute window) still occupies a slot in the family.
+
