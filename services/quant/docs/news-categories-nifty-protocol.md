@@ -194,3 +194,31 @@ The 2024–2026 dates are exactly `HOLIDAYS_2024`, `HOLIDAYS_2025`, and `HOLIDAY
 
 The result reports how many Yahoo `^NSEI` weekday closes were dropped for falling on this list, and how many weekdays in 2017–2026 had no close. Those counts are a calendar audit. They are not a licence to add or remove a date after train.
 
+## Outcomes (index only)
+
+Sessions are ordered by date. `close[t]` is the NIFTY 50 close of session `t`. `vix[t]` is the India VIX close of session `t`.
+
+Close-to-close return of session `t` (needs session `t-1`):
+
+`ret[t] = close[t] / close[t-1] - 1`
+
+India VIX percent change:
+
+`vix_chg[t] = vix[t] / vix[t-1] - 1`
+
+For an event session `t`:
+
+| Name | Definition |
+|---|---|
+| `ret_0` | `ret[t]`, the return of the assigned session |
+| `ret_1` | `ret[t+1]` |
+| `ret_1_5` | `close[t+5] / close[t] - 1` (sessions +1 through +5, not including day 0) |
+| `abs_0` | `abs(ret_0)` |
+| `abs_1` | `abs(ret_1)` |
+| `abs_1_5` | `abs(ret_1_5)` |
+| `vix_0` | `vix_chg[t]` |
+| `vix_1` | `vix_chg[t+1]` |
+| `vix_1_5` | `vix[t+5] / vix[t] - 1` |
+
+If `t-1`, `t+1`, or `t+5` does not exist, or a VIX close is missing, that outcome is missing for that session. Missing values are left out of the mean. They are not filled with zero.
+
