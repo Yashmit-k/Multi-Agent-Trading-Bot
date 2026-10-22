@@ -316,3 +316,34 @@ def test_holm_caps_at_one() -> None:
     assert holm_adjust([0.9, 0.8]) == [1.0, 1.0]
 
 
+
+from datetime import timedelta
+
+import pytest
+
+from quant_agents.research.news_categories import CASH_HOLIDAYS, build_outcomes, split_flags
+
+
+def _weekday_closes(start: date, count: int, price: float = 100.0) -> tuple[list[date], dict[date, float]]:
+    sessions: list[date] = []
+    closes: dict[date, float] = {}
+    day = start
+    while len(sessions) < count:
+        if day.weekday() < 5 and day not in CASH_HOLIDAYS:
+            sessions.append(day)
+            closes[day] = price + len(sessions)
+        day += timedelta(days=1)
+    return sessions, closes
+
+
+def test_forward_window_does_not_cross_the_split() -> None:
+    sessions, closes = _weekday_closes(date(2022, 12, 20), 12)
+    vix = {day: 15.0 for day in sessions}
+    mask = split_flags(sessions, date(2022, 12, 1), date(2022, 12, 31))
+    assert any(mask) and not all(mask)
+    columns = build_outcomes(sessions, closes, vix, {}, mask)
+    last_train = max(index for index, flag in enumerate(mask) if flag)
+    assert columns["ret_0"][last_train] == pytest.approx(closes[sessions[last_train]] / closes[sessions[last_train - 1]] - 1)
+    assert columns["ret_1"][last_train] != columns["ret_1"][last_train]  # NaN: t+1 is in 2023
+
+
