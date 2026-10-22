@@ -299,3 +299,20 @@ def test_bootstrap_without_two_per_group_does_not_draw() -> None:
     assert result.draws == ()
 
 
+
+import pytest
+
+from quant_agents.research.news_categories import holm_adjust
+
+
+def test_holm_matches_the_worked_example() -> None:
+    adjusted = holm_adjust([0.01, 0.04, 0.03])
+    assert adjusted[0] == pytest.approx(0.03)
+    assert adjusted[1] == pytest.approx(0.06)
+    assert adjusted[2] == pytest.approx(0.06)
+
+
+def test_holm_caps_at_one() -> None:
+    assert holm_adjust([0.9, 0.8]) == [1.0, 1.0]
+
+
