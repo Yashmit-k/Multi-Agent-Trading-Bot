@@ -46,7 +46,15 @@ class Reassessor:
         if settings.data_source == "rss":
             from intelligence_agents.news.rss import RssPuller
 
-            self._puller = RssPuller(self._news, self._clock, settings.symbols, max_bytes=settings.rss_max_bytes, max_items=settings.rss_max_items, interval_seconds=60)
+            self._puller = RssPuller(
+                self._news,
+                self._clock,
+                settings.symbols,
+                max_bytes=settings.rss_max_bytes,
+                max_items=settings.rss_max_items,
+                interval_seconds=60,
+                keep_market_wide=settings.news_keep_market_wide,
+            )
         self._lock = threading.Lock()
 
     def run(self, *, agent: str, symbol: str, horizon: Horizon, request_id: str, review_id: str) -> dict[str, object]:

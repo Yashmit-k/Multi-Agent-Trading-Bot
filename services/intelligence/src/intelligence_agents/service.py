@@ -76,6 +76,7 @@ def create_app(settings: IntelligenceSettings | None = None, *, sink: object | N
                 max_items=resolved.rss_max_items,
                 interval_seconds=0,
                 interpreter=interpreter,
+                keep_market_wide=resolved.news_keep_market_wide,
             )
             ingest_task = asyncio.create_task(
                 news_ingest_loop(

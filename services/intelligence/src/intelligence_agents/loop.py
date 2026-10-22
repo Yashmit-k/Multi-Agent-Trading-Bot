@@ -107,6 +107,7 @@ async def evaluation_loop(settings: IntelligenceSettings, stop: asyncio.Event, h
             max_bytes=settings.rss_max_bytes,
             max_items=settings.rss_max_items,
             interval_seconds=settings.rss_interval_seconds,
+            keep_market_wide=settings.news_keep_market_wide,
         )
     health.runner_running = True
     snapshot = router.health_snapshot()
