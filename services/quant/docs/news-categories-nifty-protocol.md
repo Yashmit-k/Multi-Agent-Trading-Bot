@@ -10,3 +10,13 @@ Do volume spikes in ten categories of news move the **NIFTY 50 index**, includin
 
 The outcome is the index only. Individual stocks are not tested. This study does not add a fusion vote, does not change agent scores, and does not change risk or the decision engine.
 
+## What this study will not change
+
+- Live and paper trading behaviour stay as they are.
+- Fusion weights, the decision engine, risk limits, and every agent's live score stay as they are.
+- No new agent vote is added.
+- A later capture switch for market-wide headlines defaults to off. Turning it on is outside this study and is not a trading-rule change by itself.
+- Raw GDELT responses and raw price caches are local only. They are not committed. The committed outputs are this protocol, the result note, and one small JSON of summary numbers.
+
+If nothing passes the rule at the end of this file, that negative result is the result. It is not a reason to retune.
+
