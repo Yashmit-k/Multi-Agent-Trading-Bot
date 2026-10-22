@@ -613,13 +613,25 @@ class _StudyClient:
     def get(self, url: str) -> _Body:
         self.calls += 1
         if "gdeltproject" in url:
+            import urllib.parse
+
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+            start = date(
+                int(query["startdatetime"][0][0:4]),
+                int(query["startdatetime"][0][4:6]),
+                int(query["startdatetime"][0][6:8]),
+            )
+            end = date(
+                int(query["enddatetime"][0][0:4]),
+                int(query["enddatetime"][0][4:6]),
+                int(query["enddatetime"][0][6:8]),
+            )
             data = []
-            day = date(2017, 1, 1)
-            for index in range(70):
-                data.append({"date": day.strftime("%Y%m%d") + "000000", "value": 1 + (index % 3)})
+            day = start
+            while day <= end:
+                data.append({"date": day.strftime("%Y%m%d") + "000000", "value": 3})
                 day += timedelta(days=1)
-            data.append({"date": "20170320000000", "value": 400})
-            return _Body(json.dumps({"timeline": [{"data": data}]}))
+            return _Body(json.dumps({"timeline": [{"series": "Article Count", "data": data}]}))
         return _Body("[]")
 
 
@@ -657,7 +669,50 @@ def test_train_process_does_not_score_validate_and_validate_runs_once(tmp_path: 
         raise AssertionError("validate ran twice")
 
 
-def test_result_note_quotes_the_negative_conclusion_when_nothing_passes() -> None:
+def test_combine_observed_does_not_turn_a_hole_into_zero() -> None:
+    from quant_agents.research.news_categories import combine_observed
+
+    rows, missing = combine_observed(
+        [{date(2017, 1, 1): 4.0, date(2017, 1, 3): 1.0}],
+        date(2017, 1, 1),
+        date(2017, 1, 3),
+    )
+    assert rows == [(date(2017, 1, 1), 4.0), (date(2017, 1, 3), 1.0)]
+    assert missing == 1
+
+
+def test_retry_after_replaces_the_fixed_pause(tmp_path: Path) -> None:
+    from quant_agents.research.news_categories import fetch_json
+
+    class _HeaderResponse(_StatusResponse):
+        def __init__(self, text: str, status: int, retry_after: str) -> None:
+            super().__init__(text, status)
+            self.headers = {"Retry-After": retry_after}
+
+    class _RetryAfter:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def get(self, url: str) -> _HeaderResponse:
+            self.calls += 1
+            if self.calls == 1:
+                return _HeaderResponse("busy", 429, "7")
+            return _HeaderResponse('{"timeline":[]}', 200, "0")
+
+    slept: list[float] = []
+    fetch_json("https://api.gdeltproject.org/api/v2/doc/doc?query=after", tmp_path, _RetryAfter(), slept.append)
+    assert slept == [7.0, 5.0]
+
+
+def test_bootstrap_interval_is_the_percentile_of_the_same_draws() -> None:
+    values = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    event = [True, False, True, False, True, False, True, False]
+    result = block_bootstrap_diff(values, event, n_boot=40, seed=0)
+    assert result.ci_low is not None and result.ci_high is not None
+    assert result.ci_low <= result.ci_high
+    again = block_bootstrap_diff(values, event, n_boot=40, seed=0)
+    assert result.ci_low == again.ci_low
+    assert result.ci_high == again.ci_high
     sessions, closes = _weekday_closes(date(2022, 11, 1), 80)
     vix = {day: 12.0 + (index % 5) for index, day in enumerate(sessions)}
     days = [(day - timedelta(days=1), False) for day in sessions]

@@ -450,6 +450,55 @@ def sum_category_volume(parts: Sequence[Mapping[date, float]], start: date, end:
     return filled_volume(combined, start, end)
 
 
+class IncompleteCoverage(RuntimeError):
+    """A category is missing fetched days. Those days are not zeros."""
+
+    def __init__(self, missing_days: dict[str, int]) -> None:
+        self.missing_days = missing_days
+        detail = ", ".join(f"{key}={value}" for key, value in missing_days.items())
+        super().__init__(f"GDELT volume is incomplete ({detail})")
+
+
+def combine_observed(
+    parts: Sequence[Mapping[date, float]], start: date, end: date
+) -> tuple[list[tuple[date, float]], int]:
+    """Sum query volumes only on days every query has already observed.
+
+    A day missing from any query is counted as missing. It is not appended as 0.
+    """
+    if end < start:
+        return [], 0
+    if not parts:
+        raise ValueError("a category needs at least one query")
+    rows: list[tuple[date, float]] = []
+    missing = 0
+    day = start
+    while day <= end:
+        if all(day in part for part in parts):
+            rows.append((day, sum(float(part[day]) for part in parts)))
+        else:
+            missing += 1
+        day += timedelta(days=1)
+    return rows, missing
+
+
+def retry_after_seconds(response: object) -> float | None:
+    """Honor a numeric Retry-After, capped at two minutes. Absent or junk headers are ignored."""
+    headers = getattr(response, "headers", None)
+    if headers is None or not hasattr(headers, "get"):
+        return None
+    raw = headers.get("Retry-After")
+    if raw is None:
+        return None
+    try:
+        seconds = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(seconds) or seconds < 0:
+        return None
+    return min(seconds, 120.0)
+
+
 
 
 def cache_file(cache_dir: Path, url: str) -> Path:
@@ -480,9 +529,11 @@ def fetch_json(
     limit = len(GDELT_RETRY_PAUSES) + 1 if attempts is None else attempts
     if limit < 1:
         raise ValueError("attempts must be positive")
+    forced: float | None = None
     for attempt in range(limit):
         if attempt:
-            sleeper(GDELT_RETRY_PAUSES[attempt - 1])
+            sleeper(forced if forced is not None else GDELT_RETRY_PAUSES[attempt - 1])
+            forced = None
         response = None
         last_error: Exception | None = None
         for _try in range(3):
@@ -496,6 +547,7 @@ def fetch_json(
             raise RuntimeError(f"GDELT request failed: {url}") from last_error
         status = int(getattr(response, "status_code", 200))
         if status == 429:
+            forced = retry_after_seconds(response)
             continue
         response.raise_for_status()
         text = response.text
@@ -521,6 +573,8 @@ class MeanDiff:
     n_event: int
     n_other: int
     draws: tuple[float, ...]
+    ci_low: float | None = None
+    ci_high: float | None = None
 
 
 def _finite_pairs(values: Sequence[float], event: Sequence[bool]) -> tuple[np.ndarray, np.ndarray]:
@@ -571,6 +625,7 @@ def block_bootstrap_diff(
     gap = np.abs(draws - observed)
     slack = 1e-8 * max(1.0, abs(observed))
     p_value = (1.0 + float(np.sum(gap + slack >= np.abs(observed)))) / (n_boot + 1.0)
+    low, high = np.quantile(draws, [0.025, 0.975])
     return MeanDiff(
         observed,
         float(p_value),
@@ -579,6 +634,8 @@ def block_bootstrap_diff(
         n_event,
         n_other,
         tuple(float(item) for item in draws),
+        float(low),
+        float(high),
     )
 
 
@@ -760,6 +817,8 @@ def score_mask(
     return {
         "diff": result.diff,
         "p": result.p,
+        "ci_low": result.ci_low,
+        "ci_high": result.ci_high,
         "event_mean": result.event_mean,
         "other_mean": result.other_mean,
         "mean_ratio": _mean_ratio(result.event_mean, result.other_mean),
@@ -1219,10 +1278,10 @@ def covered_dates(start: date, end: date, present: Iterable[date]) -> tuple[date
     if end < start:
         return None
     inside = {day for day in present if start <= day <= end}
-    if not inside or (end - start).days <= 21:
-        return start, end
+    if not inside:
+        return None
     first, last = min(inside), max(inside)
-    if first == start and last == end:
+    if (end - start).days <= 21 or (first == start and last == end):
         return start, end
     return first, last
 
@@ -1435,10 +1494,16 @@ def category_event_days(cache: Path, client: object, sleeper: Callable[[float], 
                     print(f"tone skipped {category_id} {start_day.isoformat()} {end_bound.isoformat()}", flush=True)
                     break
     flagged: dict[str, list[tuple[date, bool]]] = {}
+    missing_days: dict[str, int] = {}
     for category_id, _name, _queries in CATEGORIES:
-        series = sum_category_volume(merged_by_query[category_id], VOLUME_START, end_day)
-        bits = event_flags([value for _day, value in series])
-        flagged[category_id] = [(day, flag) for (day, _value), flag in zip(series, bits)]
+        rows, missing = combine_observed(merged_by_query[category_id], VOLUME_START, end_day)
+        if missing:
+            missing_days[category_id] = missing
+            continue
+        bits = event_flags([value for _day, value in rows])
+        flagged[category_id] = [(day, flag) for (day, _value), flag in zip(rows, bits)]
+    if missing_days:
+        raise IncompleteCoverage(missing_days)
     return flagged
 
 
@@ -1570,6 +1635,40 @@ def run_validate(root: Path, *, n_boot: int = N_BOOT) -> dict[str, object]:
     return result
 
 
+def write_blocked(root: Path, missing_days: dict[str, int], protocol_commit: str) -> Path:
+    """Record an incomplete run. No category mean and no p-value is invented."""
+    docs = root / "services" / "quant" / "docs"
+    payload = {
+        "status": "BLOCKED",
+        "reason": "GDELT volume does not cover every category. Missing days were not stored as zero.",
+        "protocol_commit": protocol_commit,
+        "missing_days": missing_days,
+        "categories_scored": False,
+        "validation_runs": 0,
+    }
+    json_path = docs / "results" / "news-categories-nifty-result.json"
+    md_path = docs / "news-categories-nifty-result.md"
+    json_path.parent.mkdir(parents=True, exist_ok=True)
+    json_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    lines = [
+        "# News categories vs the NIFTY 50 index: result",
+        "",
+        f"Protocol commit: `{protocol_commit}`.",
+        "",
+        "Status: **BLOCKED**. Train was not scored. Validate was not opened.",
+        "",
+        "GDELT did not return a successful volume timeline for every day from 2017-01-01 through the study date, for every query. Those missing days are not zeros, and they are not control days. No pass or fail is reported.",
+        "",
+        "| Category | Missing volume days |",
+        "|---|---:|",
+    ]
+    for key, value in missing_days.items():
+        lines.append(f"| {key} | {value} |")
+    lines.append("")
+    md_path.write_text("\n".join(lines), encoding="utf-8")
+    return json_path
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     import sys
 
@@ -1583,6 +1682,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         client = httpx.Client(timeout=25.0, follow_redirects=True, headers={"User-Agent": "stockx-research/1.0"})
         try:
             path = run_train(root, today=date.today(), client=client, sleeper=lambda seconds: __import__("time").sleep(seconds), yahoo=load_yahoo_closes)
+        except IncompleteCoverage as exc:
+            blocked = write_blocked(root, exc.missing_days, git_protocol_commit(root))
+            print(blocked)
+            raise SystemExit(2) from exc
         finally:
             client.close()
         print(path)
