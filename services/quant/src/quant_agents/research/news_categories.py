@@ -1224,8 +1224,13 @@ def load_gdelt_days(
     print(f"gdelt {label} {mode} {start.isoformat()} {end.isoformat()}", flush=True)
     url = gdelt_request_url(query, mode, start.strftime("%Y%m%d") + "000000", end.strftime("%Y%m%d") + "000000")
     span = (end - start).days
-    # A long window is refused as a large query. A short window that returns 429 is the rate limit, so wait.
-    attempts = 1 if span > 200 else 5
+    # Long windows are refused outright. Medium windows get one retry. Short windows wait out the rate limit.
+    if span > 120:
+        attempts = 1
+    elif span > 45:
+        attempts = 2
+    else:
+        attempts = 5
     try:
         payload, _ = fetch_json(url, cache, client, sleeper, attempts=attempts)
     except RuntimeError as exc:
