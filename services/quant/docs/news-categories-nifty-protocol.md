@@ -275,3 +275,14 @@ Sort train p-values from smallest to largest. For rank `i` starting at 1, the Ho
 
 A train test with p = 1 (too few observations, including RV outside the 5-minute window) still occupies a slot in the family.
 
+## Split
+
+| Split | Sessions | Role |
+|---|---|---|
+| Train | 2017-01-01 through 2022-12-31 inclusive | the only place exploratory tables may be read |
+| Validate | 2023-01-01 through the last session in the price file | scored **once** |
+
+The event rule may use 2022 volume when it labels a 2023 session, because those days are past volume, not past outcomes. Outcome rows do not cross the split: a train mean uses only train sessions, a validate mean uses only validate sessions.
+
+No query, threshold, window, holiday, or pass rule is chosen from validate. Nothing is chosen from train either, beyond what this file already fixes. Seeing the train table is allowed. Editing this file after that table exists is not.
+
