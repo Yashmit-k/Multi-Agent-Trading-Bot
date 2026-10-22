@@ -1222,7 +1222,8 @@ def load_gdelt_days(
     if end < start:
         return {}
     print(f"gdelt {label} {mode} {start.isoformat()} {end.isoformat()}", flush=True)
-    url = gdelt_request_url(query, mode, start.strftime("%Y%m%d") + "000000", end.strftime("%Y%m%d") + "000000")
+    request_end = end if end > start else end + timedelta(days=1)
+    url = gdelt_request_url(query, mode, start.strftime("%Y%m%d") + "000000", request_end.strftime("%Y%m%d") + "000000")
     span = (end - start).days
     # Long windows are refused outright. Medium windows get one retry. Short windows wait out the rate limit.
     if span > 120:
