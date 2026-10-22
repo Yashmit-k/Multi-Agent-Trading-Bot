@@ -133,3 +133,26 @@ CATEGORIES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ),
 )
 
+
+
+def event_flags(volume: Sequence[float], *, window: int = WINDOW, z: float = Z_SCORE) -> list[bool]:
+    """True when today's volume is at least z sample-SDs above the previous `window` days.
+
+    Index i uses volume[i - window : i] only. The value at i, and everything after it,
+    cannot change a flag at or before i.
+    """
+    if window < 2:
+        raise ValueError("window must be at least 2")
+    values = [float(item) for item in volume]
+    flags = [False] * len(values)
+    for index in range(window, len(values)):
+        past = values[index - window : index]
+        mean = sum(past) / window
+        var = sum((item - mean) ** 2 for item in past) / (window - 1)
+        if var <= 0.0:
+            continue
+        if values[index] >= mean + z * math.sqrt(var):
+            flags[index] = True
+    return flags
+
+
