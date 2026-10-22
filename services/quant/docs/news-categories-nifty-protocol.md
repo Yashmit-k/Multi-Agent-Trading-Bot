@@ -160,3 +160,11 @@ For a news timestamp:
 
 So a headline at 15:30:00 or 15:30:01 IST belongs to the next session, and so does a headline at 09:00 IST on a holiday or a weekend.
 
+## Timing: GDELT days have no clock
+
+`timelinevolraw` does not say whether the articles ran before or after the Indian close. Treating the daily count as known at the open would credit same-day moves that may have happened first.
+
+Frozen rule: a GDELT calendar day `D` (the UTC date bucket defined above) is treated as known only after that IST date is over. Its event session is the first trading session **strictly after** `D`. It never shares `D` even when `D` itself was a session.
+
+The 15:30 rule above is what the code must do for any timestamped headline (the unit test, and any later RSS item). The GDELT study uses the daily rule in this section.
+
