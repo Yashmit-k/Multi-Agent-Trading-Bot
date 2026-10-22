@@ -33,6 +33,8 @@ def test_keyword_categories_on_real_looking_headlines() -> None:
     assert categorise("RBI holds repo rate") == "central_banks"
     assert categorise("Brent crude jumps 6%") == "crude_commodities"
     assert categorise("US announces new tariffs on China") == "trade_wars"
+    assert categorise("new tariffs after the war") == "trade_wars"
+    assert categorise("Local bakery opens a new branch") == "unclassified"
 
 
 def test_switch_off_still_drops_a_headline_with_no_company() -> None:
