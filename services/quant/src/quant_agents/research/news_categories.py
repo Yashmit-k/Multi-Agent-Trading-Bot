@@ -1437,14 +1437,39 @@ def read_cached_gdelt(cache: Path) -> dict[tuple[str, str], dict[date, float]]:
             continue
         if not title:
             continue
-        bucket = found.setdefault((title, mode), {})
         try:
             points = volume_by_day(parse_stamped(payload))
         except (KeyError, TypeError, ValueError):
             continue
-        for day, value in points.items():
+        if not points:
+            continue
+        first, last = min(points), max(points)
+        span: dict[date, float] = {}
+        day = first
+        while day <= last:
+            span[day] = 0.0
+            day += timedelta(days=1)
+        span.update(points)
+        bucket = found.setdefault((title, mode), {})
+        for day, value in span.items():
             bucket.setdefault(day, value)
     return found
+
+
+def remaining_volume_windows(cache: Path, end_day: date, *, span_days: int = 150) -> list[tuple[str, str, date, date]]:
+    """Windows still missing from the cache. This does not call GDELT."""
+    cached = read_cached_gdelt(cache)
+    answered = coverage_days(cache)
+    windows: list[tuple[str, str, date, date]] = []
+    for category_id, _name, queries in CATEGORIES:
+        for query in queries:
+            merged = dict(cached.get((query, "timelinevolraw"), {}))
+            for day in answered.get((query, "timelinevolraw"), ()):
+                if VOLUME_START <= day <= end_day:
+                    merged.setdefault(day, 0.0)
+            for start_day, stop_day in gap_windows(set(merged), VOLUME_START, end_day, span_days=span_days):
+                windows.append((category_id, query, start_day, stop_day))
+    return windows
 
 
 def category_event_days(cache: Path, client: object, sleeper: Callable[[float], None], end_day: date) -> dict[str, list[tuple[date, bool]]]:
@@ -1675,9 +1700,15 @@ def main(argv: Sequence[str] | None = None) -> None:
     import httpx
 
     args = list(sys.argv[1:] if argv is None else argv)
-    if len(args) != 1 or args[0] not in {"train", "validate"}:
-        raise SystemExit("usage: python -m quant_agents.research.news_categories train|validate")
+    if len(args) != 1 or args[0] not in {"train", "validate", "plan"}:
+        raise SystemExit("usage: python -m quant_agents.research.news_categories train|validate|plan")
     root = repo_root()
+    if args[0] == "plan":
+        windows = remaining_volume_windows(cache_directory(root), date.today())
+        print(f"remaining_volume_windows {len(windows)}")
+        for category_id, _query, start_day, stop_day in windows:
+            print(f"{category_id} {start_day.isoformat()} {stop_day.isoformat()}")
+        return
     if args[0] == "train":
         client = httpx.Client(timeout=25.0, follow_redirects=True, headers={"User-Agent": "stockx-research/1.0"})
         try:

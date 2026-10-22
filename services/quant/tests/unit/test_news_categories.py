@@ -713,6 +713,36 @@ def test_bootstrap_interval_is_the_percentile_of_the_same_draws() -> None:
     again = block_bootstrap_diff(values, event, n_boot=40, seed=0)
     assert result.ci_low == again.ci_low
     assert result.ci_high == again.ci_high
+
+
+def test_cached_file_fills_only_its_own_interior_gap(tmp_path: Path) -> None:
+    import json
+
+    from quant_agents.research.news_categories import read_cached_gdelt, remaining_volume_windows
+
+    query = CATEGORIES[0][2][0]
+    body = {
+        "query_details": {"title": query},
+        "timeline": [
+            {
+                "series": "Article Count",
+                "data": [
+                    {"date": "20170101000000", "value": 4},
+                    {"date": "20170103000000", "value": 1},
+                ],
+            }
+        ],
+    }
+    (tmp_path / "one.json").write_text(json.dumps(body), encoding="utf-8")
+    observed = read_cached_gdelt(tmp_path)[(query, "timelinevolraw")]
+    assert observed[date(2017, 1, 2)] == 0.0
+    assert date(2017, 1, 4) not in observed
+    windows = remaining_volume_windows(tmp_path, date(2017, 1, 5), span_days=150)
+    assert windows
+    assert windows[0][2] == date(2017, 1, 4)
+
+
+def test_result_note_quotes_the_negative_conclusion_when_nothing_passes() -> None:
     sessions, closes = _weekday_closes(date(2022, 11, 1), 80)
     vix = {day: 12.0 + (index % 5) for index, day in enumerate(sessions)}
     days = [(day - timedelta(days=1), False) for day in sessions]
