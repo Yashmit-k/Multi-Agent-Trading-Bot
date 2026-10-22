@@ -839,3 +839,172 @@ def coverage(payload: object) -> dict[str, str | int | None]:
     return {"bars": len(payload), "first": first, "last": last}
 
 
+
+
+def _event_masks(
+    sessions: Sequence[date],
+    category_days: Mapping[str, Sequence[tuple[date, bool]]],
+) -> dict[str, list[bool]]:
+    masks: dict[str, list[bool]] = {}
+    for category_id, _label, _queries in CATEGORIES:
+        flagged = event_sessions(category_days[category_id], sessions)
+        masks[category_id] = [day in flagged for day in sessions]
+    return masks
+
+
+def train_document(
+    sessions: Sequence[date],
+    nifty: Mapping[date, float],
+    vix: Mapping[date, float],
+    rv: Mapping[date, float],
+    category_days: Mapping[str, Sequence[tuple[date, bool]]],
+    *,
+    protocol_commit: str,
+    n_boot: int = N_BOOT,
+) -> dict[str, object]:
+    """Train scores only. This is the first process. It does not score validate."""
+    previous = previous_vix(sessions, vix)
+    train_mask = split_flags(sessions, TRAIN_START, TRAIN_END)
+    edges = tercile_edges([value for value, flag in zip(previous, train_mask) if flag])
+    strata = strata_for(sessions, previous, edges)
+    names = {item[0]: item[1] for item in CATEGORIES}
+    masks = _event_masks(sessions, category_days)
+    outcomes = build_outcomes(sessions, nifty, vix, rv, train_mask)
+    categories: list[dict[str, object]] = []
+    for category_id, _label, _queries in CATEGORIES:
+        is_event = masks[category_id]
+        categories.append(
+            {
+                "id": category_id,
+                "name": names[category_id],
+                "event_sessions": [day.isoformat() for day, flag in zip(sessions, is_event) if flag],
+                "train": score_category(sessions, outcomes, is_event, strata, train_mask, n_boot=n_boot),
+            }
+        )
+    apply_holm([item["train"] for item in categories])  # type: ignore[arg-type]
+    return {
+        "protocol_commit": protocol_commit,
+        "train_window": [TRAIN_START.isoformat(), TRAIN_END.isoformat()],
+        "vix_tercile_cuts": [edges[0], edges[1]],
+        "categories": categories,
+    }
+
+
+def validate_document(
+    sessions: Sequence[date],
+    nifty: Mapping[date, float],
+    vix: Mapping[date, float],
+    rv: Mapping[date, float],
+    train_doc: Mapping[str, object],
+    *,
+    n_boot: int = N_BOOT,
+    nifty_mismatches: list[dict[str, object]] | None = None,
+    vix_mismatches: list[dict[str, object]] | None = None,
+    calendar: dict[str, int] | None = None,
+    nifty_api_coverage: dict[str, object] | None = None,
+    vix_api_coverage: dict[str, object] | None = None,
+    intraday_coverage: dict[str, object] | None = None,
+    tone: Mapping[str, Mapping[date, float]] | None = None,
+) -> dict[str, object]:
+    """Validate scores once, using the event sessions and Holm values frozen at train."""
+    previous = previous_vix(sessions, vix)
+    cuts = train_doc["vix_tercile_cuts"]
+    assert isinstance(cuts, list)
+    edges = (float(cuts[0]), float(cuts[1]))
+    strata = strata_for(sessions, previous, edges)
+    validate_mask = split_flags(sessions, VALIDATE_START, None)
+    outcomes = build_outcomes(sessions, nifty, vix, rv, validate_mask)
+    frozen = train_doc["categories"]
+    assert isinstance(frozen, list)
+    categories: list[dict[str, object]] = []
+    for item in frozen:
+        assert isinstance(item, dict)
+        event_set = set(item["event_sessions"])
+        is_event = [day.isoformat() in event_set for day in sessions]
+        validate = score_category(sessions, outcomes, is_event, strata, validate_mask, n_boot=n_boot)
+        train = item["train"]
+        assert isinstance(train, dict)
+        passing = category_matters(train, validate)
+        row: dict[str, object] = {
+            "id": item["id"],
+            "name": item["name"],
+            "train": train,
+            "validate": validate,
+            "passing_outcomes": passing,
+            "matters": bool(passing),
+        }
+        if tone and item["id"] in tone:
+            row["mean_event_tone"] = _event_tone(tone[item["id"]], is_event, sessions)
+        categories.append(row)
+    result: dict[str, object] = {
+        "protocol_commit": train_doc["protocol_commit"],
+        "train_window": train_doc["train_window"],
+        "validate_window": [VALIDATE_START.isoformat(), sessions[-1].isoformat() if sessions else None],
+        "vix_tercile_cuts": [edges[0], edges[1]],
+        "nifty_mismatches": nifty_mismatches or [],
+        "vix_mismatches": vix_mismatches or [],
+        "calendar_audit": calendar or {},
+        "nifty_api_coverage": nifty_api_coverage or {},
+        "vix_api_coverage": vix_api_coverage or {},
+        "intraday_coverage": intraday_coverage or {},
+        "categories": categories,
+    }
+    result["conclusion"] = conclude(categories)
+    return result
+
+
+def assemble_study(
+    sessions: Sequence[date],
+    nifty: Mapping[date, float],
+    vix: Mapping[date, float],
+    rv: Mapping[date, float],
+    category_days: Mapping[str, Sequence[tuple[date, bool]]],
+    *,
+    protocol_commit: str,
+    nifty_mismatches: list[dict[str, object]] | None = None,
+    vix_mismatches: list[dict[str, object]] | None = None,
+    calendar: dict[str, int] | None = None,
+    nifty_api_coverage: dict[str, object] | None = None,
+    vix_api_coverage: dict[str, object] | None = None,
+    intraday_coverage: dict[str, object] | None = None,
+    tone: Mapping[str, Mapping[date, float]] | None = None,
+    n_boot: int = N_BOOT,
+) -> dict[str, object]:
+    """Score both splits. The real study calls train_document and validate_document in separate processes."""
+    trained = train_document(
+        sessions,
+        nifty,
+        vix,
+        rv,
+        category_days,
+        protocol_commit=protocol_commit,
+        n_boot=n_boot,
+    )
+    return validate_document(
+        sessions,
+        nifty,
+        vix,
+        rv,
+        trained,
+        n_boot=n_boot,
+        nifty_mismatches=nifty_mismatches,
+        vix_mismatches=vix_mismatches,
+        calendar=calendar,
+        nifty_api_coverage=nifty_api_coverage,
+        vix_api_coverage=vix_api_coverage,
+        intraday_coverage=intraday_coverage,
+        tone=tone,
+    )
+
+
+def _event_tone(tone: Mapping[date, float], is_event: Sequence[bool], sessions: Sequence[date]) -> dict[str, float | None]:
+    """Descriptive tone only. It is not an outcome and it cannot make a category pass."""
+    event_vals = [float(tone[day]) for day, flag in zip(sessions, is_event) if flag and day in tone]
+    other_vals = [float(tone[day]) for day, flag in zip(sessions, is_event) if not flag and day in tone]
+
+    def _avg(values: list[float]) -> float | None:
+        return sum(values) / len(values) if values else None
+
+    return {"event": _avg(event_vals), "other": _avg(other_vals)}
+
+
