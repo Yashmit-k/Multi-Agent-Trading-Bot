@@ -347,3 +347,24 @@ def test_forward_window_does_not_cross_the_split() -> None:
     assert columns["ret_1"][last_train] != columns["ret_1"][last_train]  # NaN: t+1 is in 2023
 
 
+
+import pytest
+
+from quant_agents.research.news_categories import stratified_diff, tercile_edges, vix_tercile
+
+
+def test_tercile_cuts_come_from_the_supplied_train_sample_only() -> None:
+    low, high = tercile_edges([1, 2, 3, 4, 5, 6, 7, 8, 9])
+    assert vix_tercile(low, (low, high)) == 0
+    assert vix_tercile(high, (low, high)) == 1
+    assert vix_tercile(high + 1, (low, high)) == 2
+
+
+def test_matched_difference_weights_by_event_count() -> None:
+    values = [1.0, 0.0, 5.0, 1.0]
+    event = [True, False, True, False]
+    strata = [(0, 0), (0, 0), (1, 0), (1, 0)]
+    # stratum (0, 0): 1 - 0 = 1, one event. stratum (1, 0): 5 - 1 = 4, one event.
+    assert stratified_diff(values, event, strata) == pytest.approx(2.5)
+
+
