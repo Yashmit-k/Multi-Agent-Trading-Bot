@@ -168,3 +168,29 @@ Frozen rule: a GDELT calendar day `D` (the UTC date bucket defined above) is tre
 
 The 15:30 rule above is what the code must do for any timestamped headline (the unit test, and any later RSS item). The GDELT study uses the daily rule in this section.
 
+## Trading calendar
+
+A date is a trading session when all of these hold:
+
+1. It is not a Saturday or Sunday.
+2. It is not in the closed-holiday set below.
+3. The chosen NIFTY 50 daily series has a close on that date.
+
+A weekday with no close is not a session (the exchange was shut, or the bar is missing). A close on a Saturday, Sunday, or listed holiday is not a session. Muhurat trading is in the closed set, matching `quant_agents.calendar.static_nse`, which treats Muhurat as closed rather than as a one-hour session. Close-to-close returns are not computed across a Muhurat print.
+
+News that falls on a non-session waits for the next date that is a session.
+
+The 2024–2026 dates are exactly `HOLIDAYS_2024`, `HOLIDAYS_2025`, and `HOLIDAYS_2026` in `services/quant/src/quant_agents/calendar/static_nse.py` at calendar version `static-nse-2024-2026.1`. They are copied into the research module so a later edit to the live calendar does not move this study.
+
+2017–2023 weekday closures, plus Muhurat days, frozen from the NSE cash circulars and the compiled cash-segment list that matches those circulars for 2017 and 2023:
+
+- 2017: 26 Jan, 24 Feb, 13 Mar, 4 Apr, 14 Apr, 1 May, 26 Jun, 15 Aug, 25 Aug, 2 Oct, 19 Oct, 20 Oct, 25 Dec
+- 2018: 26 Jan, 13 Feb, 2 Mar, 29 Mar, 30 Mar, 1 May, 15 Aug, 22 Aug, 13 Sep, 20 Sep, 2 Oct, 18 Oct, 7 Nov, 8 Nov, 23 Nov, 25 Dec
+- 2019: 4 Mar, 21 Mar, 17 Apr, 19 Apr, 29 Apr, 1 May, 5 Jun, 12 Aug, 15 Aug, 2 Sep, 10 Sep, 2 Oct, 8 Oct, 21 Oct, 27 Oct, 28 Oct, 12 Nov, 25 Dec
+- 2020: 21 Feb, 10 Mar, 2 Apr, 6 Apr, 10 Apr, 14 Apr, 1 May, 25 May, 2 Oct, 14 Nov, 16 Nov, 30 Nov, 25 Dec
+- 2021: 26 Jan, 11 Mar, 29 Mar, 2 Apr, 14 Apr, 21 Apr, 13 May, 21 Jul, 19 Aug, 10 Sep, 15 Oct, 4 Nov, 5 Nov, 19 Nov
+- 2022: 26 Jan, 1 Mar, 18 Mar, 14 Apr, 15 Apr, 3 May, 9 Aug, 15 Aug, 31 Aug, 5 Oct, 24 Oct, 26 Oct, 8 Nov
+- 2023: 26 Jan, 7 Mar, 30 Mar, 4 Apr, 7 Apr, 14 Apr, 1 May, 28 Jun, 15 Aug, 19 Sep, 2 Oct, 24 Oct, 12 Nov, 14 Nov, 27 Nov, 25 Dec
+
+The result reports how many Yahoo `^NSEI` weekday closes were dropped for falling on this list, and how many weekdays in 2017–2026 had no close. Those counts are a calendar audit. They are not a licence to add or remove a date after train.
+
