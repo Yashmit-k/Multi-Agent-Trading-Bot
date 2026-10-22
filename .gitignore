@@ -29,3 +29,4 @@ intelligence-news*.db
 
 # Generated nightly on the server by deploy/fetch_fundamentals.sh
 data/intelligence/fundamentals.csv
+services/quant/.cache/
