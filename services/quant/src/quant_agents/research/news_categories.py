@@ -439,6 +439,10 @@ def cache_file(cache_dir: Path, url: str) -> Path:
     return cache_dir / f"{digest}.json"
 
 
+# Extra waits used only when GDELT answers 429. They are not part of the study design.
+GDELT_RETRY_PAUSES: tuple[float, ...] = (15.0, 30.0, 60.0, 90.0)
+
+
 def fetch_json(
     url: str,
     cache_dir: Path,
@@ -447,21 +451,31 @@ def fetch_json(
     *,
     pause: float = 5.0,
 ) -> tuple[object, bool]:
-    """Return (payload, did_http). Sleep only after a cache miss, never between hits."""
+    """Return (payload, did_http). Sleep only after a cache miss, never between hits.
+
+    A 429 is retried with the pauses above. A cached file is still returned with no sleep.
+    """
     path = cache_file(cache_dir, url)
     if path.exists():
         return json.loads(path.read_text(encoding="utf-8")), False
-    response = client.get(url)  # type: ignore[attr-defined]
-    response.raise_for_status()
-    text = response.text
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"GDELT did not return JSON: {text[:180]}") from exc
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
-    sleeper(pause)
-    return payload, True
+    for attempt in range(len(GDELT_RETRY_PAUSES) + 1):
+        if attempt:
+            sleeper(GDELT_RETRY_PAUSES[attempt - 1])
+        response = client.get(url)  # type: ignore[attr-defined]
+        status = int(getattr(response, "status_code", 200))
+        if status == 429:
+            continue
+        response.raise_for_status()
+        text = response.text
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"GDELT did not return JSON: {text[:180]}") from exc
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        sleeper(pause)
+        return payload, True
+    raise RuntimeError(f"GDELT kept returning 429: {url}")
 
 
 

@@ -273,6 +273,42 @@ def test_fetch_rejects_a_non_json_body(tmp_path: Path) -> None:
         fetch_json("https://example.test/gdelt", tmp_path, client, lambda _seconds: None)
 
 
+class _StatusResponse:
+    def __init__(self, text: str, status: int) -> None:
+        self.text = text
+        self.status_code = status
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise RuntimeError(str(self.status_code))
+
+
+class _RetryClient:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def get(self, url: str) -> _StatusResponse:
+        self.calls += 1
+        if self.calls == 1:
+            return _StatusResponse("busy", 429)
+        return _StatusResponse('{"timeline":[]}', 200)
+
+
+def test_fetch_retries_a_429_then_caches(tmp_path: Path) -> None:
+    client = _RetryClient()
+    slept: list[float] = []
+    url = "https://api.gdeltproject.org/api/v2/doc/doc?query=retry"
+    payload, did_http = fetch_json(url, tmp_path, client, slept.append)
+    assert payload == {"timeline": []}
+    assert did_http is True
+    assert client.calls == 2
+    assert slept == [15.0, 5.0]
+    again, did_again = fetch_json(url, tmp_path, client, slept.append)
+    assert again == payload
+    assert did_again is False
+    assert client.calls == 2
+
+
 
 import pytest
 
