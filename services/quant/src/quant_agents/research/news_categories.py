@@ -506,6 +506,14 @@ def cache_file(cache_dir: Path, url: str) -> Path:
     return cache_dir / f"{digest}.json"
 
 
+def write_cache_atomic(path: Path, text: str) -> None:
+    """Write the whole body, then replace. A crash leaves the previous file intact."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".partial")
+    temporary.write_text(text, encoding="utf-8")
+    temporary.replace(path)
+
+
 def _is_gdelt_url(url: str) -> bool:
     return "gdeltproject.org" in url
 
@@ -610,8 +618,7 @@ def fetch_json(
             problem = gdelt_payload_problem(payload, query=_query_param(url, "query"), mode=_query_param(url, "mode"))
             if problem:
                 raise RuntimeError(f"GDELT payload rejected: {problem}")
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")
+        write_cache_atomic(path, text)
         sleeper(pause)
         return payload, True
     raise RuntimeError(f"GDELT kept returning 429: {url}")

@@ -400,6 +400,28 @@ def test_fetch_rejects_a_non_json_body(tmp_path: Path) -> None:
         fetch_json("https://example.test/gdelt", tmp_path, client, lambda _seconds: None)
 
 
+def test_cache_write_replaces_the_previous_body_and_drops_the_partial(tmp_path: Path) -> None:
+    from quant_agents.research.news_categories import write_cache_atomic
+
+    dest = tmp_path / "body.json"
+    dest.write_text("old", encoding="utf-8")
+    write_cache_atomic(dest, _VALID_TIMELINE)
+    assert dest.read_text(encoding="utf-8") == _VALID_TIMELINE
+    assert list(tmp_path.glob("*.partial")) == []
+
+    def _boom(self: Path, text: str, encoding: str = "utf-8") -> int:
+        raise OSError("disk full")
+
+    original = Path.write_text
+    Path.write_text = _boom  # type: ignore[method-assign]
+    try:
+        with pytest.raises(OSError, match="disk full"):
+            write_cache_atomic(dest, "new")
+    finally:
+        Path.write_text = original  # type: ignore[method-assign]
+    assert dest.read_text(encoding="utf-8") == _VALID_TIMELINE
+
+
 def test_empty_timeline_is_not_cached_as_coverage(tmp_path: Path) -> None:
     url = "https://api.gdeltproject.org/api/v2/doc/doc?query=war&mode=timelinevolraw"
     client = _Client('{"timeline":[]}')
