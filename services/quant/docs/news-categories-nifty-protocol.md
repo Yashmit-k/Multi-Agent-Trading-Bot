@@ -86,3 +86,8 @@ Global wars, missile strikes, military escalation, and terror attacks, plus Indi
 1. `(crude OR brent OR OPEC OR "oil price" OR "oil prices") AND (surge OR jump OR plunge OR shock OR spike OR slump OR embargo OR "supply cut")`
 2. `("commodity prices" OR "commodities selloff" OR "gold price") AND (surge OR jump OR plunge OR shock OR record)`
 
+### 3. Central banks
+
+1. `("Reserve Bank of India" OR "repo rate" OR "monetary policy committee" OR "RBI policy")`
+2. `("Federal Reserve" OR FOMC OR "Fed rate" OR "interest rate decision") AND (hike OR cut OR hold OR pause OR decision)`
+
