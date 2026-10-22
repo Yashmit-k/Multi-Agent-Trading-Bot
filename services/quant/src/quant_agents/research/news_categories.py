@@ -1295,15 +1295,18 @@ def load_gdelt_days(
     else:
         attempts = 2
     try:
-        payload, _ = fetch_json(url, cache, client, sleeper, attempts=attempts)
+        payload, _ = fetch_json(url, cache, client, sleeper, attempts=attempts, pause=8.0)
     except RuntimeError as exc:
         if "429" not in str(exc):
             raise
         if span < 30:
-            # A day GDELT will not answer is missing. Volume later becomes 0; tone stays missing.
-            print(f"unanswered {label} {mode} {start.isoformat()} {end.isoformat()}", flush=True)
-            remember_coverage(cache, query, mode, start, end)
-            return {}
+            if mode == "timelinevolraw":
+                sleeper(45.0)
+                payload, _ = fetch_json(url, cache, client, sleeper, attempts=2, pause=8.0)
+            else:
+                print(f"unanswered {label} {mode} {start.isoformat()} {end.isoformat()}", flush=True)
+                remember_coverage(cache, query, mode, start, end)
+                return {}
         else:
             mid = start + timedelta(days=span // 2)
             print(f"split {label} {mode} {start.isoformat()} {end.isoformat()} at {mid.isoformat()}", flush=True)
@@ -1379,9 +1382,13 @@ def read_cached_gdelt(cache: Path) -> dict[tuple[str, str], dict[date, float]]:
 
 
 def category_event_days(cache: Path, client: object, sleeper: Callable[[float], None], end_day: date) -> dict[str, list[tuple[date, bool]]]:
-    """Pull each frozen query for the days not already cached, then flag event days."""
+    """Pull each frozen query for the days not already cached, then flag event days.
+
+    Volume is finished for every query before tone starts. Tone is descriptive
+    and a 429 there must not throw away the volume already on disk.
+    """
     cached = read_cached_gdelt(cache)
-    flagged: dict[str, list[tuple[date, bool]]] = {}
+    merged_by_query: dict[str, list[dict[date, float]]] = {}
     for category_id, _name, queries in CATEGORIES:
         parts: list[dict[date, float]] = []
         for query in queries:
@@ -1406,6 +1413,10 @@ def category_event_days(cache: Path, client: object, sleeper: Callable[[float], 
                         if VOLUME_START <= day <= end_day:
                             merged.setdefault(day, 0.0)
                 pending = gap_windows(set(merged), VOLUME_START, end_day, span_days=150)
+            parts.append({day: value for day, value in merged.items() if VOLUME_START <= day <= end_day})
+        merged_by_query[category_id] = parts
+    for category_id, _name, queries in CATEGORIES:
+        for query in queries:
             tone = set(cached.get((query, "timelinetone"), {}))
             tone.update(day for day in coverage_days(cache).get((query, "timelinetone"), ()) if VOLUME_START <= day <= end_day)
             for start_day, end_bound in gap_windows(tone, VOLUME_START, end_day, span_days=150):
@@ -1416,8 +1427,9 @@ def category_event_days(cache: Path, client: object, sleeper: Callable[[float], 
                         raise
                     print(f"tone skipped {category_id} {start_day.isoformat()} {end_bound.isoformat()}", flush=True)
                     break
-            parts.append({day: value for day, value in merged.items() if VOLUME_START <= day <= end_day})
-        series = sum_category_volume(parts, VOLUME_START, end_day)
+    flagged: dict[str, list[tuple[date, bool]]] = {}
+    for category_id, _name, _queries in CATEGORIES:
+        series = sum_category_volume(merged_by_query[category_id], VOLUME_START, end_day)
         bits = event_flags([value for _day, value in series])
         flagged[category_id] = [(day, flag) for (day, _value), flag in zip(series, bits)]
     return flagged
