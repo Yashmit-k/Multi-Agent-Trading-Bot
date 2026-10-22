@@ -73,3 +73,28 @@ def test_valuation_compares_ttm_pe_with_sector_peers() -> None:
     assert cheap.metadata["pe_basis"] == "sector_peers" and cheap.signal == 1.0  # P/E 10 vs peers 20: 50% cheaper saturates
     assert rich.signal == -1.0
     assert probe.metadata["pe_basis"] == "fixed_pe_20"  # no peer median: lower-confidence fallback
+
+
+def _peer_rows(*rows: tuple[str, str, int]):  # type: ignore[no-untyped-def]
+    """(metric, value, days before FIXTURE_AS_OF the row became available)."""
+    from datetime import timedelta
+
+    from intelligence_agents.fundamentals.csv_loader import load_csv_text
+    from intelligence_agents.fundamentals.store import MemoryFundamentalStore
+
+    lines = ["symbol,metric,value,unit,period,announced_at,available_at,source,source_id"]
+    for metric, value, days in rows:
+        stamp = (FIXTURE_AS_OF - timedelta(days=days)).isoformat()
+        lines.append(f"RELIANCE,{metric},{value},ratio,{stamp[:10]},{stamp},{stamp},test,rel-{metric}-{days}")
+    store = MemoryFundamentalStore()
+    load_csv_text(store, "\n".join(lines) + "\n")
+    news, _ = make_stores()
+    return make_context(news, store)
+
+
+def test_a_newer_zero_peer_count_retires_an_old_peer_median() -> None:
+    agent = ValuationAgent(CLOCK, _router())
+    stale = agent.evaluate("RELIANCE", FIXTURE_AS_OF, _peer_rows(("eps", "100", 5), ("peer_median_pe", "7.95", 3), ("peer_count", "0", 1)))
+    assert stale.metadata["pe_basis"] == "fixed_pe_20"  # no comparable peers: the old 7.95 is ignored
+    newer = agent.evaluate("RELIANCE", FIXTURE_AS_OF, _peer_rows(("eps", "100", 5), ("peer_count", "0", 3), ("peer_median_pe", "21", 1), ("peer_count", "4", 1)))
+    assert newer.metadata["pe_basis"] == "sector_peers" and newer.features["peer_count"] == "4"

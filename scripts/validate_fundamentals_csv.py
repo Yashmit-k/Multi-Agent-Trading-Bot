@@ -17,7 +17,7 @@ NIFTY50 = set(
     "JSWSTEEL KOTAKBANK LT M&M MARUTI NESTLEIND NTPC ONGC POWERGRID RELIANCE SBILIFE SBIN SHRIRAMFIN SUNPHARMA TATACONSUM TMPV "
     "TATASTEEL TCS TECHM TITAN TRENT ULTRACEMCO WIPRO".split()
 )
-METRICS = {"eps", "revenue_growth", "profit_growth", "margin", "roe", "roce", "debt", "cash_flow", "debt_to_equity", "pe_at_fetch", "peer_median_pe", "rank_profit_growth", "rank_revenue_growth", "rank_roe", "rank_debt_to_equity"}
+METRICS = {"eps", "revenue_growth", "profit_growth", "margin", "roe", "roce", "debt", "cash_flow", "debt_to_equity", "pe_at_fetch", "peer_median_pe", "peer_count", "rank_profit_growth", "rank_revenue_growth", "rank_roe", "rank_debt_to_equity"}
 COLUMNS = ["symbol", "metric", "value", "unit", "period", "announced_at", "available_at", "source", "source_id"]
 
 
