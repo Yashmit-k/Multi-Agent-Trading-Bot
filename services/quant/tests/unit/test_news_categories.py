@@ -386,3 +386,13 @@ def test_pass_rule_needs_holm_validate_p_and_the_same_sign() -> None:
     assert category_matters(pack(0.01, 0.001, 0.04), pack(0.02, 0.05, None)) == []
 
 
+
+from quant_agents.research.news_categories import PUBLIC_DAILY_NIFTY, coverage
+
+
+def test_public_urls_are_the_single_polite_calls() -> None:
+    assert "limit=2000" in PUBLIC_DAILY_NIFTY
+    assert coverage([])["bars"] == 0
+    assert coverage([{"start": "a", "end": "b"}])["bars"] == 1
+
+
