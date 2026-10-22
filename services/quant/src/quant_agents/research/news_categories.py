@@ -251,3 +251,103 @@ def calendar_audit(closes: Mapping[date, float], holidays: Iterable[date] = CASH
     return {"weekend_closes_dropped": weekend_closes, "holiday_closes_dropped": holiday_closes}
 
 
+
+PUBLIC_DAILY_NIFTY = "https://13-238-176-73.sslip.io/api/v1/market/candles/NIFTY50?timeframe=1d&limit=2000"
+PUBLIC_DAILY_VIX = "https://13-238-176-73.sslip.io/api/v1/market/candles/INDIAVIX?timeframe=1d&limit=2000"
+PUBLIC_INTRADAY_NIFTY = "https://13-238-176-73.sslip.io/api/v1/market/candles/NIFTY50?timeframe=5m&limit=2000"
+
+
+def close_mismatches(
+    yahoo: Mapping[date, float],
+    api: Mapping[date, float],
+    *,
+    tolerance: float = MISMATCH_TOLERANCE,
+) -> list[dict[str, float | str]]:
+    """Sessions where the two closes differ by more than half of one percent."""
+    rows: list[dict[str, float | str]] = []
+    for day in sorted(set(yahoo) & set(api)):
+        api_close = float(api[day])
+        yahoo_close = float(yahoo[day])
+        if api_close == 0:
+            continue
+        gap = abs(yahoo_close / api_close - 1.0)
+        if gap > tolerance:
+            rows.append(
+                {
+                    "date": day.isoformat(),
+                    "yahoo": yahoo_close,
+                    "api": api_close,
+                    "abs_pct": gap,
+                }
+            )
+    return rows
+
+
+def prefer_api(yahoo: Mapping[date, float], api: Mapping[date, float]) -> dict[date, float]:
+    """API close wins on overlap. Yahoo fills dates the API does not have."""
+    merged = {day: float(value) for day, value in yahoo.items()}
+    merged.update({day: float(value) for day, value in api.items()})
+    return merged
+
+
+def _parse_moment(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def parse_api_daily(payload: object) -> dict[date, float]:
+    if not isinstance(payload, list):
+        raise ValueError("daily candle payload is not a list")
+    closes: dict[date, float] = {}
+    for bar in payload:
+        if not isinstance(bar, dict) or "close" not in bar or "end" not in bar:
+            continue
+        end = _parse_moment(str(bar["end"]))
+        closes[end.astimezone(IST).date()] = float(bar["close"])
+    return closes
+
+
+def parse_api_intraday(payload: object) -> list[tuple[datetime, float]]:
+    """5-minute bars as (IST start, close). Bars outside the cash session are dropped."""
+    if not isinstance(payload, list):
+        raise ValueError("intraday candle payload is not a list")
+    bars: list[tuple[datetime, float]] = []
+    for bar in payload:
+        if not isinstance(bar, dict) or "close" not in bar or "start" not in bar:
+            continue
+        start = _parse_moment(str(bar["start"])).astimezone(IST)
+        if start.date() < RV_START:
+            continue
+        if start.time() < SESSION_OPEN or start.time() >= SESSION_CLOSE:
+            continue
+        bars.append((start, float(bar["close"])))
+    bars.sort(key=lambda item: item[0])
+    return bars
+
+
+def session_realised_variance(bars: Sequence[tuple[datetime, float]]) -> dict[date, float]:
+    """Sum of squared log returns. Sessions with fewer than two bars are absent."""
+    grouped: dict[date, list[tuple[datetime, float]]] = {}
+    for start, close in bars:
+        grouped.setdefault(start.astimezone(IST).date(), []).append((start, close))
+    out: dict[date, float] = {}
+    for day, items in grouped.items():
+        items.sort(key=lambda item: item[0])
+        closes = [close for _, close in items]
+        if len(closes) < 2:
+            continue
+        total = 0.0
+        usable = 0
+        for left, right in zip(closes, closes[1:]):
+            if left <= 0 or right <= 0:
+                continue
+            change = math.log(right / left)
+            total += change * change
+            usable += 1
+        if usable:
+            out[day] = total
+    return out
+
+
