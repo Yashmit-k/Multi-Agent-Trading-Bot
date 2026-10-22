@@ -135,6 +135,23 @@ describe("applyDailyPerformance", () => {
     expect(next.days.some((day) => day.net_pnl_inr === 0)).toBe(false);
   });
 
+  it("maps Core end-of-day books when available, keeping today provisional", () => {
+    const next = applyDailyPerformance(stub(), {
+      ok: true,
+      value: {
+        status: "available",
+        pnl_basis: "net_equity",
+        days: [{ session_id: "s", calendar_date_ist: "2026-10-15", snapshot_as_of: "2026-10-15T07:00:00Z", complete: false, pnl_basis: "net_equity",
+                 net_pnl_inr: -327.07, start_of_day_equity_inr: 1000000, realized_pnl_inr: -159.13, unrealized_change_inr: -167.94, fees_inr: 159.13,
+                 has_activity: true, trading_calendar_state: "open", source_updated_at: null, closed_trades: 0 }],
+      },
+    });
+    expect(next.daily_endpoint).toBe("available");
+    expect(next.pnl_basis).toBe("net_equity");
+    expect(next.days[0].net_pnl_inr).toBe(-327.07);
+    expect(next.days[0].complete).toBe(false);
+  });
+
   it("keeps missing when the GET fails", () => {
     const next = applyDailyPerformance(stub(), { ok: false, error: "not_implemented" });
     expect(next.daily_endpoint).toBe("missing");

@@ -25,7 +25,7 @@ from quant_agents.vote import Vote
 
 logger = logging.getLogger(__name__)
 
-AGENT_VERSION = "1.0.0"
+AGENT_VERSION = "1.4.0"
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +107,7 @@ class BaseQuantAgent:
             view.get(name)
         for name in self.optional_features:
             view.get(name)
+        self.horizon = config.horizon  # agents with horizon-specific settings read this in interpret()
         decision = self.interpret(view, extra_views)
         all_sets = (feature_set, *extra_sets, *decision.extra_feature_sets)
         input_payload = {

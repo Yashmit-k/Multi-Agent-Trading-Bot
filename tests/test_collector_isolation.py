@@ -105,3 +105,32 @@ def _bar_count() -> int:
         row = connection.execute("SELECT count(*) FROM candles WHERE timeframe = '5m'").fetchone()
     assert row is not None
     return int(row[0])
+
+
+def test_index_history_backfills_once_back_to_2024(repository: CoreRepository) -> None:
+    from datetime import datetime, timedelta, timezone
+    from decimal import Decimal
+
+    from contracts.enums import Exchange, Timeframe
+    from contracts.schemas.market import Candle
+    from core_market_data import collector
+
+    collector._index_backfill_done.clear()
+    repository.upsert_instrument(symbol="NIFTY50", exchange="NSE", trading_symbol="NIFTY 50")
+
+    def bar(day: datetime) -> Candle:
+        return Candle(symbol="NIFTY50", exchange=Exchange.NSE, timeframe=Timeframe.D1, open=Decimal("100"), high=Decimal("101"), low=Decimal("99"), close=Decimal("100"), volume=0, start=day - timedelta(hours=6, minutes=15), end=day)
+
+    recent = datetime(2025, 9, 11, 10, 0, tzinfo=timezone.utc)
+    repository.upsert_candles([bar(recent)])
+    calls = []
+
+    class Provider:
+        def get_candles(self, symbol, timeframe, start, end):  # type: ignore[no-untyped-def]
+            calls.append((symbol, start, end))
+            return [bar(datetime(2024, 1, 2, 10, 0, tzinfo=timezone.utc)), bar(recent)]
+
+    assert collector.backfill_index_history(Provider(), repository, "NIFTY50") == 1  # type: ignore[arg-type]
+    assert repository.earliest_candle_end("NIFTY50", Timeframe.D1) == datetime(2024, 1, 2, 10, 0, tzinfo=timezone.utc)
+    assert collector.backfill_index_history(Provider(), repository, "NIFTY50") == 0  # type: ignore[arg-type]
+    assert len(calls) == 1

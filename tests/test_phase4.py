@@ -40,7 +40,8 @@ def test_confidence_uses_the_same_weights_as_the_signal() -> None:
         weights={Horizon.SWING: {"technical": 1.0, "momentum": 3.0}},
     )
     assert aggregate is not None
-    assert aggregate.aggregated_signal == 0.4
+    # Confidence-weighted mean: (1*0.8*0.5 + 3*0.4*1.0) / (1*0.8 + 3*0.4) = 1.6 / 2.0
+    assert aggregate.aggregated_signal == 0.8
     assert aggregate.aggregated_confidence == 0.5
     assert aggregate.supporting_signal_ids == ("sig-momentum", "sig-technical")
 
@@ -78,7 +79,7 @@ def test_paper_cycle_fills_once_and_ignores_late_signals(repository: CoreReposit
     assert proposal.timestamp == as_of
     assert proposal.timestamp.year == 2024
     assert proposal.supporting_signal_ids == ["sig-valid"]
-    assert proposal.aggregated_signal == 0.4
+    assert proposal.aggregated_signal == 0.5  # one agent: its own signal (confidence no longer shrinks direction)
     assert proposal.aggregated_confidence == 0.8
     assert proposal.quantity == 6
     assert proposal.entry_price == Decimal("2927.00")
@@ -198,13 +199,26 @@ def test_risk_rejects_notional_cap(repository: CoreRepository) -> None:
     assert repository.list_orders() == []
 
 
-def test_risk_rejects_sell_without_a_long(repository: CoreRepository) -> None:
+def test_unheld_sell_is_not_proposed_and_risk_still_blocks_shorts(repository: CoreRepository) -> None:
     repository.open_paper_session(CASH)
     repository.upsert_candles(list(candles_for("RELIANCE")))
     _store(repository, _signal(signal_id="sig-sell", signal=-0.8, confidence=0.9, timestamp=FIXTURE_AS_OF))
     publisher = MemoryEventPublisher()
     run_paper_cycle(repository, publisher, mode=TradingMode.PAPER, starting_cash=CASH, enforce_entry_window=False)
-    decision = repository.list_risk_decisions()[0]
+    # Long-only: a bearish view on an unheld stock is not proposed at all, so nothing reaches risk.
+    assert repository.list_proposals() == []
+    assert repository.list_risk_decisions() == []
+    # The risk engine still refuses a short if one is ever submitted directly.
+    from contracts.enums import Horizon, Side
+    from contracts.schemas.trade_proposal import TradeProposal
+    from core_risk import assess
+
+    short = TradeProposal(
+        proposal_id="p-short", symbol="RELIANCE", timestamp=FIXTURE_AS_OF, horizon=Horizon.SWING, side=Side.SELL, quantity=5,
+        entry_price=Decimal("100"), stop_loss=Decimal("102"), take_profit=Decimal("96"), strategy_id="paper-fusion",
+        strategy_version="1.0.0", aggregated_signal=-0.8, aggregated_confidence=0.9, supporting_signal_ids=["sig-sell"], metadata={},
+    )
+    decision = assess(short, mode=TradingMode.PAPER, in_universe=True, cash=CASH, held_quantity=0, timestamp=FIXTURE_AS_OF)
     assert decision.status.value == "REJECTED"
     assert any(check.name == "no_short" and not check.passed for check in decision.checks)
     assert repository.held_quantity("RELIANCE") == 0

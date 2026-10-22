@@ -1,5 +1,5 @@
 import { fetchApi } from "@/lib/api";
-import type { DashboardSnapshot, PaperSession, PnlBasis } from "@/lib/daily-pnl";
+import type { DailyPnlDay, DashboardSnapshot, PaperSession, PnlBasis } from "@/lib/daily-pnl";
 import { istDateKeyFromInstant } from "@/lib/ist";
 import { parseDecimal } from "@/lib/money";
 
@@ -17,6 +17,8 @@ export const MISSING_DAILY_PNL_CONTRACT = `Daily paper equity series is not load
 export type DailyPerformanceResponse = {
   status?: string;
   reason?: string;
+  pnl_basis?: PnlBasis;
+  days?: Array<DailyPnlDay & { equity_inr?: number | null }>;
 };
 
 export function applyDailyPerformance(
@@ -36,7 +38,9 @@ export function applyDailyPerformance(
       contract_note: `${MISSING_DAILY_PNL_CONTRACT} Core daily-performance status=${status ?? "missing"}; reason=${reason}.`,
     };
   }
-  return { ...snapshot, daily_endpoint: "unavailable", days: [] };
+  // Core's end-of-day books (today provisional, complete=false), one per IST trading day.
+  const days = Array.isArray(result.value.days) ? result.value.days : [];
+  return { ...snapshot, daily_endpoint: "available", pnl_basis: result.value.pnl_basis ?? "net_equity", days };
 }
 
 function activePaperSession(paper: Record<string, unknown>): PaperSession[] {
@@ -77,7 +81,7 @@ function emptyRealSnapshot(note: string): DashboardSnapshot {
     win_rate: {
       pct: null,
       sample: null,
-      definition: "No Core closed-trade pairing convention is published for paper. Latest stored backtest is not paper session P&L.",
+      definition: "Win rate needs closed round-trip trades. None have closed in this paper session yet.",
     },
     positions: [],
     orders: [],
@@ -164,7 +168,7 @@ export async function loadRealDashboard(): Promise<DashboardSnapshot> {
       pct: null,
       sample: null,
       definition:
-        "No Core closed-trade pairing convention is published for paper. Latest stored backtest is not paper session P&L.",
+        "Win rate needs closed round-trip trades. None have closed in this paper session yet.",
     },
     positions: positions.ok ? (positions.value as Array<Record<string, unknown>>) : [],
     orders: orders.ok ? (orders.value as Array<Record<string, unknown>>) : [],

@@ -53,15 +53,21 @@ def score_votes(
     present_ratio = 1.0 if required_total == 0 else (required_total - missing_required) / required_total
     weight_sum = 0.0
     signed = 0.0
+    engaged = 0.0
     for vote in votes:
         weight_sum += vote.weight
         signed += vote.value * vote.weight
+        if vote.value != 0:
+            engaged += vote.weight
     if weight_sum == 0.0:
         raw = 0.0
         conf = 0.0
     else:
         raw = signed / weight_sum
-        conf = min(1.0, abs(raw)) * present_ratio
+        # Confidence is how much of the agent's evidence took a position (participation) times data
+        # completeness, not |signal|: direction and agreement are already in the signal, and fusion
+        # multiplies signal by confidence, so |signal| here would count a vote's size twice.
+        conf = (engaged / weight_sum) * present_ratio
     return Score(signal=_clamp(raw), confidence=_unit(conf))
 
 

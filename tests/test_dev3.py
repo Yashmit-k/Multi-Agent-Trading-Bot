@@ -63,7 +63,7 @@ def test_short_history_omits_indicators_and_marks_imbalance_unavailable() -> Non
     bars = [_bar("RELIANCE", start + timedelta(days=index), str(100 + index)) for index in range(3)]
     feature = build_feature_set("RELIANCE", Timeframe.D1, bars, bars[-1].end)
     assert feature is not None
-    assert feature.feature_version == FEATURE_VERSION == "1.1.0"
+    assert feature.feature_version == FEATURE_VERSION == "1.2.0"
     assert "trend_strength_adx" not in feature.features
     assert "volatility_percentile" not in feature.features
     assert "volume_imbalance" in feature.unavailable
@@ -170,7 +170,7 @@ def test_agent_routes_and_news_proxy(repository: CoreRepository) -> None:
     names = {row["agent_name"]: row for row in agents.json()}
     assert names["technical"]["enabled"] is True
     assert names["ml"]["enabled"] is False
-    assert names["technical"]["feature_version"] == "1.1.0"
+    assert names["technical"]["feature_version"] == "1.2.0"
     news = client.get("/api/v1/stocks/RELIANCE/news", headers=headers)
     assert news.status_code == 503
     health = client.get("/api/v1/agents/news/health", headers=headers)

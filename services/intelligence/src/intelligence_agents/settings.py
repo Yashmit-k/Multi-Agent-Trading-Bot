@@ -38,10 +38,23 @@ class IntelligenceSettings:
     rss_max_bytes: int
     rss_max_items: int
     service_mode: str
-    news_ingest: bool
-    news_interpret: bool
-    rss_symbol_batch: int
+    news_ingest: bool = False
+    news_interpret: bool = False
+    rss_symbol_batch: int = 5
     fundamentals_csv: str = ""
+    llm_min_interval_seconds: float = 0.0
+    llm_max_output_tokens: int = 160
+    llm_json_mode: bool = False
+    llm_reasoning_effort: str = ""
+    core_api_token: str = ""
+    # Model for a re-check the portfolio manager asks for (a second, independent look). Empty: tier 2.
+    llm_reassess_model: str = ""
+    # Backup models tried in order when the main one fails or is out of quota (each has its own free quota).
+    llm_fallback_models: tuple[str, ...] = ()
+    # Fundamental, valuation and earnings use their own model, so they never spend the News agent's daily quota.
+    # Empty: they share the News agent's model as before.
+    llm_context_model: str = ""
+    llm_context_reasoning_effort: str = ""
 
     @classmethod
     def from_env(cls) -> IntelligenceSettings:
@@ -89,6 +102,15 @@ class IntelligenceSettings:
             news_interpret=os.environ.get("INTELLIGENCE_NEWS_INTERPRET", "false").lower() == "true",
             rss_symbol_batch=int(os.environ.get("NEWS_RSS_SYMBOL_BATCH", "5")),
             fundamentals_csv=os.environ.get("INTELLIGENCE_FUNDAMENTALS_CSV", "").strip(),
+            llm_min_interval_seconds=float(os.environ.get("LLM_MIN_INTERVAL_SECONDS", "0")),
+            llm_max_output_tokens=int(os.environ.get("LLM_MAX_OUTPUT_TOKENS", "160")),
+            llm_json_mode=os.environ.get("LLM_JSON_MODE", "false").strip().lower() == "true",
+            llm_reasoning_effort=os.environ.get("LLM_REASONING_EFFORT", "").strip().lower(),
+            core_api_token=os.environ.get("CORE_API_TOKEN", ""),
+            llm_reassess_model=os.environ.get("LLM_REASSESS_MODEL", "").strip(),
+            llm_context_model=os.environ.get("LLM_CONTEXT_MODEL", "").strip(),
+            llm_context_reasoning_effort=os.environ.get("LLM_CONTEXT_REASONING_EFFORT", "").strip().lower(),
+            llm_fallback_models=tuple(item.strip() for item in os.environ.get("LLM_FALLBACK_MODELS", "").split(",") if item.strip()),
         )
         settings.validate()
         return settings

@@ -10,9 +10,10 @@ requires-python = ">=3.12"
 dependencies = [
     "contracts",
     "defusedxml>=0.7",
-    "fastapi>=0.142.2,<0.143",
+    "fastapi>=0.115,<1",
     "httpx>=0.27",
     "uvicorn>=0.32",
+    "yfinance>=0.2.40",
 ]
 
 [project.optional-dependencies]

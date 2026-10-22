@@ -26,6 +26,24 @@ JSON_EXAMPLE = (
 )
 
 
+def rate_limit_error(body: str) -> LLMProviderError:
+    """Gemini names the limit it hit (quotaId) and how long to wait (retryDelay). A daily limit is quota
+    exhaustion; a per-minute limit is only a rate limit, so the model is paused for seconds, not hours."""
+    import re
+
+    delay = re.search(r'"retryDelay"\s*:\s*"([0-9.]+)s"', body)
+    retry_after = float(delay.group(1)) if delay else None
+    ids = re.findall(r'"quotaId"\s*:\s*"([A-Za-z-]+)"', body)
+    if any("PerDay" in item for item in ids):
+        return LLMProviderError("quota_exhaustion", "http_429_daily", retry_after=retry_after)
+    if ids:
+        return LLMProviderError("http_429", "http_429_rate", retry_after=retry_after)
+    lowered = body[:300].lower()
+    if "quota" in lowered or "exceeded" in lowered:
+        return LLMProviderError("quota_exhaustion", "http_429", retry_after=retry_after)
+    return LLMProviderError("http_429", "http_429", retry_after=retry_after)
+
+
 class OpenAICompatibleProvider:
     def __init__(
         self,
@@ -37,6 +55,11 @@ class OpenAICompatibleProvider:
         retries: int = 1,
         client: httpx.Client | None = None,
         sleeper: Callable[[float], None] | None = None,
+        min_interval_seconds: float = 0.0,
+        clock: Callable[[], float] = time.monotonic,
+        max_output_tokens: int = MAX_OUTPUT_TOKENS,
+        json_mode: bool = False,
+        reasoning_effort: str = "",
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
@@ -50,14 +73,31 @@ class OpenAICompatibleProvider:
         self.last_failure_type: str | None = None
         self.last_generation: str | None = None
         self.quota_exhausted = False
+        self._min_interval = max(0.0, min_interval_seconds)
+        self._clock = clock
+        self._last_call: float | None = None
+        # Reasoning models spend output tokens before the JSON answer, so they need a larger cap.
+        self._max_output_tokens = max_output_tokens
+        self._json_mode = json_mode
+        # Sent as given ("none" turns Gemini thinking off); empty or "omit" leaves it out for models that reject it.
+        self._reasoning_effort = "" if reasoning_effort in {"", "omit"} else reasoning_effort
+
+    def _pace(self) -> None:
+        """Space requests at least min_interval apart to stay under a provider's per-minute limit."""
+        if self._min_interval and self._last_call is not None:
+            wait = self._last_call + self._min_interval - self._clock()
+            if wait > 0:
+                self._sleep(wait)
+        self._last_call = self._clock()
 
     def complete(self, request: LLMRequest, *, tier: str) -> object:
         last_error: Exception | None = None
-        delay = 0.2
+        delay = max(0.2, 2 * self._min_interval)
         for attempt in range(self._retries + 1):
             content = ""
             started = time.perf_counter()
             try:
+                self._pace()
                 logger.info(
                     "llm_request",
                     extra={"model": self.model, "llm_host": self.host, "tier": tier, "agent_task": request.task},
@@ -113,7 +153,8 @@ class OpenAICompatibleProvider:
                     "llm_provider_failed",
                     extra={"attempt": attempt, "model": self.model, "failure_type": exc.failure_type},
                 )
-                if exc.failure_type in {"http_429", "http_5xx"} and attempt < self._retries:
+                waits_longer = exc.retry_after is not None and exc.retry_after > delay
+                if exc.failure_type in {"http_429", "http_5xx"} and attempt < self._retries and not waits_longer:
                     self._sleep(delay)
                     delay *= 2
                     continue
@@ -187,12 +228,16 @@ class OpenAICompatibleProvider:
         body = {
             "model": self.model,
             "temperature": 0,
-            "max_tokens": MAX_OUTPUT_TOKENS,
+            "max_tokens": self._max_output_tokens,
             "messages": [
                 {"role": "system", "content": f"{SYSTEM_PROMPT} {instruction_for(request.task)}"},
                 {"role": "user", "content": wrap_untrusted(request.user_payload)},
             ],
         }
+        if self._json_mode:
+            body["response_format"] = {"type": "json_object"}
+        if self._reasoning_effort:
+            body["reasoning_effort"] = self._reasoning_effort
         headers = {"Authorization": f"Bearer {self._api_key}"}
         response = self._client.post(
             f"{self._base_url}/chat/completions",
@@ -214,10 +259,7 @@ class OpenAICompatibleProvider:
         if status == 200:
             return
         if status == 429:
-            body = (response.text or "")[:200].lower()
-            if "quota" in body or "exceeded" in body:
-                raise LLMProviderError("quota_exhaustion", "http_429")
-            raise LLMProviderError("http_429", "http_429")
+            raise rate_limit_error(response.text or "")
         if status >= 500:
             raise LLMProviderError("http_5xx", f"http_{status}")
         response.raise_for_status()

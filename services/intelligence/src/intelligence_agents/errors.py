@@ -24,6 +24,7 @@ class FixtureCoverageError(IntelligenceError):
 class LLMProviderError(IntelligenceError):
     """Observable LLM failure. Never silently invents an assessment."""
 
-    def __init__(self, failure_type: str, message: str = "") -> None:
+    def __init__(self, failure_type: str, message: str = "", *, retry_after: float | None = None) -> None:
         super().__init__(message or failure_type)
         self.failure_type = failure_type
+        self.retry_after = retry_after  # seconds the provider asked us to wait, when it said

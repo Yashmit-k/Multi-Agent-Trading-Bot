@@ -23,6 +23,8 @@ jobs:
           python -m pip install -e services/core/decision-engine
           python -m pip install -e services/core/risk-engine
           python -m pip install -e services/core/paper-execution
+          # Research studies price trades with the Strategy-lab cost model in core-api.
+          python -m pip install -e services/core/candle-engine -e services/core/signal-ingestion -e services/core/worker -e services/core/api
           python -m pip install -e "services/quant[dev]"
       - name: Unit tests
         run: python -m pytest services/quant/tests/unit -q

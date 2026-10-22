@@ -1,4 +1,4 @@
-"""Fuse one symbol and horizon. effective_signal = signal * confidence."""
+"""Fuse one symbol and horizon: a confidence-weighted mean of agent signals, times agent weights."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -9,6 +9,9 @@ from contracts.enums import AgentName, Horizon
 from contracts.schemas.agent_signal import AgentSignal
 
 _QUANTUM = Decimal("0.00000001")
+# Market-wide agents are filters on new buys (core_paper.cycle.market_risk_off), not per-stock votes:
+# the same market reading would otherwise be counted once for every stock. Default weight 0.
+MARKET_FILTER_AGENTS = frozenset({"regime"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,24 +49,31 @@ def fuse(
     selected = select_signals(signals, horizon=horizon, as_of=as_of)
     if not selected:
         return None
-    weighted = [(signal, _weight(horizon, signal.agent_name, weights)) for signal in selected]
+    # A zero weight removes the agent from the vote and from the supporting ids.
+    weighted = [(signal, weight) for signal in selected if (weight := _weight(horizon, signal.agent_name, weights)) > 0]
+    if not weighted:
+        return None
     total_weight = sum((weight for _, weight in weighted), Decimal("0"))
     if total_weight <= 0:
         return None
     signal_total = sum((weight * Decimal(str(signal.signal)) * Decimal(str(signal.confidence)) for signal, weight in weighted), Decimal("0"))
     confidence_total = sum((weight * Decimal(str(signal.confidence)) for signal, weight in weighted), Decimal("0"))
+    # Signal: confidence-weighted mean, so an agent with no opinion (confidence 0) neither votes nor dilutes.
+    # Confidence: weight-averaged, so a lone confident agent among silent ones still reads as low confidence.
+    aggregated = _clipped_ratio(signal_total, confidence_total) if confidence_total > 0 else 0.0
     return Aggregate(
-        symbol=selected[0].symbol,
+        symbol=weighted[0][0].symbol,
         horizon=horizon,
-        aggregated_signal=_clipped_ratio(signal_total, total_weight),
+        aggregated_signal=aggregated,
         aggregated_confidence=_ratio(confidence_total, total_weight),
-        supporting_signal_ids=tuple(signal.signal_id for signal in selected),
+        supporting_signal_ids=tuple(signal.signal_id for signal, _ in weighted),
     )
 
 
 def _weight(horizon: Horizon, agent: AgentName, weights: Mapping[Horizon, Mapping[str, float]] | None) -> Decimal:
     table = {} if weights is None else weights.get(horizon, {})
-    value = Decimal(str(table.get(agent.value, 1.0)))
+    default = 0.0 if agent.value in MARKET_FILTER_AGENTS else 1.0
+    value = Decimal(str(table.get(agent.value, default)))
     if value < 0:
         raise ValueError("agent weights must be non-negative")
     return value
@@ -72,7 +82,18 @@ def _weight(horizon: Horizon, agent: AgentName, weights: Mapping[Horizon, Mappin
 def _newer(candidate: AgentSignal, current: AgentSignal) -> bool:
     if _aware(candidate.timestamp) != _aware(current.timestamp):
         return _aware(candidate.timestamp) > _aware(current.timestamp)
+    # The same bar scored by two releases of an agent (it re-scores after an upgrade): the newer release wins.
+    if _version(candidate.agent_version) != _version(current.agent_version):
+        return _version(candidate.agent_version) > _version(current.agent_version)
     return candidate.signal_id > current.signal_id
+
+
+def _version(text: str) -> tuple[int, ...]:
+    parts = []
+    for piece in text.split("."):
+        digits = "".join(char for char in piece if char.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
 
 
 def _ratio(numerator: Decimal, denominator: Decimal) -> float:

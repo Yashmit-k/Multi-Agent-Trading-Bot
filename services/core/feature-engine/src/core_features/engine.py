@@ -12,7 +12,7 @@ from contracts.enums import Timeframe
 from contracts.schemas.feature_set import FeatureSet
 from contracts.schemas.market import Candle
 
-FEATURE_VERSION = "1.1.0"
+FEATURE_VERSION = "1.2.0"
 
 
 def build_feature_set(
@@ -49,7 +49,7 @@ def build_feature_set(
     _put(features, "macd_signal", macd_signal)
     _put(features, "rsi_14", _rsi(closes, 14))
     _put(features, "atr_14", _atr(visible, 14))
-    _put(features, "vwap", _vwap(visible))
+    _put(features, "vwap", _vwap(_vwap_window(visible, parsed)))
     mid, upper, lower = _bollinger(closes, 20)
     _put(features, "bollinger_mid", mid)
     _put(features, "bollinger_upper", upper)
@@ -77,6 +77,20 @@ def build_feature_set(
     _put(features, "resistance_level", _window_high(highs, 20))
     _put(features, "trend_slope", _slope(closes, 20))
     _put(features, "volatility_percentile", _volatility_percentile(closes))
+    # Normalised gaps for the quant agents, which may only compare features, never compute on them.
+    atr = features.get("atr_14")
+    for name, a, b in (
+        ("ema_gap_atr", "ema_12", "ema_26"),
+        ("sma_gap_atr", "sma_10", "sma_20"),
+        ("close_sma20_atr", "last_close", "sma_20"),
+        ("close_vwap_atr", "last_close", "vwap"),
+        ("macd_gap_atr", "macd", "macd_signal"),
+    ):
+        if isinstance(atr, (int, float)) and atr > 0 and a in features and b in features:
+            _put(features, name, (float(features[a]) - float(features[b])) / float(atr))
+    if "roc_10" in features and isinstance(features.get("volatility"), (int, float)) and float(features["volatility"]) > 0:
+        # 10-bar return in units of its expected noise (per-bar volatility x sqrt(10)).
+        _put(features, "roc_10_z", float(features["roc_10"]) / (float(features["volatility"]) * 10 ** 0.5))
     last = visible[-1]
     return FeatureSet(
         symbol=symbol,
@@ -154,6 +168,17 @@ def _atr(candles: list[Candle], length: int) -> float | None:
     for true_range in ranges[length:]:
         value = ((value * (length - 1)) + true_range) / length
     return value
+
+
+def _vwap_window(candles: list[Candle], timeframe) -> list[Candle]:  # type: ignore[no-untyped-def]
+    """Intraday: today's session only (a real session VWAP). Daily: the last 20 sessions."""
+    from zoneinfo import ZoneInfo
+
+    if getattr(timeframe, "value", timeframe) == "1d":
+        return candles[-20:]
+    ist = ZoneInfo("Asia/Kolkata")
+    day = candles[-1].end.astimezone(ist).date()
+    return [bar for bar in candles if bar.end.astimezone(ist).date() == day]
 
 
 def _vwap(candles: list[Candle]) -> float | None:

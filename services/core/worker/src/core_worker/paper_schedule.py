@@ -10,7 +10,7 @@ import logging
 import urllib.request
 from datetime import datetime
 
-from contracts.enums import TradingMode
+from contracts.enums import Horizon, TradingMode
 from core_db.repository import CoreRepository
 from core_ingestion.service import EventPublisher
 from core_paper.costs import CostSchedule
@@ -40,6 +40,14 @@ def broker_allows_entries(base_url: str, token: str, *, urlopen=urllib.request.u
     return True
 
 
+def excluded_agent_weights(raw: str) -> dict[Horizon, dict[str, float]] | None:
+    """Weight 0 on every horizon for each listed agent, e.g. agents with no live data source."""
+    names = [item.strip().lower() for item in raw.split(",") if item.strip()]
+    if not names:
+        return None
+    return {horizon: {name: 0.0 for name in names} for horizon in Horizon}
+
+
 def run_scheduled_cycle(
     repository: CoreRepository,
     publisher: EventPublisher,
@@ -48,6 +56,8 @@ def run_scheduled_cycle(
     schedule: CostSchedule | None,
     now: datetime,
     broker_authenticated: bool,
+    weights: dict | None = None,
+    manager_review: bool = False,
 ) -> int:
     """Settle and exit whenever the cash session is open. Enter only inside the entry window."""
     if mode != TradingMode.PAPER or not cash_session_open(now):
@@ -60,12 +70,14 @@ def run_scheduled_cycle(
         publisher,
         mode=TradingMode.PAPER,
         starting_cash=book.starting_cash,
+        weights=weights,
         schedule=schedule,
         require_fresh=True,
         now=now,
         enforce_entry_window=True,
         require_universe_fresh=True,
         broker_authenticated=broker_authenticated,
+        manager_review=manager_review,
     )
 
 

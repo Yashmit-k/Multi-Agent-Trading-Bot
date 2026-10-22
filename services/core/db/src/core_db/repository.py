@@ -1,11 +1,11 @@
 """Repository used by every other core service."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -23,6 +23,7 @@ from core_db.clock import as_utc
 from core_db.models import (
     AgentSignalRow,
     AuditLogRow,
+    BrokerSessionRow,
     BacktestCostRow,
     BacktestFillRow,
     BacktestMetricRow,
@@ -32,6 +33,7 @@ from core_db.models import (
     BacktestRunRow,
     CandleRow,
     CashReservationRow,
+    DailyEquityRow,
     ChargeLedgerRow,
     DpChargeRow,
     ExecutionRow,
@@ -47,7 +49,10 @@ from core_db.models import (
     RiskDecisionRow,
     RuntimeFlagRow,
     SignalRejectionRow,
+    SystemEventRow,
     TradeProposalRow,
+    UserSettingRow,
+    UserStrategyRow,
     UniverseMembershipRow,
 )
 from core_db.paper_sessions import (
@@ -319,15 +324,22 @@ class CoreRepository:
         as_of: datetime,
         start: datetime | None = None,
         end: datetime | None = None,
+        last: int | None = None,
     ) -> list[Candle]:
+        """Completed bars with end <= as_of, oldest first. ``last`` keeps only the newest N."""
         parsed = timeframe if isinstance(timeframe, Timeframe) else Timeframe(timeframe)
         moment = as_utc(as_of)
         with self._session_factory() as session:
-            rows = session.scalars(
+            query = (
                 select(CandleRow)
                 .where(CandleRow.symbol == symbol.strip().upper(), CandleRow.timeframe == parsed.value)
-                .order_by(CandleRow.start)
+                .where(CandleRow.end <= moment)
             )
+            if last is not None:
+                newest = list(session.scalars(query.order_by(CandleRow.end.desc()).limit(last)))
+                rows = sorted(newest, key=lambda row: as_utc(row.start))
+            else:
+                rows = session.scalars(query.order_by(CandleRow.start))
             candles = []
             for row in rows:
                 bar_end = as_utc(row.end)
@@ -341,18 +353,24 @@ class CoreRepository:
                 candles.append(_candle(row))
             return candles
 
-    def stored_candles(self, symbol: str, timeframe: Timeframe | str) -> list[Candle]:
-        """Every row in the candle table for this symbol and timeframe, with no as_of filter."""
+    def stored_candles(
+        self, symbol: str, timeframe: Timeframe | str, *, start: datetime | None = None, end: datetime | None = None
+    ) -> list[Candle]:
+        """Stored rows for this symbol and timeframe, with no as_of filter.
+
+        start/end narrow the read in SQL (bar start >= start, bar end <= end); without them every row is read.
+        """
         parsed = timeframe if isinstance(timeframe, Timeframe) else Timeframe(timeframe)
         with self._session_factory() as session:
-            rows = session.scalars(
-                select(CandleRow)
-                .where(
-                    CandleRow.symbol == symbol.strip().upper(),
-                    CandleRow.timeframe == parsed.value,
-                )
-                .order_by(CandleRow.start)
+            query = select(CandleRow).where(
+                CandleRow.symbol == symbol.strip().upper(),
+                CandleRow.timeframe == parsed.value,
             )
+            if start is not None:
+                query = query.where(CandleRow.start >= as_utc(start))
+            if end is not None:
+                query = query.where(CandleRow.end <= as_utc(end))
+            rows = session.scalars(query.order_by(CandleRow.start))
             return [_candle(row) for row in rows]
 
     def upsert_feature(self, feature_set: FeatureSet, instrument_id: str) -> None:
@@ -413,6 +431,86 @@ class CoreRepository:
         with self._session_factory() as session:
             row = session.get(AgentSignalRow, signal_id)
             return dict(row.payload) if row else None
+
+    def latest_signal_per_agent(self) -> list[dict]:
+        """Newest stored signal for each agent: one indexed lookup per agent name.
+
+        Uses ix_agent_signals_agent_recorded (migration 0013) on Postgres, instead of a group-by over every signal.
+        """
+        from contracts.enums import AgentName
+
+        agent = AgentSignalRow.payload["agent_name"].as_string()
+        latest: list[dict] = []
+        with self._session_factory() as session:
+            for name in sorted(item.value for item in AgentName):
+                row = session.scalars(select(AgentSignalRow).where(agent == name).order_by(AgentSignalRow.recorded_at.desc()).limit(1)).first()
+                if row is not None:
+                    latest.append(dict(row.payload))
+        return latest
+
+    def recent_signal_payloads(self, limit: int = 500, symbol: str | None = None, agent_name: str | None = None) -> list[dict]:
+        """Newest signals first, bounded, so the dashboard never pulls the whole table."""
+        with self._session_factory() as session:
+            query = select(AgentSignalRow).order_by(AgentSignalRow.recorded_at.desc())
+            if symbol:
+                query = query.where(AgentSignalRow.symbol == symbol.strip().upper())
+            if agent_name:
+                query = query.where(AgentSignalRow.payload["agent_name"].as_string() == agent_name)
+            return [dict(row.payload) for row in session.scalars(query.limit(limit))]
+
+    def signal_points_since(self, start: datetime, *, with_version: bool = False) -> list[tuple]:
+        """(signal_id, agent, horizon, symbol, timestamp, signal, confidence[, agent_version]) since start, without metadata."""
+        payload = AgentSignalRow.payload
+        columns = [
+            AgentSignalRow.signal_id,
+            payload["agent_name"].as_string(),
+            payload["horizon"].as_string(),
+            AgentSignalRow.symbol,
+            payload["timestamp"].as_string(),
+            payload["signal"].as_float(),
+            payload["confidence"].as_float(),
+        ]
+        if with_version:
+            columns.append(payload["agent_version"].as_string())
+        with self._session_factory() as session:
+            rows = session.execute(select(*columns).where(AgentSignalRow.recorded_at >= start))
+            return [tuple(row) for row in rows]
+
+    def closes_since(self, timeframe: Timeframe | str, start: datetime) -> dict[str, list[tuple[datetime, float]]]:
+        """(bar end, close) per symbol for bars ending at or after start, in one query, without building Candles."""
+        value = timeframe.value if isinstance(timeframe, Timeframe) else str(timeframe)
+        out: dict[str, list[tuple[datetime, float]]] = {}
+        with self._session_factory() as session:
+            rows = session.execute(
+                select(CandleRow.symbol, CandleRow.end, CandleRow.close).where(CandleRow.timeframe == value, CandleRow.end >= start)
+            )
+            for symbol, end, close in rows:
+                out.setdefault(symbol, []).append((as_utc(end), float(close)))
+        return out
+
+    def ohlcv(self, symbol: str, timeframe: Timeframe | str, start: datetime, end: datetime) -> list[tuple[datetime, datetime, float, float, float, float, float]]:
+        """(start, end, open, high, low, close, volume) for bars ending in [start, end], oldest first, without building Candles."""
+        value = timeframe.value if isinstance(timeframe, Timeframe) else str(timeframe)
+        with self._session_factory() as session:
+            rows = session.execute(
+                select(CandleRow.start, CandleRow.end, CandleRow.open, CandleRow.high, CandleRow.low, CandleRow.close, CandleRow.volume)
+                .where(CandleRow.symbol == symbol, CandleRow.timeframe == value, CandleRow.end >= start, CandleRow.end <= end)
+                .order_by(CandleRow.end)
+            )
+            return [(as_utc(b), as_utc(e), float(o), float(h), float(l), float(c), float(v)) for b, e, o, h, l, c, v in rows]
+
+    def proposal_support_since(self, start: datetime) -> list[tuple[list[str], bool]]:
+        """For each proposal since start: its supporting signal ids and whether risk approved it."""
+        with self._session_factory() as session:
+            rows = session.execute(
+                select(TradeProposalRow.payload, RiskDecisionRow.payload)
+                .outerjoin(RiskDecisionRow, RiskDecisionRow.proposal_id == TradeProposalRow.proposal_id)
+                .where(TradeProposalRow.as_of >= start)
+            )
+            return [
+                (list(proposal.get("supporting_signal_ids") or []), bool(decision) and decision.get("status") == "APPROVED")
+                for proposal, decision in rows
+            ]
 
     def list_signal_payloads(self) -> list[dict]:
         with self._session_factory() as session:
@@ -475,6 +573,193 @@ class CoreRepository:
             )
             session.commit()
 
+    def save_broker_token(self, broker: str, token: str, issued_at: datetime) -> None:
+        with self._session_factory() as session:
+            row = session.get(BrokerSessionRow, broker)
+            if row is None:
+                session.add(BrokerSessionRow(broker=broker, access_token=token, issued_at=as_utc(issued_at)))
+            else:
+                row.access_token = token
+                row.issued_at = as_utc(issued_at)
+            session.commit()
+
+    def broker_token(self, broker: str, *, not_before: datetime) -> str | None:
+        """The stored token if it was issued at or after ``not_before``."""
+        with self._session_factory() as session:
+            row = session.get(BrokerSessionRow, broker)
+            if row is None or as_utc(row.issued_at) < as_utc(not_before):
+                return None
+            return row.access_token
+
+    def broker_token_issued_at(self, broker: str) -> datetime | None:
+        with self._session_factory() as session:
+            row = session.get(BrokerSessionRow, broker)
+            return None if row is None else as_utc(row.issued_at)
+
+    def get_setting(self, key: str) -> dict | None:
+        with self._session_factory() as session:
+            row = session.get(UserSettingRow, key)
+            if row is None:
+                return None
+            return {"payload": dict(row.payload), "updated_at": as_utc(row.updated_at).isoformat(), "updated_by": row.updated_by}
+
+    def save_setting(self, key: str, payload: dict, *, updated_by: str, now: datetime) -> None:
+        with self._session_factory() as session:
+            row = session.get(UserSettingRow, key)
+            if row is None:
+                session.add(UserSettingRow(key=key, payload=payload, updated_at=as_utc(now), updated_by=updated_by))
+            else:
+                row.payload, row.updated_at, row.updated_by = payload, as_utc(now), updated_by
+            session.commit()
+
+    def save_strategy(self, strategy_id: str, name: str, payload: dict, now: datetime) -> None:
+        with self._session_factory() as session:
+            row = session.get(UserStrategyRow, strategy_id)
+            if row is None:
+                session.add(UserStrategyRow(strategy_id=strategy_id, name=name, payload=payload, created_at=as_utc(now), updated_at=as_utc(now)))
+            else:
+                row.name, row.payload, row.updated_at = name, payload, as_utc(now)
+            session.commit()
+
+    def list_strategies(self) -> list[dict]:
+        with self._session_factory() as session:
+            rows = session.scalars(select(UserStrategyRow).order_by(UserStrategyRow.updated_at.desc()))
+            return [
+                {"strategy_id": row.strategy_id, "name": row.name, "definition": dict(row.payload), "updated_at": as_utc(row.updated_at).isoformat()}
+                for row in rows
+            ]
+
+    def get_strategy(self, strategy_id: str) -> dict | None:
+        with self._session_factory() as session:
+            row = session.get(UserStrategyRow, strategy_id)
+            if row is None:
+                return None
+            return {"strategy_id": row.strategy_id, "name": row.name, "definition": dict(row.payload), "updated_at": as_utc(row.updated_at).isoformat()}
+
+    def delete_strategy(self, strategy_id: str) -> bool:
+        with self._session_factory() as session:
+            row = session.get(UserStrategyRow, strategy_id)
+            if row is None:
+                return False
+            session.delete(row)
+            session.commit()
+            return True
+
+    # Portfolio-manager reviews (core_db.reviews).
+    def insert_review(self, request) -> bool:
+        from core_db import reviews
+
+        return reviews.insert(self._session_factory, request)
+
+    def get_review(self, review_id: str) -> dict | None:
+        from core_db import reviews
+
+        return reviews.get(self._session_factory, review_id)
+
+    def review_for_proposal(self, proposal_id: str) -> dict | None:
+        from core_db import reviews
+
+        return reviews.for_proposal(self._session_factory, proposal_id)
+
+    def list_reviews(self, *, limit: int = 50, symbol: str | None = None) -> list[dict]:
+        from core_db import reviews
+
+        return reviews.recent(self._session_factory, limit=limit, symbol=symbol)
+
+    def claim_reviews(self, now: datetime, *, limit: int = 2) -> list:
+        from core_db import reviews
+
+        return reviews.claim(self._session_factory, now, limit=limit)
+
+    def append_review_step(self, review_id: str, step: dict, now: datetime) -> bool:
+        from core_db import reviews
+
+        return reviews.append_step(self._session_factory, review_id, step, now)
+
+    def complete_review(self, review, now: datetime) -> bool:
+        from core_db import reviews
+
+        return reviews.complete(self._session_factory, review, now)
+
+    def prune_history(self, now: datetime) -> dict[str, int]:
+        """Age out bulky history (see core_db.retention); keeps everything trades depend on."""
+        from core_db.retention import prune
+
+        return prune(self._session_factory, now)
+
+    def daily_equity_exists(self, session_id: str, trading_day: str) -> bool:
+        with self._session_factory() as session:
+            return session.get(DailyEquityRow, f"{session_id}:{trading_day}") is not None
+
+    def insert_daily_equity(self, session_id: str, trading_day: str, written_at: datetime, payload: dict) -> bool:
+        """Store one end-of-day book; an existing row for that session and day is kept, not overwritten."""
+        with self._session_factory() as session:
+            key = f"{session_id}:{trading_day}"
+            if session.get(DailyEquityRow, key) is not None:
+                return False
+            session.add(DailyEquityRow(daily_id=key, session_id=session_id, trading_day=trading_day, written_at=as_utc(written_at), payload=payload))
+            try:
+                session.commit()
+            except IntegrityError:
+                session.rollback()
+                return False
+            return True
+
+    def list_daily_equity(self, session_id: str) -> list[dict]:
+        with self._session_factory() as session:
+            rows = session.scalars(select(DailyEquityRow).where(DailyEquityRow.session_id == session_id).order_by(DailyEquityRow.trading_day))
+            return [{**dict(row.payload), "written_at": as_utc(row.written_at).isoformat()} for row in rows]
+
+    def insert_system_event(self, event_id: str, event_type: str, recorded_at: datetime, payload: dict) -> bool:
+        """Store one bus message. A repeated event_id is ignored and returns False."""
+        with self._session_factory() as session:
+            if session.get(SystemEventRow, event_id) is not None:
+                return False
+            session.add(SystemEventRow(event_id=event_id, event_type=event_type, recorded_at=as_utc(recorded_at), payload=payload))
+            try:
+                session.commit()
+            except IntegrityError:
+                session.rollback()
+                return False
+            return True
+
+    def get_system_event(self, event_id: str) -> dict | None:
+        with self._session_factory() as session:
+            row = session.get(SystemEventRow, event_id)
+            if row is None:
+                return None
+            return {"event_id": row.event_id, "event_type": row.event_type, "recorded_at": as_utc(row.recorded_at), "envelope": dict(row.payload)}
+
+    def list_system_events(
+        self,
+        *,
+        correlation_id: str | None = None,
+        event_type: str | None = None,
+        source: str | None = None,
+        limit: int = 200,
+    ) -> list[dict]:
+        """Newest bus messages first. Filters on the stored envelope."""
+        with self._session_factory() as session:
+            query = select(SystemEventRow).order_by(SystemEventRow.recorded_at.desc(), SystemEventRow.event_id)
+            if event_type is not None:
+                query = query.where(SystemEventRow.event_type == event_type)
+            if correlation_id is not None:
+                query = query.where(SystemEventRow.payload["correlation_id"].as_string() == correlation_id)
+            if source is None:
+                query = query.limit(limit)
+            rows = session.scalars(query)
+            found: list[dict] = []
+            for row in rows:
+                envelope = dict(row.payload)
+                if correlation_id is not None and envelope.get("correlation_id") != correlation_id:
+                    continue
+                if source is not None and envelope.get("source") != source and _agent_of(envelope) != source:
+                    continue
+                found.append({"event_id": row.event_id, "event_type": row.event_type, "recorded_at": as_utc(row.recorded_at), "envelope": envelope})
+                if len(found) >= limit:
+                    break
+            return found
+
     def signal_count(self) -> int:
         with self._session_factory() as session:
             return len(list(session.scalars(select(AgentSignalRow))))
@@ -494,17 +779,21 @@ class CoreRepository:
         """Latest stored bar for this symbol and timeframe. Stored bars are already complete."""
         parsed = timeframe if isinstance(timeframe, Timeframe) else Timeframe(timeframe)
         with self._session_factory() as session:
-            rows = list(
-                session.scalars(
-                    select(CandleRow).where(
-                        CandleRow.symbol == symbol.strip().upper(),
-                        CandleRow.timeframe == parsed.value,
-                    )
-                )
+            row = session.scalars(
+                select(CandleRow)
+                .where(CandleRow.symbol == symbol.strip().upper(), CandleRow.timeframe == parsed.value)
+                .order_by(CandleRow.end.desc())
+                .limit(1)
+            ).first()
+        return None if row is None else _candle(row)
+
+    def earliest_candle_end(self, symbol: str, timeframe: Timeframe | str) -> datetime | None:
+        parsed = timeframe if isinstance(timeframe, Timeframe) else Timeframe(timeframe)
+        with self._session_factory() as session:
+            value = session.scalar(
+                select(func.min(CandleRow.end)).where(CandleRow.symbol == symbol.strip().upper(), CandleRow.timeframe == parsed.value)
             )
-        if not rows:
-            return None
-        return _candle(max(rows, key=lambda item: as_utc(item.end)))
+        return None if value is None else as_utc(value)
 
     def insert_proposal(self, proposal: TradeProposal) -> bool:
         instrument = self._require_instrument(proposal.symbol)
@@ -606,7 +895,7 @@ class CoreRepository:
             row.payload = order.model_dump(mode="json")
             session.commit()
 
-    def commit_policy_order(self, order: Order, reserve: Decimal | None) -> bool:
+    def commit_policy_order(self, order: Order, reserve: Decimal | None, *, daily_limit: int = DAILY_ENTRY_LIMIT) -> bool:
         """Insert one order and, for a BUY hold, its cash reservation in one transaction.
 
         A new CNC entry is counted under its IST calendar date before the insert.
@@ -622,7 +911,7 @@ class CoreRepository:
                 _lock_entry_day(session, _ist_day(order.created_at))
             if session.scalar(select(OrderRow).where(OrderRow.proposal_id == order.proposal_id)) is not None:
                 return False
-            if counted and _entry_count(session, _ist_day(order.created_at)) >= DAILY_ENTRY_LIMIT:
+            if counted and _entry_count(session, _ist_day(order.created_at)) >= daily_limit:
                 return False
             session.add(
                 OrderRow(
@@ -1022,8 +1311,27 @@ class CoreRepository:
                 raise KeyError(session_id)
             target = book.session_id
             base = book.starting_cash if book.starting_cash is not None else starting_cash
-        snapshot = self.latest_snapshot(target)
-        return base if snapshot is None else snapshot.cash
+        # Cash is derived from the fill ledger, not from the latest snapshot: several fills on the same
+        # 5-minute bar share a snapshot timestamp, so "latest snapshot" is ambiguous and lost debits.
+        return base + self._fill_cash_delta(target)
+
+    def _fill_cash_delta(self, session_id: str | None) -> Decimal:
+        with self._session_factory() as session:
+            executions = list(session.scalars(select(ExecutionRow).where(ExecutionRow.session_id == session_id)))
+            if not executions:
+                return Decimal("0")
+            orders = {row.order_id: row for row in session.scalars(select(OrderRow).where(OrderRow.order_id.in_([row.order_id for row in executions])))}
+        delta = Decimal("0")
+        for row in executions:
+            execution = Execution.model_validate(dict(row.payload))
+            order = orders.get(row.order_id)
+            side = None if order is None else str(order.payload.get("side"))
+            notional = execution.price * execution.quantity
+            if side == "BUY":
+                delta -= notional + execution.fees
+            elif side == "SELL":
+                delta += notional - execution.fees
+        return delta
 
     def paper_running(self) -> bool:
         with self._session_factory() as session:
@@ -1404,3 +1712,11 @@ def _candle(row: CandleRow) -> Candle:
         start=as_utc(row.start),
         end=as_utc(row.end),
     )
+
+
+def _agent_of(envelope: dict) -> str | None:
+    payload = envelope.get("payload")
+    if isinstance(payload, dict):
+        name = payload.get("agent_name")
+        return str(name) if name is not None else None
+    return None

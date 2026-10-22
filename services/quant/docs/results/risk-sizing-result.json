@@ -1,0 +1,81 @@
+{
+  "protocol": "services/quant/docs/risk-sizing-protocol.md",
+  "period": {
+    "first": "2024-11-22",
+    "last": "2026-09-17"
+  },
+  "books": {
+    "all_stocks": {
+      "equal": {
+        "windows": 46,
+        "annualized_net": -0.07680714531004654,
+        "annualized_vol": 0.11742037578786241,
+        "sharpe": -0.654121099465822,
+        "max_drawdown": 0.1530136773770555,
+        "total_compounded": -0.14277390479195717
+      },
+      "risk": {
+        "windows": 46,
+        "annualized_net": -0.09257412456083404,
+        "annualized_vol": 0.11322939656120577,
+        "sharpe": -0.8175803048706827,
+        "max_drawdown": 0.17147151710092656,
+        "total_compounded": -0.16666269592784244
+      },
+      "sharpe_improvement_90": [
+        -0.3028804574142955,
+        -0.03182495378289538
+      ],
+      "risk_sizing_helps": false,
+      "risk_weighted_profitable": false
+    },
+    "momentum_top6": {
+      "equal": {
+        "windows": 46,
+        "annualized_net": -0.0474679137089258,
+        "annualized_vol": 0.14138790709813298,
+        "sharpe": -0.33572824354758846,
+        "max_drawdown": 0.20510641036409383,
+        "total_compounded": -0.10010122650923492
+      },
+      "risk": {
+        "windows": 46,
+        "annualized_net": -0.050660569349217796,
+        "annualized_vol": 0.14275145684099216,
+        "sharpe": -0.35488653125023817,
+        "max_drawdown": 0.2159535417046251,
+        "total_compounded": -0.10571053038406375
+      },
+      "sharpe_improvement_90": [
+        -0.22686818105478374,
+        0.21405077355995694
+      ],
+      "risk_sizing_helps": false,
+      "risk_weighted_profitable": false
+    },
+    "model_calm24": {
+      "equal": {
+        "windows": 46,
+        "annualized_net": -0.10450917139548885,
+        "annualized_vol": 0.11686291771930274,
+        "sharpe": -0.8942885684791234,
+        "max_drawdown": 0.19161343081148874,
+        "total_compounded": -0.18547394719583066
+      },
+      "risk": {
+        "windows": 46,
+        "annualized_net": -0.10520403244428018,
+        "annualized_vol": 0.11566802825570897,
+        "sharpe": -0.9095342423552351,
+        "max_drawdown": 0.19124091533905108,
+        "total_compounded": -0.186313354706515
+      },
+      "sharpe_improvement_90": [
+        -0.059238392843374704,
+        0.0252204033816333
+      ],
+      "risk_sizing_helps": false,
+      "risk_weighted_profitable": false
+    }
+  }
+}

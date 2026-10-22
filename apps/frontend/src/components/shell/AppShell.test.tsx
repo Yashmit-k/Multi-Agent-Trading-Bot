@@ -15,6 +15,9 @@ describe("StockX branding", () => {
     );
     const brand = screen.getByTestId("brand-mark");
     expect(brand.textContent).toBe("StockX");
+    const logo = screen.getByTestId("brand-logo");
+    expect(logo.getAttribute("src")).toBe("/logo.svg");
+    expect(logo.getAttribute("alt")).toBe("");
     expect(screen.getByTestId("mode-banner").textContent).toContain("PAPER TRADING");
     expect(screen.getByTestId("kill-chip").textContent).toContain("disarmed");
     expect(screen.queryByText(/flexi/i)).toBeNull();

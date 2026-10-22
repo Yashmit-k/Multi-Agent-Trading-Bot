@@ -51,6 +51,10 @@ def test_event_type_and_channel_vocabulary() -> None:
         "portfolio.updated",
         "system.alert",
         "agent.heartbeat",
+        "agent.request",
+        "review.requested",
+        "review.step",
+        "review.completed",
     }
     assert {item.value for item in RedisChannel} == {
         "market.events",
@@ -62,6 +66,7 @@ def test_event_type_and_channel_vocabulary() -> None:
         "order.events",
         "portfolio.events",
         "system.events",
+        "review.events",
     }
     assert set(CHANNEL_FOR_EVENT) == set(EventType)
     assert channel_for("agent.signal") == RedisChannel.AGENT_EVENTS

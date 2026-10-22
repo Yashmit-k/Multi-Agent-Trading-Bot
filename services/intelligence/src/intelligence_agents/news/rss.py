@@ -371,9 +371,10 @@ def _parse_date(value: str | None, fallback: datetime | None) -> datetime | None
 
 
 def _ensure_tz(parsed: datetime) -> datetime:
+    """Store every stamp in UTC so ISO string order matches time order."""
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=timezone.utc)
-    return parsed
+    return parsed.astimezone(timezone.utc)
 
 
 def _safe_host(url: str) -> str:

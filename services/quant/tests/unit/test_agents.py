@@ -163,3 +163,56 @@ def test_engine_key_snapshot_matches_committed() -> None:
     assert "rsi_14" in keys
     assert "return_1" in keys
     assert "last_volume" in keys
+
+
+def test_volume_agent_grades_its_conviction() -> None:
+    from quant_agents.agents.volume import VolumeAgent
+    from quant_agents.scoring import score_votes
+
+    agent = VolumeAgent.__new__(VolumeAgent)
+
+    class View:
+        def __init__(self, features):
+            self._features = features
+
+        def get(self, name):
+            return self._features.get(name)
+
+    def score(features):
+        decision = agent.interpret(View(features), {})
+        return score_votes(decision.votes, required=VolumeAgent.required_features, missing=())
+
+    ordinary = score({"last_volume": 120.0, "volume_mean": 100.0, "return_1": 0.01, "relative_volume": 1.2, "price_volume_corr": 0.1})
+    surge = score({"last_volume": 250.0, "volume_mean": 100.0, "return_1": 0.03, "relative_volume": 2.5, "price_volume_corr": 0.44})
+    extreme = score({"last_volume": 400.0, "volume_mean": 100.0, "return_1": 0.04, "relative_volume": 4.0, "price_volume_corr": 0.6})
+    selloff = score({"last_volume": 250.0, "volume_mean": 100.0, "return_1": -0.03, "relative_volume": 2.5, "price_volume_corr": 0.44})
+    quiet = score({"last_volume": 80.0, "volume_mean": 100.0, "return_1": 0.02, "relative_volume": 0.8, "price_volume_corr": 0.5})
+    assert ordinary.signal == 0.25 and ordinary.confidence == 0.25
+    assert surge.signal == 0.75
+    assert extreme.signal == 1.0
+    assert selloff.signal == -0.75
+    assert quiet.signal == 0.0
+
+
+def test_regime_agent_grades_market_tilt() -> None:
+    from quant_agents.agents.regime import RegimeAgent
+    from quant_agents.scoring import score_votes
+
+    class View:
+        def __init__(self, features):
+            self._features = features
+
+        def get(self, name):
+            return self._features.get(name)
+
+    stock = View({"ema_12": 1.0, "ema_26": 0.9, "sma_10": 1.0, "sma_20": 0.9, "volatility_percentile": 50.0})
+    agent = RegimeAgent.__new__(RegimeAgent)
+
+    def score(nifty, vix):
+        decision = agent.interpret(stock, {"NIFTY50": View(nifty), "INDIAVIX": View(vix)})
+        return score_votes(decision.votes, required=RegimeAgent.required_features, missing=())
+
+    all_bullish = score({"return_1": 0.01, "ema_12": 2.0, "ema_26": 1.0}, {"return_1": -0.05})
+    mixed = score({"return_1": 0.01, "ema_12": 1.0, "ema_26": 2.0}, {"return_1": 0.05})
+    assert all_bullish.signal == 1.0
+    assert abs(mixed.signal - (-1 / 3)) < 1e-9

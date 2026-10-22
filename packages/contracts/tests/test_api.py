@@ -23,7 +23,7 @@ def test_closed_vocabularies() -> None:
     }
     assert {item.value for item in Horizon} == {"INTRADAY", "SWING", "LONG_TERM"}
     assert {item.value for item in TradingMode} == {"BACKTEST", "PAPER", "SHADOW", "LIVE"}
-    assert __version__ == "1.0.0"
+    assert __version__ == "1.1.0"
 
 
 def test_signal_endpoint_and_catalog() -> None:
@@ -42,7 +42,7 @@ def test_signal_endpoint_and_catalog() -> None:
     catalog = client.get("/api/v1/system/contracts")
     assert catalog.status_code == 200
     body = catalog.json()
-    assert body["contract_version"] == "1.0.0"
+    assert body["contract_version"] == "1.1.0"
     assert body["schema_versions"]["AgentSignal"] == "1.0"
     assert body["event_versions"]["agent.signal"] == "1.0"
     assert "technical" in body["supported_agents"]

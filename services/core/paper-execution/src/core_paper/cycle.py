@@ -9,7 +9,7 @@ path uses the versioned Zerodha schedule and does not fall back to 2 bp.
 
 import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Protocol
 
@@ -20,15 +20,20 @@ from contracts.schemas.execution import Execution
 from contracts.schemas.order import Order
 from contracts.schemas.portfolio import PortfolioSnapshot
 from contracts.schemas.position import Position
+from contracts.schemas.review import ReviewVerdict
 from core_db.repository import DAILY_ENTRY_LIMIT, CoreRepository
+from core_risk.settings import DEFAULTS as DEFAULT_SETTINGS, RiskSettings, parse_settings
 from core_decision import build_proposal, proposal_id_for
 from core_fusion import fuse
 from core_paper.costs import CostSchedule, fee_on, slipped_price
 from core_paper.execute import MAX_NOTIONAL, queue_entry, settle_entries, settle_sell
+from core_paper.review_gate import review_gate
+from core_paper.risk_inputs import trade_context
 from core_paper.limits import PRODUCT_CNC, SELL_POLICY_VERSION
 from core_paper.charges import ZERODHA_EQUITY_RI
 from core_paper.trading_calendar import paper_test_entry_window
 from core_risk import assess
+from core_risk.portfolio import PortfolioContext
 
 HORIZON_TIMEFRAME: dict[Horizon, Timeframe] = {
     Horizon.INTRADAY: Timeframe.M5,
@@ -80,6 +85,8 @@ def run_paper_cycle(
     require_universe_fresh: bool = False,
     broker_authenticated: bool = True,
     allow_test_extension: bool = False,
+    portfolio_limits: bool = True,
+    manager_review: bool = False,
 ) -> int:
     if max_new_orders is not None and max_new_orders < 0:
         raise ValueError("max_new_orders must be zero or positive")
@@ -93,12 +100,14 @@ def run_paper_cycle(
     costs = paper_schedule(schedule)
     _settle_open_orders(repository, publisher, costs, starting_cash, now=moment)
     _monitor_brackets(repository, publisher, costs, starting_cash, mode)
+    _manage_strategy_exits(repository, publisher, costs, starting_cash, mode, moment)
     _settle_open_orders(repository, publisher, costs, starting_cash, now=moment)
     if repository.kill_switch_armed():
         _queue_flattens(repository, publisher, costs, starting_cash, mode)
         _settle_open_orders(repository, publisher, costs, starting_cash, now=moment)
         return 0
     written = 0
+    settings = load_risk_settings(repository)
     blocked = _new_entry_block(
         repository,
         moment,
@@ -107,14 +116,16 @@ def run_paper_cycle(
         require_universe_fresh=require_universe_fresh,
         broker_authenticated=broker_authenticated,
         allow_test_extension=allow_test_extension,
+        settings=settings,
     )
     if blocked is not None:
         logger.info("new_entries_blocked reason=%s", blocked)
         return written
     created_orders = 0
     capped = False
+    applied = _applied_strategy(repository)
     extension = paper_test_entry_window(moment) if allow_test_extension and mode == TradingMode.PAPER else None
-    for instrument in repository.list_instruments():
+    for instrument in _strongest_first(repository, repository.list_instruments(), moment, weights):
         if capped:
             break
         for horizon, timeframe in HORIZON_TIMEFRAME.items():
@@ -122,8 +133,9 @@ def run_paper_cycle(
                 capped = True
                 break
             candle = repository.latest_candle(instrument.symbol, timeframe)
-            if candle is None or repository.held_quantity(instrument.symbol) > 0:
+            if candle is None:
                 continue
+            # Held stocks are still scored so a bearish turn can exit them; they only skip new BUYs below.
             if require_fresh and not _candle_is_fresh(candle.end, timeframe, moment):
                 continue
             as_of = candle.end.astimezone(timezone.utc)
@@ -136,20 +148,54 @@ def run_paper_cycle(
                 proposal = build_proposal(aggregate, candle, as_of, session_id=book.session_id)
                 if proposal is None:
                     continue
-                proposal = _sized(proposal, repository.available_cash(starting_cash), costs)
-                proposal = proposal.model_copy(update={"metadata": {**proposal.metadata, "stops_monitored": True, "same_bar_exit": "stop_first"}})
+                if proposal.side == Side.BUY and (
+                    Decimal(str(proposal.aggregated_signal)) < settings.min_entry_signal or Decimal(str(proposal.aggregated_confidence)) < settings.min_entry_confidence
+                ):
+                    continue  # fewer, stronger entries: a weak BUY is not worth its charges (exits keep the lower bar)
+                # Long-only book: a bearish view on a stock we do not hold is not an order to propose.
+                held = repository.held_quantity(instrument.symbol)
+                if proposal.side == Side.SELL and held <= 0:
+                    continue
+                if proposal.side == Side.SELL and horizon != holding_horizon(repository, instrument.symbol):
+                    continue  # a swing holding is not sold by a 5-minute flicker, nor an intraday one by the daily view
+                if proposal.side == Side.BUY and held > 0:
+                    continue  # one position per stock: no adding to an existing holding
+                if proposal.side == Side.BUY and applied and settings.strategy_mode != "alongside":
+                    continue  # an applied Strategy-lab strategy replaces agent entries, unless set to trade alongside them
+                if proposal.side == Side.SELL and applied and _is_strategy_position(repository, instrument.symbol):
+                    continue  # the strategy manages its own exits
+                if proposal.side == Side.BUY and horizon == Horizon.INTRADAY and not settings.intraday_auto_entries:
+                    continue  # intraday entries are off (Settings); intraday exits of holdings still run
+                if proposal.side == Side.SELL:
+                    proposal = proposal.model_copy(update={"quantity": held})  # a signal exit sells the whole holding
+                proposal = _with_brackets(_sized(proposal, repository.available_cash(starting_cash), costs, settings.max_order_notional), settings)
+                proposal = proposal.model_copy(update={"metadata": {**proposal.metadata, "stops_monitored": True, "same_bar_exit": "stop_first", "decided_at": moment.isoformat()}})
                 if repository.insert_proposal(proposal):
                     _publish(publisher, EventType.DECISION_CREATED, f"decision.created:{proposal.proposal_id}", as_of, proposal.proposal_id, proposal)
                     written += 1
             if repository.risk_for_proposal(proposal.proposal_id) is None:
+                # An agent BUY goes to the LLM portfolio manager first; it may shrink or veto it, never enlarge it.
+                gate = review_gate(repository, publisher, proposal, moment) if manager_review and proposal.side == Side.BUY and settings.manager_review else None
+                if gate is not None and gate.wait:
+                    continue
+                assessed = proposal
+                if gate is not None and gate.verdict == ReviewVerdict.REDUCE:
+                    assessed = proposal.model_copy(update={"quantity": max(1, int(proposal.quantity * gate.size_fraction))})
                 members = {item.symbol for item in repository.members_at(as_of)}
                 decision = assess(
-                    proposal,
+                    assessed,
                     mode=mode,
                     in_universe=proposal.symbol in members,
                     cash=repository.available_cash(starting_cash),
                     held_quantity=repository.held_quantity(proposal.symbol),
                     timestamp=as_of,
+                    max_notional=settings.max_order_notional,
+                    portfolio=portfolio_context(repository, starting_cash, moment, settings) if portfolio_limits else None,
+                    # Intraday only: on swing, risk-off days were followed by the best next-day returns (tuning study).
+                    market_ok=None if proposal.side != Side.BUY or horizon != Horizon.INTRADAY else not market_risk_off(repository, instrument.symbol, horizon, as_of),
+                    manager_ok=None if gate is None or gate.verdict in {None, ReviewVerdict.UNAVAILABLE} else gate.verdict != ReviewVerdict.VETO,
+                    manager_note="" if gate is None else gate.critique,
+                    trade=trade_context(repository, assessed, starting_cash=starting_cash, now=moment, settings=settings) if proposal.side == Side.BUY and portfolio_limits else None,
                 )
                 if repository.insert_risk_decision(decision):
                     event_type = EventType.RISK_APPROVED if decision.status == RiskStatus.APPROVED else EventType.RISK_REJECTED
@@ -160,13 +206,72 @@ def run_paper_cycle(
                 continue
             if repository.order_for_proposal(proposal.proposal_id) is not None:
                 continue
+            if proposal.side == Side.SELL:
+                # Agents turned bearish on a held stock: sell at the next bar's open, like a stop or target exit.
+                _queue(repository, proposal, as_of, reason="signal", fill_at="next_open")
+                continue
             before = {item.order_id for item in repository.list_orders()}
-            queue_entry(repository, proposal, as_of, entry_window=extension)
-            created_orders += len({item.order_id for item in repository.list_orders()} - before)
+            reduced = decision.approved_quantity if decision.approved_quantity < proposal.quantity else None  # a manager REDUCE
+            queue_entry(repository, proposal, as_of, entry_window=extension, placed_at=moment, cap=settings.max_order_notional, daily_limit=settings.daily_entry_limit, quantity_limit=reduced)
+            queued = [item for item in repository.list_orders() if item.order_id not in before]
+            created_orders += len(queued)
+            for order in queued:
+                event_type = _order_event(order)
+                _publish(publisher, event_type, f"{event_type.value}:{order.order_id}", as_of, proposal.proposal_id, order)
+    if applied and not capped:
+        from core_paper.strategy_live import strategy_entries
+
+        try:
+            strategy_entries(repository, publisher, starting_cash=starting_cash, moment=moment, settings=settings, mode=mode, weights=weights, manager_review=manager_review)
+        except Exception:
+            logger.exception("strategy_entries_failed")
     if capped:
         logger.info("new_order_cap cap=%s created=%s", max_new_orders, created_orders)
     _settle_open_orders(repository, publisher, costs, starting_cash, now=moment)
     return written
+
+
+_PENDING = {OrderStatus.CREATED, OrderStatus.VALIDATED, OrderStatus.RISK_APPROVED, OrderStatus.SUBMITTED, OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED}
+
+
+def load_risk_settings(repository: CoreRepository) -> RiskSettings:
+    """The user's saved paper risk settings over the defaults; a bad stored value falls back to its default."""
+    stored = repository.get_setting("risk")
+    return parse_settings(stored["payload"] if stored else None, strict=False)
+
+
+def _with_brackets(proposal, settings: RiskSettings):
+    """Stop and target from the user's percentages, around the same entry price as before."""
+    if proposal.side != Side.BUY or (settings.stop_loss_pct == DEFAULT_SETTINGS.stop_loss_pct and settings.take_profit_pct == DEFAULT_SETTINGS.take_profit_pct):
+        return proposal
+    entry = proposal.entry_price
+    cent = Decimal("0.01")
+    stop = (entry * (1 - settings.stop_loss_pct / 100)).quantize(cent)
+    target = (entry * (1 + settings.take_profit_pct / 100)).quantize(cent)
+    return proposal.model_copy(update={"stop_loss": stop, "take_profit": target, "metadata": {**proposal.metadata, "brackets": "user_settings"}})
+
+
+def portfolio_context(repository: CoreRepository, starting_cash: Decimal, moment: datetime, settings: RiskSettings | None = None) -> PortfolioContext:
+    """The active book for portfolio risk checks: held shares at cost plus BUYs queued but not filled."""
+    exposure: dict[str, Decimal] = {}
+    for position in repository.list_positions():
+        if position.quantity > 0:
+            exposure[position.symbol] = exposure.get(position.symbol, Decimal("0")) + position.average_price * position.quantity
+    for order in repository.list_orders():
+        if order.side == Side.BUY and order.status in _PENDING:
+            price = order.limit_price or Decimal(str(order.metadata.get("reference_price") or "0"))
+            exposure[order.symbol] = exposure.get(order.symbol, Decimal("0")) + price * order.quantity
+    limits = settings or DEFAULT_SETTINGS
+    return PortfolioContext(
+        starting_cash=starting_cash,
+        exposure=exposure,
+        entries_today=repository.daily_entry_count(moment),
+        max_positions=limits.max_open_positions,
+        max_per_sector=limits.max_per_sector,
+        max_exposure_fraction=limits.max_exposure_fraction,
+        max_per_stock=limits.max_per_stock,
+        daily_entry_limit=limits.daily_entry_limit,
+    )
 
 
 class CycleRefused(RuntimeError):
@@ -174,6 +279,7 @@ class CycleRefused(RuntimeError):
 
 
 REQUIRED_MEMBER_COUNT = 50
+FEED_LAG_TOLERANCE = timedelta(minutes=5)
 
 
 def _new_entry_block(
@@ -185,8 +291,12 @@ def _new_entry_block(
     require_universe_fresh: bool,
     broker_authenticated: bool,
     allow_test_extension: bool,
+    settings: RiskSettings | None = None,
 ) -> str | None:
     """Why this cycle must not submit a new buy. Settlement has already run."""
+    limits = settings or DEFAULT_SETTINGS
+    if not limits.auto_entries:
+        return "auto_entries_off"
     if not broker_authenticated:
         return "broker_unauthenticated"
     if enforce_entry_window:
@@ -199,7 +309,7 @@ def _new_entry_block(
             require_fresh_constituents(repository, now)
         except CycleRefused as exc:
             return str(exc)
-    if repository.daily_entry_count(now) >= DAILY_ENTRY_LIMIT:
+    if repository.daily_entry_count(now) >= limits.daily_entry_limit:
         return "daily_entry_cap"
     return None
 
@@ -213,14 +323,18 @@ def require_fresh_constituents(repository: CoreRepository, now: datetime) -> Non
     members = repository.members_at(now)
     if len(members) != REQUIRED_MEMBER_COUNT:
         raise CycleRefused(f"NIFTY50 membership is {len(members)}, required {REQUIRED_MEMBER_COUNT}")
+    # The market-wide feed check tolerates one bar of lag: the collector walks 50 symbols in turn, so a
+    # strict "every symbol has the newest bar" test is false for most of each 5-minute window. The symbol
+    # being traded still needs its own newest bar (require_fresh in run_paper_cycle).
+    tolerance = now - FEED_LAG_TOLERANCE
     for item in members:
         bar = repository.latest_candle(item.symbol, Timeframe.M5)
-        if bar is None or not _candle_is_fresh(bar.end, Timeframe.M5, now):
+        if bar is None or not _candle_is_fresh(bar.end, Timeframe.M5, tolerance):
             raise CycleRefused(f"stale or missing 5m bar for {item.symbol}")
 
 
 def require_ordinary_entry_window(now: datetime) -> None:
-    """Ordinary cash session, 09:20 inclusive to 10:30 exclusive IST."""
+    """Ordinary cash session, 09:20 inclusive to ENTRY_END exclusive IST (10:30 by default)."""
     require_entry_window(now, mode=TradingMode.PAPER, allow_extension=False)
 
 
@@ -228,12 +342,13 @@ def require_entry_window(now: datetime, *, mode: TradingMode, allow_extension: b
     """New-entry gate. The 11:00 end applies only to the opted-in 13 October 2026 paper test."""
     from datetime import time
 
-    from core_paper.trading_calendar import ENTRY_END, IST, paper_test_entry_window, session_for
+    from core_paper.trading_calendar import ENTRY_END, ENTRY_START, IST, paper_test_entry_window, session_for
 
     local = now.astimezone(IST)
     window = session_for(local.date())
-    if window is None or (window.entry_start, window.entry_end) != (time(9, 20), time(10, 30)):
-        raise CycleRefused("session is not an ordinary 09:20-10:30 entry window")
+    label = f"{ENTRY_START.strftime('%H:%M')}-{ENTRY_END.strftime('%H:%M')}"
+    if window is None or (window.entry_start, window.entry_end) != (ENTRY_START, ENTRY_END):
+        raise CycleRefused(f"session is not an ordinary {label} entry window")
     end = ENTRY_END
     if allow_extension and mode == TradingMode.PAPER:
         extended = paper_test_entry_window(now)
@@ -243,15 +358,15 @@ def require_entry_window(now: datetime, *, mode: TradingMode, allow_extension: b
     if not (window.entry_start_at <= local < end_at):
         if end == time(11, 0):
             raise CycleRefused("outside the 13 October 2026 paper entry window ending 11:00 IST")
-        raise CycleRefused("outside 09:20 inclusive to 10:30 exclusive IST")
+        raise CycleRefused(f"outside {label.replace('-', ' inclusive to ')} exclusive IST")
 
 
-def _sized(proposal, cash: Decimal, schedule: CostSchedule):
+def _sized(proposal, cash: Decimal, schedule: CostSchedule, max_notional: Decimal = MAX_NOTIONAL):
     from core_paper.backtest import _shares
 
     if proposal.side != Side.BUY:
         return proposal
-    quantity = _shares(cash, proposal.entry_price, MAX_NOTIONAL, schedule)
+    quantity = _shares(cash, proposal.entry_price, max_notional, schedule)
     if quantity < 1:
         return proposal
     return proposal.model_copy(
@@ -295,12 +410,24 @@ def _queue(repository: CoreRepository, proposal, as_of: datetime, *, reason: str
 
 def _settle_open_orders(repository: CoreRepository, publisher: EventPublisher, schedule: CostSchedule, starting_cash: Decimal, *, now: datetime | None = None) -> None:
     moment = now or datetime.now(timezone.utc)
+    before = {item.execution_id for item in repository.list_executions()}
     for order_id in settle_entries(repository, starting_cash=starting_cash, now=moment):
         logger.info("legacy_order_review_required order_id=%s", order_id)
     for order in repository.list_orders():
         if order.metadata.get("policy_version") == SELL_POLICY_VERSION:
             settle_sell(repository, order, starting_cash=starting_cash, now=moment)
-    del publisher, schedule
+    del schedule
+    fresh = [item for item in repository.list_executions() if item.execution_id not in before]
+    if not fresh:
+        return
+    orders = {item.order_id: item for item in repository.list_orders()}
+    for execution in fresh:
+        order = orders.get(execution.order_id)
+        correlation = order.proposal_id if order is not None else execution.order_id
+        _publish(publisher, EventType.ORDER_FILLED, f"order.filled:{execution.execution_id}", execution.executed_at, correlation, execution)
+        position = repository.position_for(execution.symbol)
+        if position is not None:
+            _publish(publisher, EventType.POSITION_UPDATED, f"position.updated:{execution.execution_id}", execution.executed_at, correlation, position)
 
 
 def _monitor_brackets(repository, publisher, schedule, starting_cash, mode: TradingMode) -> None:
@@ -309,6 +436,8 @@ def _monitor_brackets(repository, publisher, schedule, starting_cash, mode: Trad
     for position in repository.list_positions():
         if position.quantity <= 0:
             continue
+        if _is_strategy_position(repository, position.symbol):
+            continue  # managed by core_paper.strategy_live (targets, breakeven, trailing, time exits)
         entry = _entry_execution(repository, position.symbol)
         if entry is None:
             continue
@@ -325,6 +454,47 @@ def _monitor_brackets(repository, publisher, schedule, starting_cash, mode: Trad
             continue
         price = stop if reason == "stop" else target
         _exit_proposal(repository, publisher, position, price, bar.end, reason, schedule, starting_cash, mode, fill_at="level")
+
+
+def market_risk_off(repository: CoreRepository, symbol: str, horizon: Horizon, as_of: datetime) -> bool:
+    """Risk-off when the newest valid Regime signal shows NIFTY in a downtrend *and* India VIX rising.
+
+    Regime reads only market-wide data, so it is a filter on new agent buys, not a per-stock vote
+    (its fusion weight is 0). No valid Regime signal: not risk-off (the filter fails open).
+    """
+    moment = as_of.astimezone(timezone.utc)
+    candidates = [
+        item
+        for item in repository.signals_for(symbol)
+        if item.agent_name.value == "regime" and item.horizon == horizon and item.timestamp.astimezone(timezone.utc) <= moment and item.valid_until.astimezone(timezone.utc) >= moment
+    ]
+    if not candidates:
+        return False
+    newest = max(candidates, key=lambda item: item.timestamp)
+    votes = {str(vote.get("name")): vote.get("value") for vote in newest.metadata.get("votes", []) if isinstance(vote, dict)}
+    return votes.get("index_trend") == -1 and votes.get("fear_gauge") == -1
+
+
+def _applied_strategy(repository: CoreRepository) -> bool:
+    from core_paper.strategy_live import active_strategy
+
+    return active_strategy(repository) is not None
+
+
+def _is_strategy_position(repository: CoreRepository, symbol: str) -> bool:
+    from core_paper.strategy_live import is_strategy_position
+
+    return is_strategy_position(repository, symbol)
+
+
+def _manage_strategy_exits(repository, publisher, schedule, starting_cash, mode: TradingMode, moment: datetime) -> None:
+    from core_paper.strategy_live import expire_strategy_orders, manage_strategy_positions
+
+    try:
+        expire_strategy_orders(repository, moment)
+        manage_strategy_positions(repository, publisher, schedule, starting_cash, mode, moment)
+    except Exception:
+        logger.exception("strategy_exits_failed")
 
 
 def _queue_flattens(repository, publisher, schedule, starting_cash, mode: TradingMode) -> None:
@@ -451,6 +621,33 @@ def _timeframe_for_symbol(repository: CoreRepository, symbol: str) -> Timeframe:
     return Timeframe.D1
 
 
+def holding_horizon(repository: CoreRepository, symbol: str) -> Horizon:
+    """The horizon the open holding was bought for. Manual and unknown buys count as SWING (CNC delivery)."""
+    executed = {item.order_id for item in repository.list_executions() if item.symbol == symbol}
+    buys = [order for order in repository.list_orders() if order.symbol == symbol and order.side == Side.BUY and order.order_id in executed]
+    if not buys:
+        return Horizon.SWING
+    newest = max(buys, key=lambda order: order.created_at)
+    proposal = repository.get_proposal(newest.proposal_id) if newest.metadata.get("reason") == "entry" else None
+    return proposal.horizon if proposal is not None else Horizon.SWING
+
+
+def _strongest_first(repository: CoreRepository, instruments, moment: datetime, weights) -> list:  # type: ignore[no-untyped-def]
+    """Visit the stocks with the strongest fused BUY view first, so a daily cap keeps the best entries, not
+    the first ones alphabetically. Exits are unaffected: every stock is still visited."""
+    def strength(instrument) -> float:  # type: ignore[no-untyped-def]
+        best = 0.0
+        signals = repository.signals_for(instrument.symbol)
+        for horizon in HORIZON_TIMEFRAME:
+            aggregate = fuse(signals, horizon=horizon, as_of=moment, weights=weights)
+            if aggregate is not None:
+                best = max(best, aggregate.aggregated_signal * aggregate.aggregated_confidence)
+        return best
+
+    scored = [(strength(item), item.symbol, item) for item in instruments]
+    return [item for _, _, item in sorted(scored, key=lambda row: (-row[0], row[1]))]
+
+
 def _entry_execution(repository: CoreRepository, symbol: str):
     rows = [item for item in repository.list_executions() if item.symbol == symbol and item.metadata.get("reason") == "entry"]
     return rows[-1] if rows else None
@@ -559,6 +756,14 @@ def _publish(publisher: EventPublisher, event_type: EventType, event_id: str, ti
         payload=payload,  # type: ignore[arg-type]
     )
     publisher.publish(channel_for(event_type).value, envelope.model_dump_json())
+
+
+def _order_event(order: Order) -> EventType:
+    if order.status == OrderStatus.CREATED:
+        return EventType.ORDER_CREATED
+    if order.status == OrderStatus.REJECTED:
+        return EventType.ORDER_REJECTED
+    return EventType.ORDER_UPDATED
 
 
 def _digest(*parts: str) -> str:

@@ -1,0 +1,408 @@
+{
+  "protocol": "services/quant/docs/intraday-selective-protocol.md",
+  "grid": [
+    {
+      "threshold": 0.4,
+      "hold": 12,
+      "selection": "all",
+      "train": {
+        "trades": 11545,
+        "win_rate": 0.32715461238631444,
+        "net_per_trade": -39.58007781312942,
+        "total_net": -456951.9983525792,
+        "mean_session_net": -1488.4429913764795,
+        "session_low90": -1621.1844374085128,
+        "first_half": -223612.66408139197,
+        "second_half": -233339.3342711872,
+        "exits": {
+          "hold": 11271,
+          "square_off": 130,
+          "stop": 144
+        }
+      }
+    },
+    {
+      "threshold": 0.4,
+      "hold": 12,
+      "selection": "top1",
+      "train": {
+        "trades": 6062,
+        "win_rate": 0.31689211481359286,
+        "net_per_trade": -36.26883931322778,
+        "total_net": -219861.70391678682,
+        "mean_session_net": -716.1619020090776,
+        "session_low90": -760.4208715831302,
+        "first_half": -115470.18789459715,
+        "second_half": -104391.51602218967,
+        "exits": {
+          "hold": 5840,
+          "square_off": 158,
+          "stop": 64
+        }
+      }
+    },
+    {
+      "threshold": 0.4,
+      "hold": 24,
+      "selection": "all",
+      "train": {
+        "trades": 11545,
+        "win_rate": 0.370376786487657,
+        "net_per_trade": -36.969894344576225,
+        "total_net": -426817.4302081325,
+        "mean_session_net": -1390.2847889515717,
+        "session_low90": -1554.8609077303493,
+        "first_half": -232846.61269496108,
+        "second_half": -193970.8175131714,
+        "exits": {
+          "hold": 10536,
+          "square_off": 662,
+          "stop": 347
+        }
+      }
+    },
+    {
+      "threshold": 0.4,
+      "hold": 24,
+      "selection": "top1",
+      "train": {
+        "trades": 6062,
+        "win_rate": 0.3647311118442758,
+        "net_per_trade": -35.27573953792281,
+        "total_net": -213841.53307888805,
+        "mean_session_net": -696.5522250126647,
+        "session_low90": -768.2962680251687,
+        "first_half": -113159.94577396003,
+        "second_half": -100681.58730492805,
+        "exits": {
+          "hold": 5100,
+          "square_off": 833,
+          "stop": 129
+        }
+      }
+    },
+    {
+      "threshold": 0.4,
+      "hold": "15:15",
+      "selection": "all",
+      "train": {
+        "trades": 11545,
+        "win_rate": 0.3982676483326115,
+        "net_per_trade": -39.270612711605,
+        "total_net": -453379.2237554797,
+        "mean_session_net": -1476.8052891057969,
+        "session_low90": -1761.3710315161436,
+        "first_half": -247554.25265311426,
+        "second_half": -205824.97110236538,
+        "exits": {
+          "square_off": 10570,
+          "stop": 975
+        }
+      }
+    },
+    {
+      "threshold": 0.4,
+      "hold": "15:15",
+      "selection": "top1",
+      "train": {
+        "trades": 6062,
+        "win_rate": 0.38799076212471134,
+        "net_per_trade": -35.402002092417675,
+        "total_net": -214606.93668423596,
+        "mean_session_net": -699.0453963655893,
+        "session_low90": -826.7242409819563,
+        "first_half": -104831.5665210415,
+        "second_half": -109775.37016319444,
+        "exits": {
+          "square_off": 5725,
+          "stop": 337
+        }
+      }
+    },
+    {
+      "threshold": 0.6,
+      "hold": 12,
+      "selection": "all",
+      "train": {
+        "trades": 11187,
+        "win_rate": 0.32814874407794764,
+        "net_per_trade": -39.54907754631853,
+        "total_net": -442435.5305106654,
+        "mean_session_net": -1441.1580798393009,
+        "session_low90": -1571.4410518311615,
+        "first_half": -222655.47858028155,
+        "second_half": -219780.05193038384,
+        "exits": {
+          "hold": 10920,
+          "square_off": 128,
+          "stop": 139
+        }
+      }
+    },
+    {
+      "threshold": 0.6,
+      "hold": 12,
+      "selection": "top1",
+      "train": {
+        "trades": 5932,
+        "win_rate": 0.3164194200944032,
+        "net_per_trade": -36.12682145183271,
+        "total_net": -214304.30485227163,
+        "mean_session_net": -698.0596249259662,
+        "session_low90": -743.647698292175,
+        "first_half": -111387.80547965923,
+        "second_half": -102916.4993726124,
+        "exits": {
+          "hold": 5719,
+          "square_off": 152,
+          "stop": 61
+        }
+      }
+    },
+    {
+      "threshold": 0.6,
+      "hold": 24,
+      "selection": "all",
+      "train": {
+        "trades": 11187,
+        "win_rate": 0.37579333154554395,
+        "net_per_trade": -36.53057073086875,
+        "total_net": -408667.4947662287,
+        "mean_session_net": -1331.1644780658912,
+        "session_low90": -1498.0751251571166,
+        "first_half": -226634.7578831349,
+        "second_half": -182032.73688309372,
+        "exits": {
+          "hold": 10173,
+          "square_off": 674,
+          "stop": 340
+        }
+      }
+    },
+    {
+      "threshold": 0.6,
+      "hold": 24,
+      "selection": "top1",
+      "train": {
+        "trades": 5932,
+        "win_rate": 0.3639581928523264,
+        "net_per_trade": -35.47708645345836,
+        "total_net": -210450.07684191503,
+        "mean_session_net": -685.5051362928829,
+        "session_low90": -758.0393870956156,
+        "first_half": -110311.05285736013,
+        "second_half": -100139.02398455492,
+        "exits": {
+          "hold": 5007,
+          "square_off": 801,
+          "stop": 124
+        }
+      }
+    },
+    {
+      "threshold": 0.6,
+      "hold": "15:15",
+      "selection": "all",
+      "train": {
+        "trades": 11187,
+        "win_rate": 0.3988558147850183,
+        "net_per_trade": -38.78059306753087,
+        "total_net": -433838.4946464678,
+        "mean_session_net": -1413.1547056888203,
+        "session_low90": -1688.9027345180536,
+        "first_half": -237217.08594714061,
+        "second_half": -196621.4086993272,
+        "exits": {
+          "square_off": 10254,
+          "stop": 933
+        }
+      }
+    },
+    {
+      "threshold": 0.6,
+      "hold": "15:15",
+      "selection": "top1",
+      "train": {
+        "trades": 5932,
+        "win_rate": 0.3880647336480108,
+        "net_per_trade": -35.538258254279704,
+        "total_net": -210812.94796438722,
+        "mean_session_net": -686.687126919828,
+        "session_low90": -814.7919994514323,
+        "first_half": -101635.984629065,
+        "second_half": -109176.96333532219,
+        "exits": {
+          "square_off": 5601,
+          "stop": 331
+        }
+      }
+    },
+    {
+      "threshold": 0.8,
+      "hold": 12,
+      "selection": "all",
+      "train": {
+        "trades": 10068,
+        "win_rate": 0.3324394119984108,
+        "net_per_trade": -37.830594679119386,
+        "total_net": -380878.42722937395,
+        "mean_session_net": -1240.6463427666904,
+        "session_low90": -1351.772660378271,
+        "first_half": -191318.80578166107,
+        "second_half": -189559.62144771288,
+        "exits": {
+          "hold": 9796,
+          "square_off": 146,
+          "stop": 126
+        }
+      }
+    },
+    {
+      "threshold": 0.8,
+      "hold": 12,
+      "selection": "top1",
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.3172561629153269,
+        "net_per_trade": -36.070434420220856,
+        "total_net": -201922.29188439637,
+        "mean_session_net": -657.7273351283269,
+        "session_low90": -702.3665409738329,
+        "first_half": -106039.65622106742,
+        "second_half": -95882.63566332897,
+        "exits": {
+          "hold": 5388,
+          "square_off": 151,
+          "stop": 59
+        }
+      }
+    },
+    {
+      "threshold": 0.8,
+      "hold": 24,
+      "selection": "all",
+      "train": {
+        "trades": 10068,
+        "win_rate": 0.3802145411203814,
+        "net_per_trade": -35.34195591295647,
+        "total_net": -355822.8121316457,
+        "mean_session_net": -1159.0319613408656,
+        "session_low90": -1313.2332794613662,
+        "first_half": -200823.70139549545,
+        "second_half": -154999.11073615027,
+        "exits": {
+          "hold": 8978,
+          "square_off": 779,
+          "stop": 311
+        }
+      }
+    },
+    {
+      "threshold": 0.8,
+      "hold": 24,
+      "selection": "top1",
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.36513040371561273,
+        "net_per_trade": -35.71326362848676,
+        "total_net": -199922.84979226888,
+        "mean_session_net": -651.2144944373579,
+        "session_low90": -719.7045380607609,
+        "first_half": -106501.8055742946,
+        "second_half": -93421.04421797427,
+        "exits": {
+          "hold": 4702,
+          "square_off": 778,
+          "stop": 118
+        }
+      }
+    },
+    {
+      "threshold": 0.8,
+      "hold": "15:15",
+      "selection": "all",
+      "train": {
+        "trades": 10068,
+        "win_rate": 0.40137067938021453,
+        "net_per_trade": -37.590083242555565,
+        "total_net": -378456.9580860495,
+        "mean_session_net": -1232.758821127197,
+        "session_low90": -1487.235695460792,
+        "first_half": -207576.2944650959,
+        "second_half": -170880.66362095356,
+        "exits": {
+          "square_off": 9240,
+          "stop": 828
+        }
+      }
+    },
+    {
+      "threshold": 0.8,
+      "hold": "15:15",
+      "selection": "top1",
+      "train": {
+        "trades": 5598,
+        "win_rate": 0.39067524115755625,
+        "net_per_trade": -35.59289910289117,
+        "total_net": -199249.04917798477,
+        "mean_session_net": -649.0197041628169,
+        "session_low90": -768.3740680720404,
+        "first_half": -96343.93218609596,
+        "second_half": -102905.11699188882,
+        "exits": {
+          "square_off": 5280,
+          "stop": 318
+        }
+      }
+    }
+  ],
+  "chosen": {
+    "threshold": 0.8,
+    "hold": "15:15",
+    "selection": "top1"
+  },
+  "train": {
+    "trades": 5598,
+    "win_rate": 0.39067524115755625,
+    "net_per_trade": -35.59289910289117,
+    "total_net": -199249.04917798477,
+    "mean_session_net": -649.0197041628169,
+    "session_low90": -768.3740680720404,
+    "first_half": -96343.93218609596,
+    "second_half": -102905.11699188882,
+    "exits": {
+      "square_off": 5280,
+      "stop": 318
+    }
+  },
+  "validate": {
+    "trades": 2463,
+    "win_rate": 0.3447015834348356,
+    "net_per_trade": -40.92419956369954,
+    "total_net": -100796.30352539198,
+    "mean_session_net": -806.3704282031358,
+    "session_low90": -931.986492621326,
+    "first_half": -59405.29865848368,
+    "second_half": -41391.00486690828,
+    "exits": {
+      "square_off": 2423,
+      "stop": 40
+    }
+  },
+  "validated": false,
+  "test": {
+    "trades": 3507,
+    "win_rate": 0.36241802110065585,
+    "net_per_trade": -43.43349164292634,
+    "total_net": -152321.2551917427,
+    "mean_session_net": -827.8329086507756,
+    "session_low90": -1002.9088290632337,
+    "first_half": -57023.18797027075,
+    "second_half": -95298.06722147197,
+    "exits": {
+      "square_off": 3330,
+      "stop": 177
+    }
+  },
+  "works": false
+}

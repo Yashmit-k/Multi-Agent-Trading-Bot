@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+import logging
+from datetime import datetime, timezone, timedelta
 
 from contracts.enums import Timeframe
 from core_db.repository import CoreRepository
@@ -202,6 +203,11 @@ def _poll_locked(
                 state.last_error = "authentication_failed"
                 return True
         state.symbols = rows
+        # Market context for the regime agent. Not tradable and not part of the freshness counts.
+        for index in INDEX_INSTRUMENTS:
+            if repository.get_by_symbol(index) is not None:
+                _one_symbol(provider, repository, index, moment, seed_if_empty=True)
+                backfill_index_history(provider, repository, index)
         errors = [row.last_error for row in rows if row.last_error]
         fetch_errors = [item for item in errors if item not in {"needs_seed"}]
         if any(row.written > 0 or row.last_error is None for row in rows) or not rows:
@@ -227,11 +233,45 @@ def _poll_locked(
         state._lock.release()
 
 
+# NSE indices the regime agent reads: symbol -> (Kite trading symbol, instrument token).
+INDEX_INSTRUMENTS: dict[str, tuple[str, int]] = {"NIFTY50": ("NIFTY 50", 256265), "INDIAVIX": ("INDIA VIX", 264969)}
+INDEX_SEED_DAYS = {Timeframe.D1: 400, Timeframe.M5: 5}
+logger = logging.getLogger(__name__)
+
+# Daily index history reaches back as far as the stock history, so backtest benchmarks cover the same dates.
+INDEX_HISTORY_START = datetime(2024, 1, 1, tzinfo=timezone.utc)
+_index_backfill_done: set[str] = set()
+
+
+def backfill_index_history(provider: ZerodhaMarketDataProvider, repository: CoreRepository, symbol: str) -> int:
+    """Once per process: fetch daily index bars from INDEX_HISTORY_START up to the earliest stored one."""
+    if symbol in _index_backfill_done:
+        return 0
+    earliest = repository.earliest_candle_end(symbol, Timeframe.D1)
+    if earliest is None:
+        return 0  # nothing stored yet: the normal seed runs first
+    if earliest <= INDEX_HISTORY_START + timedelta(days=7):
+        _index_backfill_done.add(symbol)
+        return 0
+    try:
+        candles = [bar for bar in provider.get_candles(symbol, Timeframe.D1, INDEX_HISTORY_START, earliest) if bar.end < earliest]
+    except Exception:  # noqa: BLE001 - retried on the next pass
+        logger.warning("index_backfill_failed symbol=%s", symbol)
+        return 0
+    if candles:
+        repository.upsert_candles(candles)
+    _index_backfill_done.add(symbol)
+    logger.info("index_backfill symbol=%s bars=%s", symbol, len(candles))
+    return len(candles)
+
+
 def _one_symbol(
     provider: ZerodhaMarketDataProvider,
     repository: CoreRepository,
     symbol: str,
     now: datetime,
+    *,
+    seed_if_empty: bool = False,
 ) -> SymbolIngestion:
     row = SymbolIngestion(symbol=symbol)
     for timeframe, label in ((Timeframe.D1, "daily"), (Timeframe.M5, "intraday")):
@@ -245,6 +285,8 @@ def _one_symbol(
             row.intraday_end = None if end is None else end.isoformat()
             row.intraday_fresh = fresh
         window = incremental_range(end, timeframe, now)
+        if window is None and end is None and seed_if_empty:
+            window = (now - timedelta(days=INDEX_SEED_DAYS[timeframe]), now)
         if window is None:
             if end is None:
                 row.last_error = "needs_seed"
@@ -275,6 +317,6 @@ def _one_symbol(
                 row.intraday_end = None if stored_end is None else stored_end.isoformat()
                 row.intraday_fresh = stored_fresh
         expected = expected_starts(start, stop, Timeframe.D1 if timeframe == Timeframe.D1 else Timeframe.M5)
-        have = {bar.start.astimezone(timezone.utc) for bar in repository.stored_candles(symbol, timeframe)}
+        have = {bar.start.astimezone(timezone.utc) for bar in repository.stored_candles(symbol, timeframe, start=start, end=stop)}
         row.missing_bars += len({item for item in expected if item not in have})
     return row

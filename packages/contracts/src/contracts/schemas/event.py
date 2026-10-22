@@ -17,6 +17,7 @@ from contracts.schemas.news_signal import NewsSignal
 from contracts.schemas.order import Order
 from contracts.schemas.portfolio import PortfolioSnapshot
 from contracts.schemas.position import Position
+from contracts.schemas.review import AgentRequest, ProposalReview, ReviewRequest, ReviewStep
 from contracts.schemas.risk_decision import RiskDecision
 from contracts.schemas.system import AgentHeartbeat, SystemAlert
 from contracts.schemas.trade_proposal import TradeProposal
@@ -40,6 +41,10 @@ PAYLOAD_MODELS: dict[EventType, type[ContractModel]] = {
     EventType.PORTFOLIO_UPDATED: PortfolioSnapshot,
     EventType.SYSTEM_ALERT: SystemAlert,
     EventType.AGENT_HEARTBEAT: AgentHeartbeat,
+    EventType.AGENT_REQUEST: AgentRequest,
+    EventType.REVIEW_REQUESTED: ReviewRequest,
+    EventType.REVIEW_STEP: ReviewStep,
+    EventType.REVIEW_COMPLETED: ProposalReview,
 }
 
 if set(PAYLOAD_MODELS) != set(EventType):
@@ -92,6 +97,10 @@ EventPayload = (
     | PortfolioSnapshot
     | SystemAlert
     | AgentHeartbeat
+    | AgentRequest
+    | ReviewRequest
+    | ReviewStep
+    | ProposalReview
 )
 
 

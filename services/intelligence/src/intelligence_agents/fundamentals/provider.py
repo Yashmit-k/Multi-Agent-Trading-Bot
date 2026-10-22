@@ -17,3 +17,11 @@ class IntelligenceFundamentalProvider:
     def get_fundamentals(self, symbol: str, as_of: datetime) -> list[FundamentalDataPoint]:
         aware = require_aware(as_of, "as_of")
         return self._store.points_for(symbol, aware)
+
+
+def latest_by_metric(points) -> dict:  # type: ignore[no-untyped-def]
+    """The newest point per metric: latest available_at, then latest period. Never insertion order."""
+    latest: dict = {}
+    for point in sorted(points, key=lambda item: (item.available_at, item.period)):
+        latest[point.metric] = point
+    return latest

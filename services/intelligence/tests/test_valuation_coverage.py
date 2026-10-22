@@ -48,3 +48,28 @@ def test_runner_skips_unsupported_symbols_and_keeps_supported_ones() -> None:
     assert [signal.symbol for signal in produced] == ["RELIANCE"]
     assert [signal.symbol for signal in sink.signals] == ["RELIANCE"]
     assert runner.skipped == [{"agent": "valuation", "symbol": "TRENT", "reason": "fixture_coverage"}]
+
+
+def _with_points(rows: list[tuple[str, str]]):  # type: ignore[no-untyped-def]
+    from datetime import timedelta
+
+    from intelligence_agents.fundamentals.csv_loader import load_csv_text
+    from intelligence_agents.fundamentals.store import MemoryFundamentalStore
+
+    stamp = (FIXTURE_AS_OF - timedelta(days=1)).isoformat()
+    lines = ["symbol,metric,value,unit,period,announced_at,available_at,source,source_id"]
+    lines += [f"RELIANCE,{metric},{value},ratio,2026Q3,{stamp},{stamp},test,rel-{metric}" for metric, value in rows]
+    store = MemoryFundamentalStore()
+    load_csv_text(store, "\n".join(lines) + "\n")
+    news, _ = make_stores()
+    return make_context(news, store)
+
+
+def test_valuation_compares_ttm_pe_with_sector_peers() -> None:
+    probe = ValuationAgent(CLOCK, _router()).evaluate("RELIANCE", FIXTURE_AS_OF, _with_points([("eps", "1")]))
+    price = float(probe.features["last_price"])
+    cheap = ValuationAgent(CLOCK, _router()).evaluate("RELIANCE", FIXTURE_AS_OF, _with_points([("eps", str(price / 10)), ("peer_median_pe", "20")]))
+    rich = ValuationAgent(CLOCK, _router()).evaluate("RELIANCE", FIXTURE_AS_OF, _with_points([("eps", str(price / 40)), ("peer_median_pe", "20")]))
+    assert cheap.metadata["pe_basis"] == "sector_peers" and cheap.signal == 1.0  # P/E 10 vs peers 20: 50% cheaper saturates
+    assert rich.signal == -1.0
+    assert probe.metadata["pe_basis"] == "fixed_pe_20"  # no peer median: lower-confidence fallback

@@ -97,6 +97,105 @@
       "title": "AgentName",
       "type": "string"
     },
+    "AgentRequest": {
+      "additionalProperties": false,
+      "description": "The manager asks another agent to look again. Published on agent.events as agent.request.",
+      "properties": {
+        "from_agent": {
+          "const": "portfolio_manager",
+          "default": "portfolio_manager",
+          "title": "From Agent",
+          "type": "string"
+        },
+        "question": {
+          "minLength": 1,
+          "title": "Question",
+          "type": "string"
+        },
+        "request_id": {
+          "minLength": 1,
+          "title": "Request Id",
+          "type": "string"
+        },
+        "review_id": {
+          "minLength": 1,
+          "title": "Review Id",
+          "type": "string"
+        },
+        "symbol": {
+          "minLength": 1,
+          "title": "Symbol",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "to_agent": {
+          "$ref": "#/$defs/AgentName"
+        }
+      },
+      "required": [
+        "request_id",
+        "review_id",
+        "to_agent",
+        "symbol",
+        "question",
+        "timestamp"
+      ],
+      "title": "AgentRequest",
+      "type": "object"
+    },
+    "AgentRequestEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "correlation_id": {
+          "minLength": 1,
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "event_id": {
+          "minLength": 1,
+          "title": "Event Id",
+          "type": "string"
+        },
+        "event_type": {
+          "const": "agent.request",
+          "title": "Event Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/AgentRequest"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "timestamp",
+        "source",
+        "correlation_id",
+        "event_type",
+        "payload"
+      ],
+      "title": "AgentRequestEnvelope",
+      "type": "object"
+    },
     "AgentSignal": {
       "additionalProperties": false,
       "description": "A directional view from one agent. It is not an order.",
@@ -1816,6 +1915,91 @@
       "title": "PositionUpdatedEnvelope",
       "type": "object"
     },
+    "ProposalReview": {
+      "additionalProperties": false,
+      "description": "The manager's verdict. Published on review.events as review.completed.",
+      "properties": {
+        "conflicts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Conflicts",
+          "type": "array"
+        },
+        "critique": {
+          "title": "Critique",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ReviewKind"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "proposal_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proposal Id"
+        },
+        "review_id": {
+          "minLength": 1,
+          "title": "Review Id",
+          "type": "string"
+        },
+        "reviewer": {
+          "minLength": 1,
+          "title": "Reviewer",
+          "type": "string"
+        },
+        "size_fraction": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Size Fraction",
+          "type": "number"
+        },
+        "steps": {
+          "minimum": 0,
+          "title": "Steps",
+          "type": "integer"
+        },
+        "symbol": {
+          "minLength": 1,
+          "title": "Symbol",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/$defs/ReviewVerdict"
+        }
+      },
+      "required": [
+        "review_id",
+        "kind",
+        "symbol",
+        "verdict",
+        "size_fraction",
+        "critique",
+        "reviewer",
+        "steps",
+        "timestamp"
+      ],
+      "title": "ProposalReview",
+      "type": "object"
+    },
     "Quote": {
       "additionalProperties": false,
       "description": "Last traded price visible at timestamp.",
@@ -1861,6 +2045,360 @@
       ],
       "title": "Quote",
       "type": "object"
+    },
+    "ReviewCompletedEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "correlation_id": {
+          "minLength": 1,
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "event_id": {
+          "minLength": 1,
+          "title": "Event Id",
+          "type": "string"
+        },
+        "event_type": {
+          "const": "review.completed",
+          "title": "Event Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ProposalReview"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "timestamp",
+        "source",
+        "correlation_id",
+        "event_type",
+        "payload"
+      ],
+      "title": "ReviewCompletedEnvelope",
+      "type": "object"
+    },
+    "ReviewKind": {
+      "enum": [
+        "pipeline",
+        "ad_hoc"
+      ],
+      "title": "ReviewKind",
+      "type": "string"
+    },
+    "ReviewRequest": {
+      "additionalProperties": false,
+      "description": "A proposal waiting for the portfolio manager. Published on review.events as review.requested.",
+      "properties": {
+        "aggregated_confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Aggregated Confidence",
+          "type": "number"
+        },
+        "aggregated_signal": {
+          "maximum": 1,
+          "minimum": -1,
+          "title": "Aggregated Signal",
+          "type": "number"
+        },
+        "entry_price": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Entry Price"
+        },
+        "horizon": {
+          "$ref": "#/$defs/Horizon"
+        },
+        "kind": {
+          "$ref": "#/$defs/ReviewKind"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "proposal_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proposal Id"
+        },
+        "quantity": {
+          "exclusiveMinimum": 0,
+          "title": "Quantity",
+          "type": "integer"
+        },
+        "requested_at": {
+          "format": "date-time",
+          "title": "Requested At",
+          "type": "string"
+        },
+        "requested_by": {
+          "minLength": 1,
+          "title": "Requested By",
+          "type": "string"
+        },
+        "review_id": {
+          "minLength": 1,
+          "title": "Review Id",
+          "type": "string"
+        },
+        "side": {
+          "$ref": "#/$defs/Side"
+        },
+        "symbol": {
+          "minLength": 1,
+          "title": "Symbol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "review_id",
+        "kind",
+        "symbol",
+        "horizon",
+        "side",
+        "quantity",
+        "entry_price",
+        "aggregated_signal",
+        "aggregated_confidence",
+        "requested_at",
+        "requested_by",
+        "metadata"
+      ],
+      "title": "ReviewRequest",
+      "type": "object"
+    },
+    "ReviewRequestedEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "correlation_id": {
+          "minLength": 1,
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "event_id": {
+          "minLength": 1,
+          "title": "Event Id",
+          "type": "string"
+        },
+        "event_type": {
+          "const": "review.requested",
+          "title": "Event Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ReviewRequest"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "timestamp",
+        "source",
+        "correlation_id",
+        "event_type",
+        "payload"
+      ],
+      "title": "ReviewRequestedEnvelope",
+      "type": "object"
+    },
+    "ReviewStep": {
+      "additionalProperties": false,
+      "description": "One step of the manager's reasoning: a plan, a tool call and its result, a critique, a replan.",
+      "properties": {
+        "actor": {
+          "minLength": 1,
+          "title": "Actor",
+          "type": "string"
+        },
+        "arguments": {
+          "additionalProperties": true,
+          "title": "Arguments",
+          "type": "object"
+        },
+        "kind": {
+          "$ref": "#/$defs/ReviewStepKind"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "purpose": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Purpose"
+        },
+        "review_id": {
+          "minLength": 1,
+          "title": "Review Id",
+          "type": "string"
+        },
+        "step": {
+          "minimum": 0,
+          "title": "Step",
+          "type": "integer"
+        },
+        "summary": {
+          "default": "",
+          "title": "Summary",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool"
+        }
+      },
+      "required": [
+        "review_id",
+        "step",
+        "kind",
+        "actor",
+        "timestamp"
+      ],
+      "title": "ReviewStep",
+      "type": "object"
+    },
+    "ReviewStepEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "correlation_id": {
+          "minLength": 1,
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "event_id": {
+          "minLength": 1,
+          "title": "Event Id",
+          "type": "string"
+        },
+        "event_type": {
+          "const": "review.step",
+          "title": "Event Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ReviewStep"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "timestamp",
+        "source",
+        "correlation_id",
+        "event_type",
+        "payload"
+      ],
+      "title": "ReviewStepEnvelope",
+      "type": "object"
+    },
+    "ReviewStepKind": {
+      "enum": [
+        "plan",
+        "tool_call",
+        "tool_result",
+        "agent_reply",
+        "critique",
+        "replan",
+        "llm_error"
+      ],
+      "title": "ReviewStepKind",
+      "type": "string"
+    },
+    "ReviewVerdict": {
+      "enum": [
+        "APPROVE",
+        "REDUCE",
+        "VETO",
+        "UNAVAILABLE"
+      ],
+      "title": "ReviewVerdict",
+      "type": "string"
     },
     "RiskApprovedEnvelope": {
       "additionalProperties": false,
@@ -2329,6 +2867,7 @@
   "discriminator": {
     "mapping": {
       "agent.heartbeat": "#/$defs/AgentHeartbeatEnvelope",
+      "agent.request": "#/$defs/AgentRequestEnvelope",
       "agent.signal": "#/$defs/AgentSignalEnvelope",
       "decision.created": "#/$defs/DecisionCreatedEnvelope",
       "feature.updated": "#/$defs/FeatureUpdatedEnvelope",
@@ -2343,6 +2882,9 @@
       "order.updated": "#/$defs/OrderUpdatedEnvelope",
       "portfolio.updated": "#/$defs/PortfolioUpdatedEnvelope",
       "position.updated": "#/$defs/PositionUpdatedEnvelope",
+      "review.completed": "#/$defs/ReviewCompletedEnvelope",
+      "review.requested": "#/$defs/ReviewRequestedEnvelope",
+      "review.step": "#/$defs/ReviewStepEnvelope",
       "risk.approved": "#/$defs/RiskApprovedEnvelope",
       "risk.rejected": "#/$defs/RiskRejectedEnvelope",
       "system.alert": "#/$defs/SystemAlertEnvelope"
@@ -2403,6 +2945,18 @@
     },
     {
       "$ref": "#/$defs/AgentHeartbeatEnvelope"
+    },
+    {
+      "$ref": "#/$defs/AgentRequestEnvelope"
+    },
+    {
+      "$ref": "#/$defs/ReviewRequestedEnvelope"
+    },
+    {
+      "$ref": "#/$defs/ReviewStepEnvelope"
+    },
+    {
+      "$ref": "#/$defs/ReviewCompletedEnvelope"
     }
   ]
 }

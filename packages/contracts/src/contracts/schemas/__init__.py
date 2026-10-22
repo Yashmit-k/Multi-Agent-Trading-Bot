@@ -11,6 +11,7 @@ from contracts.schemas.news_signal import NewsSignal
 from contracts.schemas.order import Order
 from contracts.schemas.portfolio import PortfolioSnapshot
 from contracts.schemas.position import Position
+from contracts.schemas.review import AgentRequest, ProposalReview, ReviewKind, ReviewRequest, ReviewStep, ReviewStepKind, ReviewVerdict
 from contracts.schemas.risk_decision import RiskCheck, RiskDecision
 from contracts.schemas.submission import SubmissionResult
 from contracts.schemas.system import AgentHeartbeat, AlertSeverity, SystemAlert
@@ -19,6 +20,7 @@ from contracts.schemas.event import EventEnvelope
 
 __all__ = [
     "AgentHeartbeat",
+    "AgentRequest",
     "AgentSignal",
     "AlertSeverity",
     "Candle",
@@ -32,7 +34,13 @@ __all__ = [
     "Order",
     "PortfolioSnapshot",
     "Position",
+    "ProposalReview",
     "Quote",
+    "ReviewKind",
+    "ReviewRequest",
+    "ReviewStep",
+    "ReviewStepKind",
+    "ReviewVerdict",
     "RiskCheck",
     "RiskDecision",
     "SubmissionResult",

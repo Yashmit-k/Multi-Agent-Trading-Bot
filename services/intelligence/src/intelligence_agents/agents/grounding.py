@@ -18,6 +18,10 @@ NEWS_CODES = frozenset(
         "capacity_expansion",
         "operating_updates",
         "profit_growth",
+        "price_move",
+        "capital_raise",
+        "results_preview",
+        "analyst_view",
     }
 )
 FUNDAMENTAL_CODES = frozenset(
@@ -44,7 +48,18 @@ _PHRASES = {
     "management_change": ("management change", "ceo resign", "appointed ceo", "new cfo"),
     "product_update": ("product launch", "product update", "new product"),
     "capacity_expansion": ("capacity expansion", "new facility", "new plant"),
-    "operating_updates": ("operating update", "operating updates", "operational update", "business update"),
+    "operating_updates": (
+        "operating update", "operating updates", "operational update", "business update", "expansion", "plans to",
+        "launches", "partnership", "agreement", "contract", "deal", "deliveries", "sales", "volumes", "operations",
+        "subsidiary", "unit", "facility", "plant", "board", "approves", "announces",
+    ),
+    "capital_raise": ("ipo", "qip", "rights issue", "fundraise", "fund raise", "raise funds", "raises", "stake sale", "block deal", "anchor", "share sale", "offer for sale", "listing"),
+    "results_preview": ("results preview", "q1 preview", "q2 preview", "q3 preview", "q4 preview", "earnings preview", "results today", "results date", "to announce", "ahead of q", "ahead of results", "q2 results", "q1 results", "q3 results", "q4 results"),
+    "analyst_view": ("target price", "upgrade", "downgrade", "rating", "brokerage", "analyst", "price target", "outperform", "underperform", "overweight", "underweight"),
+    "price_move": (
+        "share price", "shares", "stock price", "hits", "falls", "rises", "jumps", "surges", "slumps",
+        "rallies", "gainers", "losers", "52-week", "month low", "month high", "record high",
+    ),
     "profit_growth": ("profit growth", "earnings growth", "profit rose", "profit beat", "higher profit"),
     "revenue_growth": ("revenue growth", "sales growth"),
     "margin": ("margin",),
@@ -62,7 +77,11 @@ AGENT_PROMPTS = {
         "A valid reason is an event type supported by the article, not a copied word. "
         "Do not invent events or numbers. Do not place orders. "
         "If the article is only an operational/business update, use operating_updates. "
-        "Use profit_growth only if the article states profit or earnings growth."
+        "Use profit_growth only if the article states profit or earnings growth. "
+        "If the article mainly reports a share-price move or market performance, use price_move. "
+        "Use capital_raise for IPOs, QIPs, rights issues, block deals, or stake sales; results_preview for upcoming results; "
+        "analyst_view for brokerage ratings or target-price changes; operating_updates for business news such as deals, launches, expansion, or volumes. "
+        "If nothing in the article supports a score, return reason_codes [insufficient_data] with sentiment 0."
     ),
     "fundamental": (
         "Interpret computed fundamental metrics. Metric names and values are authoritative. "
@@ -164,5 +183,8 @@ def quality_gate(assessment: LLMAssessment, *, task: str, evidence: str, raw: st
         if mapped and mapped not in kept:
             kept.append(mapped)
     if not kept:
+        # The model's own "no usable evidence" answer is a valid, neutral opinion.
+        if any(code.strip().lower() == "insufficient_data" for code in assessment.reason_codes):
+            return replace(assessment, reason_codes=("insufficient_data",), sentiment=0.0, impact=0.0, high_impact=False)
         raise ValidationError("unsupported_reason")
     return replace(assessment, reason_codes=tuple(kept))

@@ -1,5 +1,20 @@
 # Multi-agent trading
 
+> **Assessment submission**
+>
+> - Live demo: **https://13-238-176-73.sslip.io** (AWS EC2 t3.small, ap-southeast-2; see [`deploy/README.md`](deploy/README.md))
+> - [Project synopsis](docs/submission/synopsis.md) — problem, solution, target user, scope vs CA2
+> - [Design document](docs/submission/design.md) — architecture diagram, agent roles, orchestration pattern, technology choices
+> - [Input definition](docs/submission/input-definition.md) and [Output definition](docs/submission/output-definition.md), with real samples
+> - [Agent execution traces](docs/submission/agent-trace/): real Redis bus messages captured by the trace recorder. Start with [one complete real trade](docs/submission/agent-trace/20261021-jswsteel-trade.md) (agent signal → proposal → 18 manager steps with a re-check request → REDUCE → 19 risk checks → order → fill), then [the portfolio-manager reviews](docs/submission/agent-trace/20261020-portfolio-manager-reviews.md): planning, tool calls, critique and revision, an agent-to-agent re-check request and its reply, model failover, and the verdict.
+> - Portfolio manager (LLM supervisor agent): [`services/intelligence/src/intelligence_agents/manager/`](services/intelligence/src/intelligence_agents/manager/); live at [/manager](https://13-238-176-73.sslip.io/manager)
+> - [Research write-ups](services/quant/docs/): 15 pre-registered studies (each protocol written before its result was run), including the failures
+> - [Demo video script](docs/submission/demo-script.md)
+>
+> Team (commit authors): Yashmit Kotekar ([@Yashmit-k](https://github.com/Yashmit-k)), ishita2403, nimitajestin. Each member should confirm their GitHub username here.
+>
+> Live market data comes from Zerodha Kite, and live news from public RSS feeds. Trading is **paper only**: `live_enabled` is hard-coded false.
+
 Shared contracts live in [`packages/contracts`](packages/contracts). That package is the only source of truth for schemas, event names, Redis channels, horizons, trading modes, and agent interfaces.
 
 Install it from the repo root:

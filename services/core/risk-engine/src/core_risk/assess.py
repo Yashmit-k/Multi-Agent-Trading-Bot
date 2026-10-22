@@ -11,8 +11,10 @@ from decimal import Decimal
 from contracts.enums import RiskStatus, Side, TradingMode
 from contracts.schemas.risk_decision import RiskCheck, RiskDecision
 from contracts.schemas.trade_proposal import TradeProposal
+from core_risk.portfolio import PortfolioContext
+from core_risk.trade import TradeContext
 
-RISK_VERSION = "1.0.0"
+RISK_VERSION = "1.3.0"
 MAX_NOTIONAL = Decimal("20000")
 
 
@@ -25,14 +27,24 @@ def assess(
     held_quantity: int,
     timestamp: datetime,
     max_notional: Decimal | None = None,
+    portfolio: PortfolioContext | None = None,
+    market_ok: bool | None = None,
+    manager_ok: bool | None = None,
+    manager_note: str = "",
+    trade: TradeContext | None = None,
 ) -> RiskDecision:
+    """Six order checks always. On BUYs: five portfolio checks with the book, seven trade checks with the trade context
+    (losses so far, risk per trade, reward to risk, price drift, stop-out cooldown, evidence quality), the market regime
+    and the portfolio manager's verdict when given."""
     bound = MAX_NOTIONAL if max_notional is None else max_notional
     notional = proposal.entry_price * proposal.quantity
     checks = [
         _check("mode_is_paper", mode == TradingMode.PAPER, f"mode {mode.value} is not PAPER"),
         _check("universe_member", in_universe, f"{proposal.symbol} is outside the universe at as_of"),
         _check("sufficient_cash", proposal.side != Side.BUY or notional <= cash, "buy notional exceeds cash"),
-        _check("notional_cap", notional <= bound, f"order notional exceeds {bound}"),
+        # The per-order cap limits new exposure. A SELL closes a holding, which may have grown past the cap
+        # (a +4% target on a full-size buy is over Rs 20,000), and must never be blocked by it.
+        _check("notional_cap", proposal.side != Side.BUY or notional <= bound, f"order notional exceeds {bound}"),
         _check(
             "no_short",
             proposal.side != Side.SELL or proposal.quantity <= held_quantity,
@@ -40,6 +52,14 @@ def assess(
         ),
         _check("stop_and_target_side", _brackets_ok(proposal), "stop or target is on the wrong side of entry"),
     ]
+    if market_ok is not None and proposal.side == Side.BUY:
+        checks.append(_check("market_regime", market_ok, "market is risk-off (NIFTY downtrend with India VIX rising): no new agent buys"))
+    if manager_ok is not None and proposal.side == Side.BUY:
+        checks.append(_check("portfolio_manager", manager_ok, f"portfolio manager vetoed: {manager_note}"[:300]))
+    if portfolio is not None and proposal.side == Side.BUY:
+        checks += [_check(name, passed, failure) for name, passed, failure in portfolio.checks(proposal.symbol, notional)]
+    if trade is not None and proposal.side == Side.BUY:
+        checks += [_check(name, passed, failure) for name, passed, failure in trade.checks(proposal)]
     failed = [check for check in checks if not check.passed]
     approved = not failed
     return RiskDecision(
@@ -52,7 +72,7 @@ def assess(
         rejection_reason=None if approved else "; ".join(check.detail for check in failed),
         approved_quantity=proposal.quantity if approved else 0,
         approved_price=proposal.entry_price if approved else None,
-        metadata={"kill_switch": "noop"},
+        metadata={"kill_switch": "noop", "portfolio_checks": portfolio is not None and proposal.side == Side.BUY, "trade_checks": trade is not None and proposal.side == Side.BUY},
     )
 
 

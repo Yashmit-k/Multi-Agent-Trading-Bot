@@ -1,0 +1,233 @@
+"""Export recorded bus messages as an agent execution trace.
+
+Reads ``GET /api/v1/trace`` from a running Core API and writes two files:
+
+- ``<out>/<run>.jsonl``: one stored event per line, exactly as recorded.
+- ``<out>/<run>.md``: a timeline grouped by correlation id, showing the
+  producing agent, the bus channel, and the consumer of each handoff.
+
+Usage::
+
+    CORE_API_TOKEN=... python scripts/export_agent_trace.py \
+        --api http://localhost:8000 --limit 1000 --run live-signals-20261014
+
+Or read the recorded rows directly (read-only), e.g. before the API is rebuilt::
+
+    python scripts/export_agent_trace.py --database-url postgresql+psycopg://core:core@localhost:5432/core --run …
+
+Nothing here writes to the API or the database.
+"""
+
+import argparse
+import json
+import os
+import urllib.parse
+import urllib.request
+from collections import defaultdict
+from pathlib import Path
+
+CONSUMER = {
+    "agent.signal": "signal-fusion (via Postgres signal store)",
+    "decision.created": "risk-engine",
+    "risk.approved": "paper-execution",
+    "risk.rejected": "(end of chain)",
+    "order.created": "paper-execution settle",
+    "order.updated": "paper-execution settle",
+    "order.filled": "portfolio / dashboard",
+    "order.rejected": "(end of chain)",
+    "position.updated": "portfolio / dashboard",
+    "review.requested": "portfolio-manager agent (claims it from Core)",
+    "review.step": "trace / dashboard",
+    "agent.request": "intelligence agent (POST /reassess)",
+    "review.completed": "risk-engine portfolio_manager check (or the operator, for a question)",
+}
+
+
+def fetch(api: str, token: str, limit: int, event_type: str | None) -> list[dict]:
+    query = {"limit": str(limit)}
+    if event_type:
+        query["event_type"] = event_type
+    url = f"{api.rstrip('/')}/api/v1/trace?{urllib.parse.urlencode(query)}"
+    request = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        return json.loads(response.read())["events"]
+
+
+def _get(api: str, token: str, path: str) -> dict:
+    request = urllib.request.Request(f"{api.rstrip('/')}{path}", headers={"Authorization": f"Bearer {token}"})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        return json.loads(response.read())
+
+
+def fetch_reviews(api: str, token: str, review_ids: list[str]) -> list[dict]:
+    """Each review's whole chain, plus the signals other agents sent back in reply to its requests."""
+    events: dict[str, dict] = {}
+    signals = _get(api, token, "/api/v1/trace?event_type=agent.signal&limit=1000")["events"]
+    for review_id in review_ids:
+        review = _get(api, token, f"/api/v1/reviews/{urllib.parse.quote(review_id)}")
+        for item in _get(api, token, f"/api/v1/trace/{urllib.parse.quote(review['correlation_id'])}")["events"]:
+            events[item["event_id"]] = item
+        for item in signals:
+            if ((item.get("payload") or {}).get("metadata") or {}).get("review_id") == review_id:
+                events[item["event_id"]] = item
+    return list(events.values())
+
+
+def fetch_db(database_url: str, limit: int, event_type: str | None) -> list[dict]:
+    from core_api.app import _trace_item
+    from core_db.repository import CoreRepository
+    from core_db.session import make_session_factory
+
+    repository = CoreRepository(make_session_factory(database_url))
+    return [_trace_item(item) for item in repository.list_system_events(event_type=event_type, limit=limit)]
+
+
+def producer(event: dict) -> str:
+    if event.get("agent"):
+        return f"{event['agent']} agent → {event['source']}"
+    return str(event.get("source"))
+
+
+def summary(event: dict) -> str:
+    payload = event.get("payload") or {}
+    kind = event["event_type"]
+    if kind == "agent.signal":
+        metadata = payload.get("metadata") or {}
+        headlines = metadata.get("headlines") or []
+        raw_llm = metadata.get("llm") or {}
+        llm = raw_llm[0] if isinstance(raw_llm, list) and raw_llm else raw_llm if isinstance(raw_llm, dict) else {}
+        source = f" model={llm.get('model')}" if llm else ""
+        headline = f' headline="{headlines[0].get("title", "")[:110]}"' if headlines else ""
+        return (
+            f"{payload.get('symbol')} {payload.get('horizon')} signal={_num(payload.get('signal'))} "
+            f"confidence={_num(payload.get('confidence'))} reasons={','.join(payload.get('reason_codes') or [])}{source}{headline}"
+        )
+    if kind == "decision.created":
+        return (
+            f"{payload.get('side')} {payload.get('quantity')} {payload.get('symbol')} @ {payload.get('entry_price')} "
+            f"fused={payload.get('aggregated_signal')} conf={payload.get('aggregated_confidence')} "
+            f"stop={payload.get('stop_loss')} target={payload.get('take_profit')} "
+            f"from {len(payload.get('supporting_signal_ids') or [])} signals"
+        )
+    if kind.startswith("risk."):
+        failed = [check["name"] for check in payload.get("checks", []) if not check.get("passed")]
+        return f"{payload.get('status')} failed_checks={failed or 'none'}"
+    if kind.startswith("order."):
+        return (
+            f"{payload.get('side', '')} {payload.get('quantity')} {payload.get('symbol')} "
+            f"status={payload.get('status', 'FILLED')} price={payload.get('price') or payload.get('limit_price')}"
+        )
+    if kind == "position.updated":
+        return f"{payload.get('symbol')} qty={payload.get('quantity')} avg={payload.get('average_price')}"
+    if kind == "review.requested":
+        return f"{payload.get('kind')} review of {payload.get('side')} {payload.get('quantity')} {payload.get('symbol')} @ {payload.get('entry_price')} fused={payload.get('aggregated_signal')}"
+    if kind == "review.step":
+        why = f" why=\"{payload.get('purpose')}\"" if payload.get("purpose") else ""
+        return f"step {payload.get('step')} {payload.get('kind')} {payload.get('tool') or ''}{why} {payload.get('summary') or ''}".strip()
+    if kind == "agent.request":
+        return f"portfolio_manager asks {payload.get('to_agent')} to re-check {payload.get('symbol')}: \"{payload.get('question')}\""
+    if kind == "review.completed":
+        return f"{payload.get('verdict')} size={payload.get('size_fraction')} reviewer={payload.get('reviewer')} conflicts={payload.get('conflicts')} critique=\"{payload.get('critique')}\""
+    return kind
+
+
+def write(events: list[dict], out: Path, run: str) -> tuple[Path, Path]:
+    out.mkdir(parents=True, exist_ok=True)
+    ordered = sorted(events, key=lambda item: (item.get("timestamp") or "", item["recorded_at"]))
+    jsonl = out / f"{run}.jsonl"
+    jsonl.write_text("".join(json.dumps(item, sort_keys=True) + "\n" for item in ordered))
+    chains: dict[str, list[dict]] = defaultdict(list)
+    for item in ordered:
+        chains[item["correlation_id"]].append(item)
+    proposals = {cid: chain for cid, chain in chains.items() if any(e["event_type"] == "decision.created" for e in chain)}
+    signal_ids = {e["correlation_id"] for e in ordered if e["event_type"] == "agent.signal"}
+    lines = [
+        f"# Agent execution trace — `{run}`",
+        "",
+        "Captured from the Redis event buses by `core_ingestion.trace_recorder` and exported from "
+        "`GET /api/v1/trace`. Every row is a real message; nothing here is simulated or edited. "
+        "Trading mode is PAPER and `live_enabled` is false.",
+        "",
+        f"- Events: {len(ordered)}",
+        f"- Agent signals: {len(signal_ids)}",
+        f"- Agents seen: {', '.join(sorted({e['agent'] for e in ordered if e.get('agent')})) or 'none'}",
+        f"- Decision chains (signal → decision → risk → order → fill): {len(proposals)}",
+        f"- First event: {ordered[0]['timestamp'] if ordered else '—'}",
+        f"- Last event: {ordered[-1]['timestamp'] if ordered else '—'}",
+        "",
+        "Signal ids are deterministic per (agent, symbol, horizon, bar). An agent whose input bar has not changed "
+        "re-sends the same id, which ingestion stores once and does not re-publish. Quant agents therefore appear "
+        "on the bus only when a new candle closes during market hours.",
+        "",
+    ]
+    if proposals:
+        lines += ["## Decision chains", ""]
+        for cid, chain in proposals.items():
+            lines += [f"### Proposal `{cid[:16]}…`", ""]
+            decision = next(e for e in chain if e["event_type"] == "decision.created")
+            supporting = (decision.get("payload") or {}).get("supporting_signal_ids") or []
+            for sid in supporting:
+                for signal in chains.get(sid, []):
+                    lines.append(_row(signal))
+            for event in chain:
+                lines.append(_row(event))
+            lines.append("")
+    reviews = {cid: chain for cid, chain in chains.items() if any(e["event_type"] == "review.requested" for e in chain)}
+    if reviews:
+        replies = {((e.get("payload") or {}).get("metadata") or {}).get("request_id"): e for e in ordered if e["event_type"] == "agent.signal"}
+        lines += ["## Portfolio-manager reviews", "", "Each review: the request, every reasoning step and tool call, requests to other agents and their replies, and the verdict.", ""]
+        for cid, chain in reviews.items():
+            lines += [f"### Review chain `{cid[:24]}…`", ""]
+            for event in chain:
+                if event["event_type"] == "agent.signal":
+                    continue
+                lines.append(_row(event))
+                if event["event_type"] == "agent.request":
+                    reply = replies.get((event.get("payload") or {}).get("request_id"))
+                    if reply is not None:
+                        lines.append("  - reply " + _row(reply).removeprefix("- "))
+            lines.append("")
+    lines += ["## Agent signal handoffs", "", "| time (UTC) | producer | channel | consumer | content |", "|---|---|---|---|---|"]
+    for event in ordered:
+        if event["event_type"] == "agent.signal":
+            lines.append(
+                f"| {event.get('timestamp')} | {producer(event)} | `{event.get('channel')}` | "
+                f"{CONSUMER['agent.signal']} | {summary(event).replace('|', '/')} |"
+            )
+    markdown = out / f"{run}.md"
+    markdown.write_text("\n".join(lines) + "\n")
+    return jsonl, markdown
+
+
+def _num(value: object) -> str:
+    return f"{value:.3f}" if isinstance(value, float) else str(value)
+
+
+def _row(event: dict) -> str:
+    consumer = CONSUMER.get(event["event_type"], "—")
+    return f"- `{event.get('timestamp')}` **{event['event_type']}** — {producer(event)} → `{event.get('channel')}` → {consumer}: {summary(event)}"
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("--api", default=os.environ.get("CORE_API_URL", "http://localhost:8000"))
+    parser.add_argument("--limit", type=int, default=1000)
+    parser.add_argument("--event-type", default=None)
+    parser.add_argument("--run", required=True)
+    parser.add_argument("--out", default="docs/submission/agent-trace")
+    parser.add_argument("--database-url", default=None, help="read system_events directly instead of the API")
+    parser.add_argument("--review", action="append", default=[], help="export only these portfolio-manager reviews (repeatable)")
+    args = parser.parse_args()
+    if args.database_url:
+        events = fetch_db(args.database_url, args.limit, args.event_type)
+    else:
+        token = os.environ.get("CORE_API_TOKEN", "")
+        if not token:
+            raise SystemExit("CORE_API_TOKEN is required")
+        events = fetch_reviews(args.api, token, args.review) if args.review else fetch(args.api, token, args.limit, args.event_type)
+    jsonl, markdown = write(events, Path(args.out), args.run)
+    print(f"wrote {len(events)} events to {jsonl} and {markdown}")
+
+
+if __name__ == "__main__":
+    main()

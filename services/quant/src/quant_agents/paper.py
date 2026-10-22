@@ -35,6 +35,7 @@ _ML_SKIP_REASONS = frozenset(
 
 _AGENTS = (TechnicalAgent, MomentumAgent, MeanReversionAgent, VolumeAgent, RegimeAgent)
 _SWING = {"horizon": Horizon.SWING, "timeframe": Timeframe.D1, "regime_index_symbols": ()}
+INDEX_SYMBOLS = ("NIFTY50", "INDIAVIX")
 
 
 class _OneFeatureProvider:
@@ -166,13 +167,14 @@ def fetch_feature(
     attempts: int = 3,
     delay_seconds: float = READY_DELAY_SECONDS,
     sleep=time.sleep,
+    timeframe: Timeframe | str = Timeframe.D1,
 ) -> FeatureSet | None:
     """Retry only when no response arrives. A received response is not retried."""
     for attempt in range(1, attempts + 1):
         try:
             response = client.get(
                 f"{base_url.rstrip('/')}/api/v1/features/{symbol}",
-                params={"timeframe": Timeframe.D1.value},
+                params={"timeframe": timeframe.value if isinstance(timeframe, Timeframe) else str(timeframe)},
                 headers={"Authorization": f"Bearer {token}"},
             )
         except httpx.TransportError:
@@ -210,8 +212,18 @@ def run_paper_pass(
             logger.error("quant_core_api_unavailable")
             return 0
         ml_registry = _open_ml_registry(ml_demo, ml_demo_dir, ml_artifact_dir)
+        # NIFTY 50 and INDIA VIX for the regime agent; absent until Core has collected them.
+        config = dict(configuration or _SWING)
+        timeframe = config.get("timeframe", Timeframe.D1)
+        index_sets = tuple(
+            item
+            for item in (fetch_feature(owned, base_url, read_token, name, attempts=1, sleep=sleep, timeframe=timeframe) for name in INDEX_SYMBOLS)
+            if item is not None
+        )
+        if index_sets:
+            config["regime_index_symbols"] = tuple(item.symbol for item in index_sets)
         for symbol in symbols:
-            feature_set = fetch_feature(owned, base_url, read_token, symbol, sleep=sleep)
+            feature_set = fetch_feature(owned, base_url, read_token, symbol, sleep=sleep, timeframe=timeframe)
             if feature_set is None:
                 logger.info("quant_skip_symbol", extra={"symbol": symbol, "reason": "no_features"})
                 continue
@@ -219,7 +231,8 @@ def run_paper_pass(
                 symbol,
                 feature_set,
                 sink,
-                configuration=configuration,
+                configuration=config,
+                index_sets=index_sets,
                 ml_registry=ml_registry,
                 ml_demo=ml_demo,
             )

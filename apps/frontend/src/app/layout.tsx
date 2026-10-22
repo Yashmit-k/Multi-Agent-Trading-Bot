@@ -6,16 +6,18 @@ import type { ProvisionalRiskStatus, ProvisionalSystemStatus } from "@/api/gener
 import { parseMode } from "@/lib/mode";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Trading Overview" };
+export const metadata = { title: "StockX · NIFTY 50 paper trading" };
 
 const inter = Inter({ subsets: ["latin"] });
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   let mode: ReturnType<typeof parseMode> = "UNKNOWN";
   let killSwitch = "UNKNOWN";
+  let market: { open: boolean; trading_day: boolean } | null = null;
   try {
     const status = await fetchApi<ProvisionalSystemStatus>("/api/v1/system/status");
     mode = parseMode(status.trading_mode);
+    market = (status as unknown as { market?: { open: boolean; trading_day: boolean } }).market ?? null;
   } catch {
     mode = "UNKNOWN";
   }
@@ -28,7 +30,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en">
       <body className={inter.className}>
-        <AppShell mode={mode} killSwitch={killSwitch}>
+        <AppShell mode={mode} killSwitch={killSwitch} market={market}>
           {children}
         </AppShell>
       </body>

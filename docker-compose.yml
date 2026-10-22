@@ -34,7 +34,9 @@ services:
       REDIS_URL: redis://redis:6379/0
       SEED_HISTORY_DAYS: ${SEED_HISTORY_DAYS:-100}
       MARKET_DATA_COLLECTOR: "true"
-      MARKET_DATA_POLL_SECONDS: "60"
+      MARKET_DATA_POLL_SECONDS: "20"
+      # Same list the worker fuses with, so the Agents scorecard reports in_fusion correctly.
+      FUSION_EXCLUDED_AGENTS: ${FUSION_EXCLUDED_AGENTS:-fundamental,valuation,earnings,ml}
     depends_on:
       postgres:
         condition: service_healthy
@@ -54,7 +56,30 @@ services:
       context: .
       dockerfile: docker/Dockerfile.core
     command: ["python", "-m", "core_worker"]
+    # Never starts with a plain `docker compose up`. Start it explicitly:
+    #   docker compose --profile worker up -d core-worker
+    profiles: ["worker"]
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://core:core@postgres:5432/core
+      REDIS_URL: redis://redis:6379/0
+      # Agents with no live data source get weight 0 in fusion.
+      FUSION_EXCLUDED_AGENTS: ${FUSION_EXCLUDED_AGENTS:-fundamental,valuation,earnings,ml}
+      # New entries 09:20 to this time IST (code default 10:30, max 15:15). Exits run all session.
+      PAPER_ENTRY_END: ${PAPER_ENTRY_END:-15:15}
+    # Once started explicitly, come back after a crash or VM reboot.
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  trace-recorder:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.core
+    command: ["python", "-m", "core_ingestion.trace_recorder"]
     environment:
       DATABASE_URL: postgresql+psycopg://core:core@postgres:5432/core
       REDIS_URL: redis://redis:6379/0
@@ -63,6 +88,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    restart: unless-stopped
 
   intelligence:
     build:
@@ -72,14 +98,35 @@ services:
     environment:
       INTELLIGENCE_TRADING_MODE: PAPER
       INTELLIGENCE_SERVICE_MODE: serve
-      INTELLIGENCE_DATA_SOURCE: fixtures
+      # rss: live headlines from public Indian market feeds. A separate sqlite file
+      # keeps the old fixture articles out of the live news store.
+      INTELLIGENCE_DATA_SOURCE: ${INTELLIGENCE_DATA_SOURCE:-rss}
+      NEWS_RSS_URLS: ${NEWS_RSS_URLS:-https://economictimes.indiatimes.com/markets/stocks/rssfeeds/2146842.cms,https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms,https://economictimes.indiatimes.com/news/company/corporate-trends/rssfeeds/2143429.cms,https://economictimes.indiatimes.com/industry/rssfeeds/13352306.cms,https://economictimes.indiatimes.com/markets/ipos/fpos/rssfeeds/14655708.cms,https://www.business-standard.com/rss/markets-106.rss,https://www.business-standard.com/rss/companies-101.rss,https://www.livemint.com/rss/markets,https://www.livemint.com/rss/companies,https://www.livemint.com/rss/money,https://www.livemint.com/rss/news,https://www.thehindubusinessline.com/markets/feeder/default.rss,https://www.thehindubusinessline.com/companies/feeder/default.rss,https://feeds.feedburner.com/ndtvprofit-latest,https://www.cnbctv18.com/commonfeeds/v1/cne/rss/market.xml,https://www.cnbctv18.com/commonfeeds/v1/cne/rss/business.xml}
       INTELLIGENCE_STORE: sqlite
-      INTELLIGENCE_SQLITE_PATH: /var/lib/intelligence/intel.db
-      INTELLIGENCE_EVAL_INTERVAL_SECONDS: "300"
+      INTELLIGENCE_SQLITE_PATH: /var/lib/intelligence/intel-rss.db
+      INTELLIGENCE_FUNDAMENTALS_CSV: ${INTELLIGENCE_FUNDAMENTALS_CSV:-/data/intelligence/fundamentals.csv}
+      INTELLIGENCE_EVAL_INTERVAL_SECONDS: "600"
       INTELLIGENCE_SYMBOLS: *nifty50
       CORE_API_URL: http://core-api:8000
-      LLM_BASE_URL: ""
-      LLM_API_KEY: ""
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      # Free tiers allow about 30 requests a minute; 2.5 s spacing stays under it.
+      LLM_MIN_INTERVAL_SECONDS: ${LLM_MIN_INTERVAL_SECONDS:-2.5}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
+      NEWS_RSS_MAX_ITEMS: ${NEWS_RSS_MAX_ITEMS:-200}
+      LLM_MAX_OUTPUT_TOKENS: ${LLM_MAX_OUTPUT_TOKENS:-600}
+      # Groq's JSON validator rejects reasoning-model output, so JSON mode is off by default.
+      LLM_JSON_MODE: ${LLM_JSON_MODE:-false}
+      # "none" disables Gemini thinking (fastest); "low" suits gpt-oss; "omit" leaves the field out.
+      LLM_REASONING_EFFORT: ${LLM_REASONING_EFFORT:-low}
+      # A re-check requested by the portfolio manager uses a second model with its own quota.
+      LLM_REASSESS_MODEL: ${LLM_REASSESS_MODEL:-gemini-3-flash-preview}
+      # Tried in order when the main model fails or its free daily quota is used up (each model has its own).
+      LLM_FALLBACK_MODELS: ${LLM_FALLBACK_MODELS:-gemini-3.6-flash,gemini-3-flash-preview}
+      # Fundamental, valuation and earnings get their own model and quota, so they never use up the News agent's
+      # (gemini-3.1-flash-lite: 500 requests a day on the free tier). 3.5-flash-lite rejects reasoning "none".
+      LLM_CONTEXT_MODEL: ${LLM_CONTEXT_MODEL:-gemini-3.5-flash-lite}
+      LLM_CONTEXT_REASONING_EFFORT: ${LLM_CONTEXT_REASONING_EFFORT:-low}
     depends_on:
       core-api:
         condition: service_healthy
@@ -87,6 +134,30 @@ services:
       - "8101:8080"
     volumes:
       - intelligence-data:/var/lib/intelligence
+      # Real quarterly fundamentals (see data/intelligence/README.md). Missing file = warning, agents stay idle.
+      - ./data/intelligence:/data/intelligence:ro
+
+  # LLM portfolio manager: reviews each agent BUY before risk (approve / reduce / veto), using tools and
+  # re-check requests to the intelligence agents. Same image as intelligence, different entry point.
+  portfolio-manager:
+    build:
+      context: .
+      dockerfile: services/intelligence/Dockerfile
+    command: ["python", "-m", "intelligence_agents.manager"]
+    env_file: .env
+    environment:
+      CORE_API_URL: http://core-api:8000
+      INTELLIGENCE_URL: http://intelligence:8080
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      # Its own models, so it does not share the news agents' daily quota.
+      MANAGER_LLM_MODEL: ${MANAGER_LLM_MODEL:-gemini-3.5-flash-lite}
+      MANAGER_FALLBACK_MODEL: ${MANAGER_FALLBACK_MODEL:-gemini-3.5-flash}
+      MANAGER_REASONING_EFFORT: ${MANAGER_REASONING_EFFORT:-low}
+    depends_on:
+      core-api:
+        condition: service_healthy
+    restart: unless-stopped
 
   quant:
     build:
@@ -105,13 +176,40 @@ services:
     ports:
       - "8102:8080"
 
+  # Same five quant agents on completed 5-minute bars (INTRADAY horizon), refreshed every bar.
+  quant-intraday:
+    build:
+      context: .
+      dockerfile: services/quant/Dockerfile
+    env_file: .env
+    environment:
+      QUANT_TRADING_MODE: PAPER
+      QUANT_DATA_SOURCE: fixtures
+      QUANT_SYMBOLS: *nifty50
+      QUANT_HORIZON: INTRADAY
+      QUANT_TIMEFRAME: 5m
+      QUANT_EVAL_INTERVAL_SECONDS: "300"
+      CORE_API_URL: http://core-api:8000
+    depends_on:
+      core-api:
+        condition: service_healthy
+    restart: unless-stopped
+
   frontend:
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
       args:
-        NEXT_PUBLIC_API_BASE_URL: http://core-api:8000
-        NEXT_PUBLIC_CORE_API_TOKEN: ${CORE_API_TOKEN}
+        NEXT_PUBLIC_API_BASE_URL: ""
+    environment:
+      API_INTERNAL_BASE_URL: http://core-api:8000
+      CORE_API_TOKEN: ${CORE_API_TOKEN}
+      FRONTEND_ALLOW_POST_PATHS: ${FRONTEND_ALLOW_POST_PATHS:-}
+      # Operator sign-in for settings, manual paper orders and strategies. Unset = read-only site.
+      OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:-}
+      OPERATOR_SESSION_SECRET: ${OPERATOR_SESSION_SECRET:-}
+      FUSION_EXCLUDED_AGENTS: ${FUSION_EXCLUDED_AGENTS:-fundamental,valuation,earnings,ml}
+      PAPER_ENTRY_END: ${PAPER_ENTRY_END:-15:15}
     depends_on:
       - core-api
     ports:

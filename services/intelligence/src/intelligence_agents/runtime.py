@@ -64,16 +64,36 @@ def make_stores(settings: IntelligenceSettings):
     return news, funds
 
 
-def make_router(settings: IntelligenceSettings) -> LLMRouter:
+def make_price_provider(settings: IntelligenceSettings):
+    """Real Zerodha prices from Core in live modes; deterministic fixtures in BACKTEST and fixture mode."""
+    if settings.trading_mode is TradingMode.BACKTEST or settings.data_source == "fixtures":
+        return FakeMarketDataProvider()
+    from intelligence_agents.market import CoreMarketDataProvider
+
+    return CoreMarketDataProvider(settings.core_api_url, settings.core_api_token)
+
+
+def make_router(settings: IntelligenceSettings, *, tier1_model: str | None = None, reasoning_effort: str | None = None, exclude: tuple[str, ...] = ()) -> LLMRouter:
+    from intelligence_agents.llm.cache import LLMCache
+
+    persistent = settings.store == "sqlite" and settings.trading_mode is not TradingMode.BACKTEST
     return build_router(
         api_key=settings.llm_api_key,
         base_url=settings.llm_base_url,
-        tier1_model=settings.llm_tier1_model,
+        tier1_model=tier1_model or settings.llm_tier1_model,
         tier2_model=settings.llm_tier2_model,
         timeout=settings.llm_timeout_seconds,
         daily_budget_usd=settings.llm_daily_budget_usd,
         tier2_enabled=settings.tier2_enabled,
-        use_cache=False,
+        # Live modes reuse an assessment for unchanged text, so a repeated headline costs
+        # no LLM call. BACKTEST stays uncached and uses the fixture provider.
+        use_cache=settings.trading_mode is not TradingMode.BACKTEST,
+        min_interval_seconds=settings.llm_min_interval_seconds,
+        max_output_tokens=settings.llm_max_output_tokens,
+        json_mode=settings.llm_json_mode,
+        reasoning_effort=settings.llm_reasoning_effort if reasoning_effort is None else reasoning_effort,
+        cache=LLMCache(settings.sqlite_path if persistent else None),
+        fallback_models=tuple(name for name in settings.llm_fallback_models if name not in exclude),
     )
 
 
@@ -85,6 +105,18 @@ def make_sink(settings: IntelligenceSettings, *, sink: SignalSink | None = None)
     return HttpSignalSink(settings.core_api_url, settings.internal_signal_token, settings.trading_mode)
 
 
+def make_context_router(settings: IntelligenceSettings, news_router: LLMRouter) -> LLMRouter:
+    """The router for fundamental, valuation and earnings: their own model, never the News agent's."""
+    if not settings.llm_context_model or settings.llm_context_model == settings.llm_tier1_model:
+        return news_router
+    return make_router(
+        settings,
+        tier1_model=settings.llm_context_model,
+        reasoning_effort=settings.llm_context_reasoning_effort or settings.llm_reasoning_effort,
+        exclude=(settings.llm_tier1_model,),
+    )
+
+
 def make_runner(
     settings: IntelligenceSettings,
     *,
@@ -94,16 +126,19 @@ def make_runner(
     news, funds = make_stores(settings)
     resolved_clock = clock or make_clock(settings)
     router = make_router(settings)
+    context_router = make_context_router(settings, router)
     agents = (
         NewsAgent(resolved_clock, router),
-        FundamentalAgent(resolved_clock, router),
-        ValuationAgent(resolved_clock, router),
-        EarningsAgent(resolved_clock, router),
+        FundamentalAgent(resolved_clock, context_router),
+        ValuationAgent(resolved_clock, context_router),
+        EarningsAgent(resolved_clock, context_router),
     )
+
+    prices = make_price_provider(settings)
 
     def factory(symbol: str, as_of: datetime, horizon: Horizon) -> AgentContext:
         return AgentContext(
-            market_data_provider=FakeMarketDataProvider(),
+            market_data_provider=prices,
             feature_provider=FakeFeatureProvider(),
             news_provider=IntelligenceNewsProvider(news),
             fundamental_provider=IntelligenceFundamentalProvider(funds),
@@ -113,4 +148,5 @@ def make_runner(
     runner = Runner(agents, make_sink(settings, sink=sink), resolved_clock, factory, settings.trading_mode)
     runner.news_store = news
     runner.fund_store = funds
+    runner.context_router = context_router
     return runner, router

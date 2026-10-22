@@ -26,12 +26,15 @@ def refresh_sources(settings: IntelligenceSettings, runner, puller=None) -> None
     if settings.data_source == "rss":
         if puller is None:
             logger.error("rss_puller_missing")
-            return
-        for url in settings.news_rss_urls:
-            try:
-                puller.pull(url)
-            except Exception:
-                logger.exception("rss_cycle_failed")
+        else:
+            for url in settings.news_rss_urls:
+                try:
+                    puller.pull(url)
+                except Exception:
+                    logger.exception("rss_cycle_failed")
+        # Live news and a real fundamentals file can run together.
+        if settings.fundamentals_csv:
+            _load_fundamentals(runner, settings.fundamentals_csv)
         return
     if settings.data_source == "csv-live":
         from intelligence_agents.fundamentals.csv_loader import load_csv
@@ -42,16 +45,33 @@ def refresh_sources(settings: IntelligenceSettings, runner, puller=None) -> None
             logger.exception("csv_cycle_failed")
 
 
+def _load_fundamentals(runner, path: str) -> None:
+    from pathlib import Path
+
+    from intelligence_agents.fundamentals.csv_loader import load_csv
+
+    if not Path(path).is_file():
+        logger.warning("fundamentals_csv_missing", extra={"path": path})
+        return
+    try:
+        inserted = load_csv(runner.fund_store, path)
+        if inserted:
+            logger.info("fundamentals_csv_loaded", extra={"rows": inserted})
+    except Exception:
+        logger.exception("csv_cycle_failed")
+
+
 def run_cycle(settings: IntelligenceSettings, runner, health: RunnerHealth, router, puller=None) -> None:
     refresh_sources(settings, runner, puller)
     as_of = cycle_as_of(runner.clock.now(), settings.eval_interval_seconds)
     produced = runner.run(list(settings.symbols), as_of)
     health.last_run_at = datetime.now(timezone.utc).isoformat()
     health.signals_emitted_last_run = len(produced)
-    health.prompt_tokens = router._tracker.prompt_tokens
-    health.completion_tokens = router._tracker.completion_tokens
+    routers = [router, *([runner.context_router] if getattr(runner, "context_router", router) is not router else [])]
+    health.prompt_tokens = sum(item._tracker.prompt_tokens for item in routers)
+    health.completion_tokens = sum(item._tracker.completion_tokens for item in routers)
     snapshot = router.health_snapshot()
-    health.fallbacks = int(snapshot["fallback_count"])
+    health.fallbacks = sum(int(item.health_snapshot()["fallback_count"]) for item in routers)
     health.last_generation = snapshot["last_generation"]  # type: ignore[assignment]
     health.last_failure_type = snapshot["last_failure_type"]  # type: ignore[assignment]
     health.llm_provider = str(snapshot["provider"])

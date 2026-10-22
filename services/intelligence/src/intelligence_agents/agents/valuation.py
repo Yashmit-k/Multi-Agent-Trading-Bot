@@ -10,6 +10,7 @@ from contracts.interfaces import AgentContext
 from contracts.schemas.agent_signal import AgentSignal
 
 from intelligence_agents.agents.base import BaseIntelligenceAgent
+from intelligence_agents.fundamentals.provider import latest_by_metric
 from intelligence_agents.errors import FixtureCoverageError
 from intelligence_agents.agents.confidence import CAPS
 from intelligence_agents.agents.interpret import interpret
@@ -37,24 +38,31 @@ class ValuationAgent(BaseIntelligenceAgent):
             "quote": quote.model_dump(mode="json"),
             "points": [point.model_dump(mode="json") for point in points],
         }
-        eps_points = [point for point in points if point.metric == "eps"]
-        if not eps_points:
+        latest = latest_by_metric(points)
+        if "eps" not in latest:
             return self._insufficient(symbol, as_of, context, payload)
-        eps = eps_points[-1].value
+        eps = latest["eps"].value  # trailing-twelve-month EPS in INR
         if eps <= 0:
             return self._insufficient(symbol, as_of, context, payload)
         pe = Decimal(quote.last_price) / eps
-        # Cheap vs rich around PE 20 as a bounded heuristic, not a trade.
-        score = max(-1.0, min(1.0, float((Decimal("20") - pe) / Decimal("40"))))
+        peer = latest.get("peer_median_pe")
+        if peer is not None and peer.value > 0:
+            # Cheaper than sector peers -> positive, richer -> negative; 50% below/above the median saturates.
+            anchor, base_confidence, basis = peer.value, 0.48, "sector_peers"
+            score = max(-1.0, min(1.0, float((anchor - pe) / anchor) * 2))
+        else:
+            # No peer median: a market-wide P/E of 20, with lower confidence.
+            anchor, base_confidence, basis = Decimal("20"), 0.3, "fixed_pe_20"
+            score = max(-1.0, min(1.0, float((anchor - pe) / Decimal("40"))))
         assessment = interpret(
             self._router,
             task="valuation",
             payload=(
                 "Interpret this computed valuation. Do not invent price, EPS, or PE. "
-                f"last_price={quote.last_price} eps={eps} implied_pe={pe} score={score:.4f}"
+                f"last_price={quote.last_price} ttm_eps={eps} implied_pe={pe:.2f} comparison_pe={anchor} basis={basis} score={score:.4f}"
             ),
         )
-        confidence = self._combine_confidence([0.48, assessment.confidence])
+        confidence = self._combine_confidence([base_confidence, assessment.confidence])
         payload["llm"] = as_jsonable(assessment)
         return self._build(
             symbol=symbol,
@@ -63,7 +71,7 @@ class ValuationAgent(BaseIntelligenceAgent):
             score=score,
             confidence=confidence,
             reason_codes=assessment.reason_codes,
-            features={"implied_pe": str(pe), "last_price": str(quote.last_price), "eps": str(eps)},
-            metadata={"quote_timestamp": quote.timestamp.isoformat(), "llm": payload["llm"]},
+            features={"implied_pe": str(pe), "last_price": str(quote.last_price), "eps": str(eps), "comparison_pe": str(anchor)},
+            metadata={"quote_timestamp": quote.timestamp.isoformat(), "pe_basis": basis, "eps_period": latest["eps"].period, "llm": payload["llm"]},
             payload=payload,
         )

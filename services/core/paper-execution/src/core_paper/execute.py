@@ -10,7 +10,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_DOWN
 
-from contracts.enums import Exchange, OrderStatus, OrderType, Side, Timeframe, TradingMode
+from contracts.enums import Exchange, Horizon, OrderStatus, OrderType, Side, Timeframe, TradingMode
 from contracts.schemas.execution import Execution
 from contracts.schemas.market import Candle
 from contracts.schemas.order import Order
@@ -53,10 +53,12 @@ logger = logging.getLogger(__name__)
 
 
 def order_notional_cap(requested: Decimal | None = None) -> Decimal:
-    """Hard per-order notional ceiling. A larger requested cap cannot raise it."""
-    if requested is None or requested > MAX_NOTIONAL:
+    """Per-order notional cap: the user setting (default Rs 20,000), never above the hard ceiling."""
+    from core_risk.settings import HARD_MAX_ORDER_NOTIONAL
+
+    if requested is None:
         return MAX_NOTIONAL
-    return requested
+    return min(requested, HARD_MAX_ORDER_NOTIONAL)
 
 
 def affordable_quantity(
@@ -91,8 +93,16 @@ def queue_entry(
     schedule: EquityChargeSchedule | None = ZERODHA_EQUITY_RI,
     cap: Decimal | None = None,
     entry_window: EntryWindow | None = None,
+    placed_at: datetime | None = None,
+    daily_limit: int | None = None,
+    limit_override: Decimal | None = None,
+    quantity_limit: int | None = None,
 ) -> Order | None:
-    """Create one CNC limit order, or a rejected order when the policy cannot be applied."""
+    """Create one CNC limit order, or a rejected order when the policy cannot be applied.
+
+    as_of is the decision bar; it assigns the entry window. placed_at (default as_of) is when the
+    order is created: it stamps created_at, which the daily entry cap counts by IST date.
+    """
     if proposal.side != Side.BUY:
         return None
     if repository.order_for_proposal(proposal.proposal_id) is not None:
@@ -103,20 +113,25 @@ def queue_entry(
     bound = order_notional_cap(cap)
     reason = _entry_block(repository, proposal, as_of, instrument.tick_size, schedule)
     if reason is not None:
-        order = _order(repository, proposal, as_of, instrument, status=OrderStatus.REJECTED, limit=None, metadata={"reason": reason, "product_type": PRODUCT_CNC})
+        order = _order(repository, proposal, placed_at or as_of, instrument, status=OrderStatus.REJECTED, limit=None, metadata={"reason": reason, "product_type": PRODUCT_CNC})
         repository.commit_policy_order(order, None)
         return order
     priced = require_schedule(schedule)
-    daily, candle_id = repository.completed_daily(proposal.symbol, as_of)  # type: ignore[misc]
+    daily, candle_id, reference_rule = _reference(repository, proposal, as_of)
     window = _requested_window(entry_window) if entry_window is not None else assign_entry_window(as_of)
     limit = buy_limit(daily.close, instrument.tick_size)
+    if limit_override is not None:  # a manual limit, never above the standard +25 bp entry limit
+        tick = instrument.tick_size
+        limit = min(limit, (limit_override / tick).to_integral_value(rounding="ROUND_FLOOR") * tick)
     cash = repository.available_cash(repository.active_paper_session().starting_cash)  # type: ignore[union-attr]
     quantity = affordable_quantity(cash, limit, priced, bound)
+    if quantity_limit is not None:
+        quantity = min(quantity, quantity_limit)
     if quantity < 1:
         order = _order(
             repository,
             proposal,
-            as_of,
+            placed_at or as_of,
             instrument,
             status=OrderStatus.REJECTED,
             limit=limit,
@@ -125,11 +140,11 @@ def queue_entry(
         repository.commit_policy_order(order, None)
         return order
     notional = limit * quantity
-    if notional > MAX_NOTIONAL:
+    if notional > bound:
         order = _order(
             repository,
             proposal,
-            as_of,
+            placed_at or as_of,
             instrument,
             status=OrderStatus.REJECTED,
             limit=limit,
@@ -142,7 +157,7 @@ def queue_entry(
         "reason": "entry",
         "product_type": PRODUCT_CNC,
         "policy_version": POLICY_VERSION,
-        "reference_rule": REFERENCE_RULE,
+        "reference_rule": reference_rule,
         "reference_price": str(daily.close),
         "reference_candle_end": daily.end.astimezone(timezone.utc).isoformat(),
         "reference_candle_id": candle_id,
@@ -161,16 +176,32 @@ def queue_entry(
         "evaluated_bars": [],
         "stop_loss": str(proposal.stop_loss),
         "take_profit": str(proposal.take_profit),
+        "notional_cap": str(bound),
     }
     sized = proposal.model_copy(update={"quantity": quantity})
-    order = _order(repository, sized, as_of, instrument, status=OrderStatus.OPEN, limit=limit, metadata=metadata, quantity=quantity)
-    if repository.commit_policy_order(order, reserve):
+    order = _order(repository, sized, placed_at or as_of, instrument, status=OrderStatus.OPEN, limit=limit, metadata=metadata, quantity=quantity)
+    committed = repository.commit_policy_order(order, reserve) if daily_limit is None else repository.commit_policy_order(order, reserve, daily_limit=daily_limit)
+    if committed:
         return order
     existing = repository.order_for_proposal(proposal.proposal_id)
     if existing is not None:
         return existing
     logger.info("daily_entry_cap day=%s", order.created_at.astimezone(IST).date().isoformat())
     return None
+
+
+INTRADAY_REFERENCE_RULE = "latest_completed_5m_close_v1"
+
+
+def _reference(repository: CoreRepository, proposal, as_of: datetime):
+    """Price an entry off the bar the decision used: the 5m close for INTRADAY, the daily close otherwise."""
+    if proposal.horizon == Horizon.INTRADAY:
+        bars = repository.candles_until(proposal.symbol, Timeframe.M5, as_of, last=1)
+        if bars:
+            bar = bars[-1]
+            return bar, f"NSE:{bar.symbol}:5m:{bar.start.astimezone(timezone.utc).isoformat()}", INTRADAY_REFERENCE_RULE
+    daily, candle_id = repository.completed_daily(proposal.symbol, as_of)  # type: ignore[misc]
+    return daily, candle_id, REFERENCE_RULE
 
 
 def settle_entries(
@@ -251,7 +282,9 @@ def _settle_one(repository, order: Order, *, starting_cash: Decimal, now: dateti
         return
     limit = Decimal(str(order.limit_price))
     bars = {bar.start.astimezone(timezone.utc): bar for bar in repository.stored_candles(order.symbol, Timeframe.M5)}
-    for start in expected_bar_starts(window, activation):
+    # Only bars that start after the order existed: an order placed at 10:09 cannot fill on the 09:25 bar.
+    first_moment = max(activation.astimezone(timezone.utc), order.created_at.astimezone(timezone.utc))
+    for start in expected_bar_starts(window, first_moment):
         key = start.astimezone(timezone.utc).isoformat()
         if repository.bar_already_checked(order.order_id, key):
             continue
@@ -281,7 +314,7 @@ def _fill_buy(repository, order, bar: Candle, price: Decimal, starting_cash: Dec
     fees = delivery_buy(notional, schedule).total
     debit = notional + fees
     reserved = Decimal(str(order.metadata["reserved_amount"]))
-    if price > Decimal(str(order.limit_price)) or notional > MAX_NOTIONAL or debit > reserved:
+    if price > Decimal(str(order.limit_price)) or notional > order_notional_cap(Decimal(str(order.metadata.get("notional_cap") or MAX_NOTIONAL))) or debit > reserved:
         return False
     if debit > repository.cash_balance(starting_cash):
         return False
@@ -330,7 +363,7 @@ def settle_sell(repository: CoreRepository, order: Order, *, starting_cash: Deci
     decision_end = datetime.fromisoformat(str(order.metadata["decision_end"]))
     later = [
         bar
-        for bar in repository.stored_candles(order.symbol, Timeframe.M5)
+        for bar in repository.stored_candles(order.symbol, Timeframe.M5, start=decision_end, end=now)
         if bar.end.astimezone(timezone.utc) > decision_end.astimezone(timezone.utc)
         and bar.end.astimezone(timezone.utc) <= now.astimezone(timezone.utc)
     ]

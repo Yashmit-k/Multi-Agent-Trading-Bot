@@ -3,7 +3,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, DateTime, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Index, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -55,7 +55,10 @@ class MarketTickRow(Base):
 
 class CandleRow(Base):
     __tablename__ = "candles"
-    __table_args__ = (UniqueConstraint("instrument_id", "timeframe", "start", name="uq_candles"),)
+    __table_args__ = (
+        UniqueConstraint("instrument_id", "timeframe", "start", name="uq_candles"),
+        Index("ix_candles_symbol_timeframe_end", "symbol", "timeframe", "end"),
+    )
 
     candle_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     instrument_id: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -86,6 +89,10 @@ class FeatureRow(Base):
 
 class AgentSignalRow(Base):
     __tablename__ = "agent_signals"
+    __table_args__ = (
+        Index("ix_agent_signals_recorded_at", "recorded_at"),
+        Index("ix_agent_signals_symbol", "symbol"),
+    )
 
     signal_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     symbol: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -117,8 +124,10 @@ class AuditLogRow(Base):
 
 class SystemEventRow(Base):
     __tablename__ = "system_events"
+    __table_args__ = (Index("ix_system_events_recorded_at", "recorded_at"),)
 
-    event_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    # Envelope ids are "<event type>:<id>"; quant signal ids alone are 64 hex characters.
+    event_id: Mapped[str] = mapped_column(String(200), primary_key=True)
     event_type: Mapped[str] = mapped_column(String(64), nullable=False)
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
@@ -320,3 +329,83 @@ class RuntimeFlagRow(Base):
     flag_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     paper_running: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     peak_equity: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+
+
+class BrokerSessionRow(Base):
+    """Latest market-data access token per broker, so a Core restart does not log out.
+
+    Paper only: the token is used for market data. No order endpoint is ever called.
+    """
+
+    __tablename__ = "broker_sessions"
+
+    broker: Mapped[str] = mapped_column(String(32), primary_key=True)
+    access_token: Mapped[str] = mapped_column(String(256), nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class DailyEquityRow(Base):
+    """One end-of-day book per paper session and IST trading day, written after the cash close."""
+
+    __tablename__ = "daily_equity"
+    __table_args__ = (UniqueConstraint("session_id", "trading_day", name="uq_daily_equity_session_day"),)
+
+    daily_id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    trading_day: Mapped[str] = mapped_column(String(10), nullable=False)
+    written_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class UserSettingRow(Base):
+    """One JSON document per settings key (e.g. "risk"), edited from the Settings page."""
+
+    __tablename__ = "user_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_by: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+class UserStrategyRow(Base):
+    """A user-built rule strategy (indicators, conditions, exits), as JSON."""
+
+    __tablename__ = "user_strategies"
+
+    strategy_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AgentSignalDailyRow(Base):
+    """Daily summary of an agent's signals, kept after the raw rows age out (core_db retention)."""
+
+    __tablename__ = "agent_signal_daily"
+
+    day: Mapped[str] = mapped_column(String(10), primary_key=True)
+    agent: Mapped[str] = mapped_column(String(32), primary_key=True)
+    horizon: Mapped[str] = mapped_column(String(16), primary_key=True)
+    version: Mapped[str] = mapped_column(String(16), primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class ProposalReviewRow(Base):
+    """One portfolio-manager review: the request, its reasoning steps, and the verdict (core_db.reviews)."""
+
+    __tablename__ = "proposal_reviews"
+    __table_args__ = (Index("ix_proposal_reviews_proposal_id", "proposal_id"), Index("ix_proposal_reviews_created_at", "created_at"))
+
+    review_id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    proposal_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    request: Mapped[dict] = mapped_column(JSON_VALUE, nullable=False)
+    steps: Mapped[list] = mapped_column(JSON_VALUE, nullable=False)
+    verdict: Mapped[dict | None] = mapped_column(JSON_VALUE, nullable=True)

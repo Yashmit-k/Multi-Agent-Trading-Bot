@@ -59,6 +59,11 @@ class KiteConnectMarketClient:
             self._kite.set_access_token(self.access_token)
         return dict(data)
 
+    def use_access_token(self, token: str) -> None:
+        """Reuse a token issued earlier today (restored after a restart)."""
+        self.access_token = token
+        self._kite.set_access_token(token)
+
     def instruments(self, exchange: str) -> list[dict[str, Any]]:
         return list(self._kite.instruments(exchange))
 

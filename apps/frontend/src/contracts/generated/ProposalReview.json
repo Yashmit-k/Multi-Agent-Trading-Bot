@@ -1,0 +1,105 @@
+{
+  "$defs": {
+    "ReviewKind": {
+      "enum": [
+        "pipeline",
+        "ad_hoc"
+      ],
+      "title": "ReviewKind",
+      "type": "string"
+    },
+    "ReviewVerdict": {
+      "enum": [
+        "APPROVE",
+        "REDUCE",
+        "VETO",
+        "UNAVAILABLE"
+      ],
+      "title": "ReviewVerdict",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The manager's verdict. Published on review.events as review.completed.",
+  "properties": {
+    "conflicts": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Conflicts",
+      "type": "array"
+    },
+    "critique": {
+      "title": "Critique",
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/ReviewKind"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "proposal_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Proposal Id"
+    },
+    "review_id": {
+      "minLength": 1,
+      "title": "Review Id",
+      "type": "string"
+    },
+    "reviewer": {
+      "minLength": 1,
+      "title": "Reviewer",
+      "type": "string"
+    },
+    "size_fraction": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Size Fraction",
+      "type": "number"
+    },
+    "steps": {
+      "minimum": 0,
+      "title": "Steps",
+      "type": "integer"
+    },
+    "symbol": {
+      "minLength": 1,
+      "title": "Symbol",
+      "type": "string"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "verdict": {
+      "$ref": "#/$defs/ReviewVerdict"
+    }
+  },
+  "required": [
+    "review_id",
+    "kind",
+    "symbol",
+    "verdict",
+    "size_fraction",
+    "critique",
+    "reviewer",
+    "steps",
+    "timestamp"
+  ],
+  "title": "ProposalReview",
+  "type": "object"
+}
