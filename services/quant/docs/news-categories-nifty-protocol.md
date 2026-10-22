@@ -254,3 +254,16 @@ Also compute a matched difference. It does **not** enter the Holm family and it 
 - Inside a stratum that has at least one event and one non-event, take the difference of means. The matched statistic is the average of those differences weighted by the number of event sessions in the stratum.
 - A session with no previous VIX, or a stratum with no control, is left out of the matched statistic only.
 
+## Statistics: block bootstrap
+
+For each category, outcome, and split, on the unmatched difference:
+
+- Circular moving-block bootstrap of the session sequence.
+- Block length **5** trading sessions.
+- **5,000** resamples.
+- Seed **0**, via `numpy.random.Generator(numpy.random.PCG64(0))`. Each test constructs its own generator from seed 0, so the p-value does not depend on call order.
+- Two-sided p-value, with the bootstrap distribution recentered by subtracting the observed difference. Add-one smoothing: `(1 + count(|boot - observed| >= |observed|)) / 5001`.
+- If either group has fewer than two finite observations, do not draw a bootstrap. Difference is null and p = 1.
+
+The unit test must show that two calls with seed 0 return the same p-value and the same bootstrap draws.
+
