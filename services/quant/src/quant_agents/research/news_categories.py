@@ -536,3 +536,19 @@ def block_bootstrap_diff(
     )
 
 
+
+
+def holm_adjust(p_values: Sequence[float]) -> list[float]:
+    """Holm adjusted p-values, in the original order, capped at 1."""
+    p = [float(item) for item in p_values]
+    order = sorted(range(len(p)), key=lambda index: (p[index], index))
+    adjusted = [1.0] * len(p)
+    running = 0.0
+    m = len(p)
+    for rank, index in enumerate(order):
+        step = min(1.0, (m - rank) * p[index])
+        running = max(running, step)
+        adjusted[index] = running
+    return adjusted
+
+
