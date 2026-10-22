@@ -368,3 +368,21 @@ def test_matched_difference_weights_by_event_count() -> None:
     assert stratified_diff(values, event, strata) == pytest.approx(2.5)
 
 
+
+from quant_agents.research.news_categories import OUTCOMES, category_matters
+
+
+def _cell(diff: float, p: float, holm: float | None) -> dict[str, object]:
+    return {"diff": diff, "p": p, "holm_p": holm}
+
+
+def test_pass_rule_needs_holm_validate_p_and_the_same_sign() -> None:
+    def pack(diff: float, p: float, holm: float | None) -> dict[str, object]:
+        return {"outcomes": {name: _cell(0.0, 1.0, 1.0) for name in OUTCOMES} | {"ret_0": _cell(diff, p, holm)}}
+
+    assert category_matters(pack(0.01, 0.001, 0.04), pack(0.02, 0.03, None)) == ["ret_0"]
+    assert category_matters(pack(0.01, 0.001, 0.04), pack(-0.02, 0.03, None)) == []
+    assert category_matters(pack(0.01, 0.001, 0.06), pack(0.02, 0.03, None)) == []
+    assert category_matters(pack(0.01, 0.001, 0.04), pack(0.02, 0.05, None)) == []
+
+
