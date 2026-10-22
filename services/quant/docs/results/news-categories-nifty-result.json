@@ -1,0 +1,47 @@
+{
+  "status": "BLOCKED",
+  "reason": "GDELT volume does not cover every query. Missing days were not stored as zero, and no category was scored.",
+  "protocol_commit": "2a074372e576f0d5615138bdb731ac2624870340",
+  "study_end": "2026-10-23",
+  "volume_start": "2017-01-01",
+  "categories_scored": false,
+  "validation_runs": 0,
+  "train_freeze_commit": null,
+  "hypothesis_family": "10 categories x 12 outcomes = 120 tests, not evaluated",
+  "remaining_volume_windows": 435,
+  "probe": {
+    "date": "2026-10-23",
+    "category": "geopolitics_war",
+    "query_index": 2,
+    "mode": "timelinevolraw",
+    "window": ["2017-01-01", "2017-01-15"],
+    "attempts": 1,
+    "http_status": 429,
+    "stored_as_zero": false
+  },
+  "categories": [
+    {
+      "id": "geopolitics_war",
+      "missing_volume_days": 3583,
+      "queries": [
+        {"index": 0, "mode": "timelinevolraw", "observed_days_through_2026_10_22": 3582, "last_observed": "2026-10-22"},
+        {"index": 0, "mode": "timelinetone", "observed_days_through_2026_10_22": 3582, "last_observed": "2026-10-22"},
+        {"index": 1, "mode": "timelinevolraw", "observed_days_through_2026_10_22": 3300, "last_observed": "2026-01-13"},
+        {"index": 1, "mode": "timelinetone", "observed_days_through_2026_10_22": 1773, "last_observed": "2022-08-19"},
+        {"index": 2, "mode": "timelinevolraw", "observed_days_through_2026_10_22": 0, "last_observed": null},
+        {"index": 2, "mode": "timelinetone", "observed_days_through_2026_10_22": 0, "last_observed": null}
+      ]
+    },
+    {"id": "crude_commodities", "missing_volume_days": 3583, "queries_with_volume": 0},
+    {"id": "central_banks", "missing_volume_days": 3583, "queries_with_volume": 0},
+    {"id": "inflation_macro", "missing_volume_days": 3583, "queries_with_volume": 0},
+    {"id": "india_policy", "missing_volume_days": 3583, "queries_with_volume": 0},
+    {"id": "elections", "missing_volume_days": 3583, "queries_with_volume": 0},
+    {"id": "global_selloff", "missing_volume_days": 3583, "queries_with_volume": 0},
+    {"id": "fii_rupee", "missing_volume_days": 3583, "queries_with_volume": 0},
+    {"id": "disasters_pandemics", "missing_volume_days": 3583, "queries_with_volume": 0},
+    {"id": "trade_wars", "missing_volume_days": 3583, "queries_with_volume": 0}
+  ],
+  "pass_fail": null,
+  "conclusion": "No category was tested. The preregistered pass rule was not applied."
+}
