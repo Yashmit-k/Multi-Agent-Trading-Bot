@@ -242,6 +242,26 @@ def test_a_429_on_a_wide_window_is_split(tmp_path: Path) -> None:
     assert any(pause == 15.0 for pause in slept)
 
 
+def test_a_short_window_counts_omitted_days_as_answered(tmp_path: Path) -> None:
+    from quant_agents.research.news_categories import coverage_days, covered_dates, load_gdelt_days
+
+    start, end = date(2017, 1, 1), date(2017, 1, 3)
+    assert covered_dates(start, end, {date(2017, 1, 1)}) == (start, end)
+    long_start, long_end = date(2017, 1, 1), date(2017, 6, 1)
+    assert covered_dates(long_start, long_end, {date(2017, 1, 1), date(2017, 3, 1)}) == (date(2017, 1, 1), date(2017, 3, 1))
+
+    class _Partial:
+        def get(self, url: str) -> _StatusResponse:
+            return _StatusResponse(
+                '{"timeline":[{"series":"Article Count","data":[{"date":"20170101000000","value":4}]}]}',
+                200,
+            )
+
+    load_gdelt_days("(war)", "timelinevolraw", start, end, tmp_path, _Partial(), lambda _seconds: None, "geopolitics_war")
+    answered = coverage_days(tmp_path)[("(war)", "timelinevolraw")]
+    assert answered == {date(2017, 1, 1), date(2017, 1, 2), date(2017, 1, 3)}
+
+
 def test_gap_windows_skip_days_already_in_hand() -> None:
     from datetime import date
 

@@ -1097,7 +1097,7 @@ def render_markdown(result: dict[str, object]) -> str:
         assert isinstance(category, dict)
         lines.append(f"## {category['name']}")
         lines.append("")
-        lines.append("| Split | Events | Day-0 return, event | Day-0 return, other | Diff | Abs-move ratio | VIX diff | p | Holm p |")
+        lines.append("| Split | Events | Next-session return, event | Next-session return, other | Diff | Abs-move ratio | VIX diff | p | Holm p |")
         lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
         for split in ("train", "validate"):
             block = category[split]
@@ -1208,6 +1208,70 @@ def git_protocol_commit(root: Path) -> str:
     return output.strip()
 
 
+def covered_dates(start: date, end: date, present: Iterable[date]) -> tuple[date, date] | None:
+    """Days a successful GDELT window actually answered.
+
+    A short window, an empty timeline, or a timeline that touches both ends
+    counts the whole request: days the timeline omits are zeros, not gaps.
+    A long timeline that stops early counts only the returned span, so the
+    tail can be requested again.
+    """
+    if end < start:
+        return None
+    inside = {day for day in present if start <= day <= end}
+    if not inside or (end - start).days <= 21:
+        return start, end
+    first, last = min(inside), max(inside)
+    if first == start and last == end:
+        return start, end
+    return first, last
+
+
+def remember_coverage(cache: Path, query: str, mode: str, start: date, end: date) -> None:
+    """Append one inclusive range that GDELT has already answered."""
+    if end < start:
+        return
+    path = cache / "coverage.json"
+    rows: list[object] = []
+    if path.exists():
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            loaded = []
+        if isinstance(loaded, list):
+            rows = loaded
+    rows.append({"query": query, "mode": mode, "start": start.isoformat(), "end": end.isoformat()})
+    path.write_text(json.dumps(rows), encoding="utf-8")
+
+
+def coverage_days(cache: Path) -> dict[tuple[str, str], set[date]]:
+    """Expand recorded ranges. Missing files mean nothing has been answered yet."""
+    path = cache / "coverage.json"
+    found: dict[tuple[str, str], set[date]] = {}
+    if not path.exists():
+        return found
+    try:
+        rows = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return found
+    if not isinstance(rows, list):
+        return found
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        try:
+            start = date.fromisoformat(str(row["start"]))
+            end = date.fromisoformat(str(row["end"]))
+        except (KeyError, ValueError):
+            continue
+        bucket = found.setdefault((str(row.get("query") or ""), str(row.get("mode") or "")), set())
+        cursor = start
+        while cursor <= end:
+            bucket.add(cursor)
+            cursor += timedelta(days=1)
+    return found
+
+
 def load_gdelt_days(
     query: str,
     mode: str,
@@ -1250,8 +1314,12 @@ def load_gdelt_days(
                 raise RuntimeError(f"GDELT window overlap on {min(shared).isoformat()}") from exc
             left.update(right)
             return left
+    present = volume_by_day(parse_stamped(payload))
+    answered = covered_dates(start, end, present)
+    if answered is not None:
+        remember_coverage(cache, query, mode, answered[0], answered[1])
     out: dict[date, float] = {}
-    for day, value in volume_by_day(parse_stamped(payload)).items():
+    for day, value in present.items():
         if start <= day <= end:
             out[day] = value
     return out
@@ -1318,12 +1386,29 @@ def category_event_days(cache: Path, client: object, sleeper: Callable[[float], 
         parts: list[dict[date, float]] = []
         for query in queries:
             merged = dict(cached.get((query, "timelinevolraw"), {}))
-            for start_day, end_bound in gap_windows(set(merged), VOLUME_START, end_day):
-                piece = load_gdelt_days(query, "timelinevolraw", start_day, end_bound, cache, client, sleeper, category_id)
-                for day, value in piece.items():
-                    merged.setdefault(day, value)
+            for day in coverage_days(cache).get((query, "timelinevolraw"), ()):
+                if VOLUME_START <= day <= end_day:
+                    merged.setdefault(day, 0.0)
+            # 150 days stays under the protocol's 700-day cap and is what GDELT will answer.
+            pending = gap_windows(set(merged), VOLUME_START, end_day, span_days=150)
+            rounds = 0
+            while pending:
+                rounds += 1
+                if rounds > 6:
+                    raise RuntimeError(
+                        f"GDELT volume still missing for {category_id} at {pending[0][0].isoformat()} ({len(pending)} windows)"
+                    )
+                for start_day, end_bound in pending:
+                    piece = load_gdelt_days(query, "timelinevolraw", start_day, end_bound, cache, client, sleeper, category_id)
+                    for day, value in piece.items():
+                        merged.setdefault(day, value)
+                    for day in coverage_days(cache).get((query, "timelinevolraw"), ()):
+                        if VOLUME_START <= day <= end_day:
+                            merged.setdefault(day, 0.0)
+                pending = gap_windows(set(merged), VOLUME_START, end_day, span_days=150)
             tone = set(cached.get((query, "timelinetone"), {}))
-            for start_day, end_bound in gap_windows(tone, VOLUME_START, end_day):
+            tone.update(day for day in coverage_days(cache).get((query, "timelinetone"), ()) if VOLUME_START <= day <= end_day)
+            for start_day, end_bound in gap_windows(tone, VOLUME_START, end_day, span_days=150):
                 try:
                     load_gdelt_days(query, "timelinetone", start_day, end_bound, cache, client, sleeper, category_id)
                 except RuntimeError as exc:
@@ -1476,7 +1561,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         raise SystemExit("usage: python -m quant_agents.research.news_categories train|validate")
     root = repo_root()
     if args[0] == "train":
-        client = httpx.Client(timeout=90.0, follow_redirects=True, headers={"User-Agent": "stockx-research/1.0"})
+        client = httpx.Client(timeout=25.0, follow_redirects=True, headers={"User-Agent": "stockx-research/1.0"})
         try:
             path = run_train(root, today=date.today(), client=client, sleeper=lambda seconds: __import__("time").sleep(seconds), yahoo=load_yahoo_closes)
         finally:
