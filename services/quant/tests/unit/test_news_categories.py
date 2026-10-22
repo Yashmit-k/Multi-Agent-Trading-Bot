@@ -353,13 +353,19 @@ class _Client:
         return _Response(self.text)
 
 
+_VALID_TIMELINE = (
+    '{"query_details":{"title":"war"},"timeline":[{"series":"Article Count",'
+    '"data":[{"date":"20170101000000","value":1}]}]}'
+)
+
+
 def test_fetch_sleeps_only_on_a_cache_miss(tmp_path: Path) -> None:
-    client = _Client('{"timeline":[]}')
+    client = _Client(_VALID_TIMELINE)
     slept: list[float] = []
     url = "https://api.gdeltproject.org/api/v2/doc/doc?query=war"
     first, did_http = fetch_json(url, tmp_path, client, slept.append)
     second, did_http_again = fetch_json(url, tmp_path, client, slept.append)
-    assert first == {"timeline": []}
+    assert first["timeline"][0]["data"][0]["value"] == 1
     assert second == first
     assert did_http is True
     assert did_http_again is False
@@ -377,12 +383,12 @@ def test_fetch_retries_a_dropped_connection(tmp_path: Path) -> None:
             self.calls += 1
             if self.calls == 1:
                 raise ConnectionError("dropped")
-            return _Response('{"timeline":[]}')
+            return _Response(_VALID_TIMELINE)
 
     client = _Flaky()
     slept: list[float] = []
-    payload, did_http = fetch_json("https://api.gdeltproject.org/api/v2/doc/doc?query=flaky", tmp_path, client, slept.append)
-    assert payload == {"timeline": []}
+    payload, did_http = fetch_json("https://api.gdeltproject.org/api/v2/doc/doc?query=war", tmp_path, client, slept.append)
+    assert payload["timeline"][0]["data"][0]["value"] == 1
     assert did_http is True
     assert slept == [10.0, 5.0]
     assert client.calls == 2
@@ -392,6 +398,23 @@ def test_fetch_rejects_a_non_json_body(tmp_path: Path) -> None:
     client = _Client("please slow down")
     with pytest.raises(RuntimeError, match="GDELT"):
         fetch_json("https://example.test/gdelt", tmp_path, client, lambda _seconds: None)
+
+
+def test_empty_timeline_is_not_cached_as_coverage(tmp_path: Path) -> None:
+    url = "https://api.gdeltproject.org/api/v2/doc/doc?query=war&mode=timelinevolraw"
+    client = _Client('{"timeline":[]}')
+    with pytest.raises(RuntimeError, match="empty timeline"):
+        fetch_json(url, tmp_path, client, lambda _seconds: None)
+    assert not cache_file(tmp_path, url).exists()
+
+
+def test_query_mismatch_is_not_reused(tmp_path: Path) -> None:
+    from quant_agents.research.news_categories import gdelt_payload_problem
+
+    payload = json.loads(_VALID_TIMELINE)
+    assert gdelt_payload_problem(payload, query="other") == "query mismatch"
+    assert gdelt_payload_problem({"timeline": [{"data": []}]}) == "empty data"
+    assert gdelt_payload_problem(["not", "an", "object"]) == "malformed payload"
 
 
 class _StatusResponse:
@@ -412,15 +435,15 @@ class _RetryClient:
         self.calls += 1
         if self.calls == 1:
             return _StatusResponse("busy", 429)
-        return _StatusResponse('{"timeline":[]}', 200)
+        return _StatusResponse(_VALID_TIMELINE, 200)
 
 
 def test_fetch_retries_a_429_then_caches(tmp_path: Path) -> None:
     client = _RetryClient()
     slept: list[float] = []
-    url = "https://api.gdeltproject.org/api/v2/doc/doc?query=retry"
+    url = "https://api.gdeltproject.org/api/v2/doc/doc?query=war"
     payload, did_http = fetch_json(url, tmp_path, client, slept.append)
-    assert payload == {"timeline": []}
+    assert payload["timeline"][0]["data"][0]["value"] == 1
     assert did_http is True
     assert client.calls == 2
     assert slept == [15.0, 5.0]
@@ -631,7 +654,8 @@ class _StudyClient:
             while day <= end:
                 data.append({"date": day.strftime("%Y%m%d") + "000000", "value": 3})
                 day += timedelta(days=1)
-            return _Body(json.dumps({"timeline": [{"series": "Article Count", "data": data}]}))
+            series = "Average Tone" if query.get("mode", ["timelinevolraw"])[0] == "timelinetone" else "Article Count"
+            return _Body(json.dumps({"timeline": [{"series": series, "data": data}]}))
         return _Body("[]")
 
 
@@ -697,10 +721,10 @@ def test_retry_after_replaces_the_fixed_pause(tmp_path: Path) -> None:
             self.calls += 1
             if self.calls == 1:
                 return _HeaderResponse("busy", 429, "7")
-            return _HeaderResponse('{"timeline":[]}', 200, "0")
+            return _HeaderResponse(_VALID_TIMELINE, 200, "0")
 
     slept: list[float] = []
-    fetch_json("https://api.gdeltproject.org/api/v2/doc/doc?query=after", tmp_path, _RetryAfter(), slept.append)
+    fetch_json("https://api.gdeltproject.org/api/v2/doc/doc?query=war", tmp_path, _RetryAfter(), slept.append)
     assert slept == [7.0, 5.0]
 
 

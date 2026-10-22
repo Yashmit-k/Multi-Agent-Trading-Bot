@@ -506,6 +506,49 @@ def cache_file(cache_dir: Path, url: str) -> Path:
     return cache_dir / f"{digest}.json"
 
 
+def _is_gdelt_url(url: str) -> bool:
+    return "gdeltproject.org" in url
+
+
+def _query_param(url: str, name: str) -> str | None:
+    values = urllib.parse.parse_qs(urllib.parse.urlparse(url).query).get(name)
+    if not values:
+        return None
+    return values[0]
+
+
+def gdelt_payload_problem(payload: object, *, query: str | None = None, mode: str | None = None) -> str | None:
+    """Reject a body that cannot prove which days GDELT answered.
+
+    An empty timeline is not a run of zero-article days. A title that disagrees
+    with the requested query is a different request and must not be reused.
+    """
+    if not isinstance(payload, dict):
+        return "malformed payload"
+    timeline = payload.get("timeline")
+    if not isinstance(timeline, list) or not timeline:
+        return "empty timeline"
+    block = timeline[0]
+    if not isinstance(block, dict):
+        return "malformed timeline"
+    data = block.get("data")
+    if not isinstance(data, list) or not data:
+        return "empty data"
+    series = str(block.get("series") or "")
+    expected = {"timelinevolraw": "Article Count", "timelinetone": "Average Tone"}.get(mode or "")
+    if expected and series and series != expected:
+        return "wrong series"
+    details = payload.get("query_details")
+    if query and isinstance(details, dict):
+        recorded = str(details.get("title") or "")
+        if recorded and recorded != query:
+            return "query mismatch"
+    for row in data:
+        if not isinstance(row, dict) or "date" not in row or "value" not in row:
+            return "malformed point"
+    return None
+
+
 # Extra waits used only when GDELT answers 429. They are not part of the study design.
 GDELT_RETRY_PAUSES: tuple[float, ...] = (15.0, 30.0, 60.0, 90.0)
 
@@ -525,7 +568,15 @@ def fetch_json(
     """
     path = cache_file(cache_dir, url)
     if path.exists():
-        return json.loads(path.read_text(encoding="utf-8")), False
+        try:
+            cached = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            cached = None
+        if cached is not None and (
+            not _is_gdelt_url(url)
+            or gdelt_payload_problem(cached, query=_query_param(url, "query"), mode=_query_param(url, "mode")) is None
+        ):
+            return cached, False
     limit = len(GDELT_RETRY_PAUSES) + 1 if attempts is None else attempts
     if limit < 1:
         raise ValueError("attempts must be positive")
@@ -555,6 +606,10 @@ def fetch_json(
             payload = json.loads(text)
         except json.JSONDecodeError as exc:
             raise RuntimeError(f"GDELT did not return JSON: {text[:180]}") from exc
+        if _is_gdelt_url(url):
+            problem = gdelt_payload_problem(payload, query=_query_param(url, "query"), mode=_query_param(url, "mode"))
+            if problem:
+                raise RuntimeError(f"GDELT payload rejected: {problem}")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
         sleeper(pause)
