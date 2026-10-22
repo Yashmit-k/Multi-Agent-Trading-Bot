@@ -1270,10 +1270,10 @@ def git_protocol_commit(root: Path) -> str:
 def covered_dates(start: date, end: date, present: Iterable[date]) -> tuple[date, date] | None:
     """Days a successful GDELT window actually answered.
 
-    A short window, an empty timeline, or a timeline that touches both ends
-    counts the whole request: days the timeline omits are zeros, not gaps.
-    A long timeline that stops early counts only the returned span, so the
-    tail can be requested again.
+    A short window, or a timeline that touches both ends, counts the whole
+    request: days the timeline omits are zeros, not gaps. A response with no
+    points inside the request is not coverage. A long timeline that stops
+    early counts only the returned span, so the tail can be requested again.
     """
     if end < start:
         return None
