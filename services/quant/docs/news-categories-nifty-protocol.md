@@ -244,3 +244,13 @@ Inside one split, the statistic for an outcome is:
 
 This unmatched difference is the statistic the pass rule uses.
 
+## Comparison: same weekday and VIX tercile
+
+Also compute a matched difference. It does **not** enter the Holm family and it does **not** change the pass rule. It is reported so a weekday or volatility mix is visible.
+
+- The tercile of session `t` uses India VIX at `t-1` (known before the open), not VIX at `t`.
+- Cutpoints are the one-third and two-thirds quantiles of those previous-close VIX values on **train** sessions only. Validate uses the same two numbers. They are not refit.
+- Stratum = weekday of `t` crossed with that tercile (`<=` lower cut is low, `<=` upper cut is mid, else high).
+- Inside a stratum that has at least one event and one non-event, take the difference of means. The matched statistic is the average of those differences weighted by the number of event sessions in the stratum.
+- A session with no previous VIX, or a stratum with no control, is left out of the matched statistic only.
+
