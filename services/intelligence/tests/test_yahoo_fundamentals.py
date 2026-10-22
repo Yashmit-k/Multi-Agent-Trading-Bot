@@ -6,7 +6,7 @@ from pathlib import Path
 
 from intelligence_agents.agents.fundamental import fundamental_score
 from intelligence_agents.fundamentals.csv_loader import load_csv_text
-from intelligence_agents.fundamentals.yahoo import merge, peer_medians, quarter_label, read_csv, rows_for, run, snapshot_from_info
+from intelligence_agents.fundamentals.yahoo import merge, older_quarter_count, peer_groups, peer_medians, quarter_label, read_csv, rows_for, run, snapshot_from_info
 
 NOW = datetime(2026, 10, 19, 15, 30, tzinfo=timezone.utc)
 QUARTER = datetime(2026, 9, 30, tzinfo=timezone.utc).timestamp()
@@ -34,12 +34,51 @@ def test_stale_or_undated_quarters_write_nothing() -> None:
     assert rows_for(snapshot_from_info("HDFCBANK", _info(mostRecentQuarter=None)), None, NOW, NOW.date()) == []
 
 
-def test_peer_median_uses_sector_with_three_peers_else_all() -> None:
-    snaps = [snapshot_from_info(name, _info(trailingPE=pe, sector=sector)) for name, pe, sector in
-             [("A", 10, "Tech"), ("B", 20, "Tech"), ("C", 30, "Tech"), ("D", 50, "Retail"), ("E", -5, "Tech")]]
-    medians = peer_medians(snaps)
-    assert medians["A"] == 20 and medians["D"] == 25  # Retail has one peer: falls back to all-stock median
-    assert "E" not in medians  # negative P/E is not a peer
+def test_peer_median_never_includes_the_stock_itself() -> None:
+    snaps = [snapshot_from_info(name, _info(trailingPE=pe, sector="Tech", industry="Software")) for name, pe in
+             [("A", 10), ("B", 20), ("C", 30), ("D", 40), ("E", -5)]]
+    groups = peer_groups(snaps)
+    assert groups["A"].median_pe == 30 and groups["A"].count == 3  # B, C, D: A's own 10 is left out
+    assert groups["D"].median_pe == 20  # A, B, C
+    assert "E" not in groups  # a negative P/E has no meaningful comparison and is nobody's peer
+    assert peer_medians(snaps) == {symbol: group.median_pe for symbol, group in groups.items()}
+
+
+def test_peer_group_prefers_industry_then_sector_then_all() -> None:
+    rows = [
+        # Oil & Gas Refining: only two members, so RELIANCE falls back to its broad sector
+        ("RELIANCE", 22, "Energy", "Oil & Gas Refining & Marketing"),
+        ("BPCL", 8, "Energy", "Oil & Gas Refining & Marketing"),
+        ("ONGC", 7, "Energy", "Oil & Gas E&P"),
+        ("COALINDIA", 9, "Energy", "Thermal Coal"),
+        ("NTPC", 15, "Utilities", "Utilities - Regulated Electric"),
+        # Software: four members, so each one compares with the three others in its industry
+        ("TCS", 28, "Technology", "Information Technology Services"),
+        ("INFY", 24, "Technology", "Information Technology Services"),
+        ("WIPRO", 20, "Technology", "Information Technology Services"),
+        ("HCLTECH", 26, "Technology", "Information Technology Services"),
+        ("TITAN", 90, "Consumer Cyclical", "Luxury Goods"),
+    ]
+    snaps = [snapshot_from_info(name, _info(trailingPE=pe, sector=sector, industry=industry)) for name, pe, sector, industry in rows]
+    groups = peer_groups(snaps)
+    assert (groups["TCS"].basis, groups["TCS"].count, groups["TCS"].median_pe) == ("industry", 3, 24)  # INFY, WIPRO, HCLTECH
+    assert (groups["RELIANCE"].basis, groups["RELIANCE"].count, groups["RELIANCE"].median_pe) == ("sector", 3, 8)  # BPCL, ONGC, COALINDIA
+    assert groups["TITAN"].basis == "all" and groups["TITAN"].count == 9  # alone in its sector: every other stock
+    assert all(group.count <= len(snaps) - 1 for group in groups.values())  # a stock is never one of its own peers
+
+
+def test_peer_count_row_sits_next_to_the_median() -> None:
+    rows = rows_for(snapshot_from_info("TCS", _info()), 24.0, NOW, NOW.date(), peer_count=3)
+    by_metric = {row["metric"]: row for row in rows}
+    assert by_metric["peer_count"]["value"] == "3" and by_metric["peer_count"]["unit"] == "count"
+    assert by_metric["peer_count"]["period"] == by_metric["peer_median_pe"]["period"]
+
+
+def test_older_quarter_count_reports_results_season() -> None:
+    newer = datetime(2026, 9, 30, tzinfo=timezone.utc).timestamp()
+    older = datetime(2026, 6, 30, tzinfo=timezone.utc).timestamp()
+    snaps = [snapshot_from_info(f"S{i}", _info(mostRecentQuarter=newer if i < 3 else older)) for i in range(5)]
+    assert older_quarter_count(snaps, NOW.date()) == (2, "2026Q3")
 
 
 def test_merge_never_rewrites_and_keeps_revisions() -> None:
@@ -75,6 +114,27 @@ def test_run_writes_a_csv_the_loader_accepts(tmp_path: Path) -> None:
     store = Store()
     assert load_csv_text(store, out.read_text()) == len(read_csv(out))
     assert {point.metric for point in store.points} >= {"eps", "peer_median_pe", "profit_growth", "roe"}
+
+
+def test_generated_csv_passes_the_validator_script(tmp_path: Path) -> None:
+    import importlib.util
+
+    script = Path(__file__).resolve().parents[3] / "scripts" / "validate_fundamentals_csv.py"
+    spec = importlib.util.spec_from_file_location("validate_fundamentals_csv", script)
+    module = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+    spec.loader.exec_module(module)  # type: ignore[union-attr]
+
+    class Ticker:
+        def __init__(self, name: str) -> None:
+            symbol = name.removesuffix(".NS")
+            pe = {"TCS": 28.0, "INFY": 24.0, "WIPRO": 20.0, "HCLTECH": 26.0, "ITC": 16.5}[symbol]
+            self.info = _info(trailingPE=pe, industry="Tobacco" if symbol == "ITC" else "Information Technology Services")
+
+    out = tmp_path / "fundamentals.csv"
+    run(["TCS", "INFY", "WIPRO", "HCLTECH", "ITC"], out, now=NOW, factory=Ticker, pause=0)
+    rows = read_csv(out)
+    assert module.validate(out) == []
+    assert {row["value"] for row in rows if row["symbol"] == "TCS" and row["metric"] == "peer_count"} == {"3"}
 
 
 def test_fundamental_score_parts_and_bounds() -> None:

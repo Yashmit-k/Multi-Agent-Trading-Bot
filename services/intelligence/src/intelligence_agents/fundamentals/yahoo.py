@@ -4,7 +4,9 @@ Writes, per NSE symbol, point-in-time rows for the Fundamental, Valuation and Ea
 
   eps             trailing-twelve-month EPS in INR (Yahoo `trailingEps`, quoted in the trading currency)
   pe_at_fetch     trailing P/E at fetch time (information; Valuation recomputes P/E from the live price)
-  peer_median_pe  median trailing P/E of NIFTY 50 peers in the same Yahoo sector (>= 3 peers, else all 50)
+  peer_median_pe  median trailing P/E of the stock's NIFTY 50 peers, never the stock itself: its Yahoo industry
+                  when that has >= 3 other members, else its Yahoo sector (>= 3 others), else all the others
+  peer_count      how many peers stand behind peer_median_pe
   profit_growth   year-on-year quarterly earnings growth, fraction
   revenue_growth  year-on-year quarterly revenue growth, fraction
   margin          trailing net profit margin, fraction
@@ -54,6 +56,7 @@ class Snapshot:
     margin: float | None
     roe: float | None
     debt_to_equity: float | None
+    industry: str | None = None
 
 
 def _num(value: object) -> float | None:
@@ -84,24 +87,50 @@ def snapshot_from_info(symbol: str, info: dict, statement_roe: float | None = No
         margin=_num(info.get("profitMargins")),
         roe=_num(info.get("returnOnEquity")) if _num(info.get("returnOnEquity")) is not None else statement_roe,
         debt_to_equity=None if de is None else de / 100,
+        industry=info.get("industry") or None,
     )
 
 
-def peer_medians(snapshots: Iterable[Snapshot]) -> dict[str, float]:
-    """Median positive trailing P/E per symbol's sector; the all-stock median when a sector has < MIN_PEERS."""
+@dataclass(frozen=True)
+class PeerGroup:
+    median_pe: float
+    count: int
+    basis: str  # "industry", "sector" or "all"
+
+
+def peer_groups(snapshots: Iterable[Snapshot]) -> dict[str, PeerGroup]:
+    """Median positive trailing P/E of each stock's peers, the stock itself excluded.
+
+    Yahoo's industry is preferred when it holds at least MIN_PEERS other NIFTY 50 members (its sectors are broad:
+    RELIANCE sits with PSU energy names), then the sector, then every other stock with a positive P/E.
+    """
     items = [item for item in snapshots if item.pe is not None and item.pe > 0]
-    if not items:
-        return {}
-    overall = statistics.median(item.pe for item in items)  # type: ignore[misc]
-    by_sector: dict[str, list[float]] = {}
+    out: dict[str, PeerGroup] = {}
     for item in items:
-        if item.sector:
-            by_sector.setdefault(item.sector, []).append(item.pe)  # type: ignore[arg-type]
-    out: dict[str, float] = {}
-    for item in items:
-        peers = by_sector.get(item.sector or "", [])
-        out[item.symbol] = statistics.median(peers) if len(peers) >= MIN_PEERS else overall
+        others = [other for other in items if other.symbol != item.symbol]
+        for basis in ("industry", "sector"):
+            label = getattr(item, basis)
+            peers = [other.pe for other in others if label and getattr(other, basis) == label]
+            if len(peers) >= MIN_PEERS:
+                break
+        else:
+            basis, peers = "all", [other.pe for other in others]
+        if peers:
+            out[item.symbol] = PeerGroup(statistics.median(peers), len(peers), basis)  # type: ignore[arg-type]
     return out
+
+
+def peer_medians(snapshots: Iterable[Snapshot]) -> dict[str, float]:
+    return {symbol: group.median_pe for symbol, group in peer_groups(snapshots).items()}
+
+
+def older_quarter_count(snapshots: Iterable[Snapshot], today: date) -> tuple[int, str | None]:
+    """Stocks whose latest dated, non-stale quarter is behind the newest one in the batch (results season)."""
+    labels = [quarter_label(item.quarter_end) for item in snapshots if item.quarter_end is not None and (today - item.quarter_end).days <= MAX_QUARTER_AGE_DAYS]
+    if not labels:
+        return 0, None
+    newest = max(labels)
+    return sum(1 for label in labels if label != newest), newest
 
 
 RANKED = (("profit_growth", True), ("revenue_growth", True), ("roe", True), ("debt_to_equity", False))
@@ -121,7 +150,14 @@ def percentile_ranks(snapshots: Iterable[Snapshot]) -> dict[str, dict[str, float
     return out
 
 
-def rows_for(snapshot: Snapshot, peer_pe: float | None, fetched_at: datetime, today: date, ranks: dict[str, float] | None = None) -> list[dict[str, str]]:
+def rows_for(
+    snapshot: Snapshot,
+    peer_pe: float | None,
+    fetched_at: datetime,
+    today: date,
+    ranks: dict[str, float] | None = None,
+    peer_count: int | None = None,
+) -> list[dict[str, str]]:
     if snapshot.quarter_end is None or (today - snapshot.quarter_end).days > MAX_QUARTER_AGE_DAYS:
         return []  # stale or undated: better no row than an old one presented as current
     period = quarter_label(snapshot.quarter_end)
@@ -130,6 +166,7 @@ def rows_for(snapshot: Snapshot, peer_pe: float | None, fetched_at: datetime, to
         ("eps", snapshot.eps, "INR", period),
         ("pe_at_fetch", snapshot.pe, "ratio", today.isoformat()),
         ("peer_median_pe", peer_pe, "ratio", today.isoformat()),
+        ("peer_count", peer_count, "count", today.isoformat()),
         ("profit_growth", snapshot.profit_growth, "ratio", period),
         ("revenue_growth", snapshot.revenue_growth, "ratio", period),
         ("margin", snapshot.margin, "ratio", period),
@@ -228,15 +265,30 @@ def fetch_snapshots(symbols: list[str], *, pause: float = 0.3, factory: Callable
 def run(symbols: list[str], out: Path, *, now: datetime | None = None, factory: Callable | None = None, pause: float = 0.3) -> dict[str, object]:
     moment = now or datetime.now(timezone.utc)
     snapshots = fetch_snapshots(symbols, pause=pause, factory=factory)
-    medians = peer_medians(snapshots)
+    groups = peer_groups(snapshots)
     ranks = percentile_ranks(snapshots)
     today = moment.astimezone(timezone.utc).date()
-    fresh = [row for item in snapshots for row in rows_for(item, medians.get(item.symbol), moment, today, ranks.get(item.symbol))]
+    fresh = [
+        row
+        for item in snapshots
+        for row in rows_for(
+            item,
+            groups[item.symbol].median_pe if item.symbol in groups else None,
+            moment,
+            today,
+            ranks.get(item.symbol),
+            groups[item.symbol].count if item.symbol in groups else None,
+        )
+    ]
+    older, newest = older_quarter_count(snapshots, today)
+    if older:
+        # Results season: some stocks already report the new quarter. Logged only; ranks are not changed for it.
+        logger.warning("yahoo_fundamentals %d stocks on an older quarter (newest %s)", older, newest)
     merged, added = merge(read_csv(out), fresh)
     if added:
         write_csv(out, merged)
     covered = sorted({row["symbol"] for row in fresh})
-    report = {"fetched": len(snapshots), "symbols_with_rows": len(covered), "rows_added": added, "missing": sorted(set(symbols) - set(covered))}
+    report = {"fetched": len(snapshots), "symbols_with_rows": len(covered), "rows_added": added, "missing": sorted(set(symbols) - set(covered)), "older_quarter": older}
     logger.info("yahoo_fundamentals %s", report)
     return report
 

@@ -57,6 +57,9 @@ class ValuationAgent(BaseIntelligenceAgent):
         assessment = interpret(self._router, task="valuation", payload=valuation_prompt(pe, anchor, basis))
         confidence = self._combine_confidence([base_confidence, assessment.confidence])
         payload["llm"] = as_jsonable(assessment)
+        features = {"implied_pe": str(pe), "last_price": str(quote.last_price), "eps": str(eps), "comparison_pe": str(anchor)}
+        if basis == "sector_peers" and "peer_count" in latest:
+            features["peer_count"] = str(latest["peer_count"].value)  # how many peers stand behind comparison_pe
         return self._build(
             symbol=symbol,
             as_of=as_of,
@@ -64,7 +67,7 @@ class ValuationAgent(BaseIntelligenceAgent):
             score=score,
             confidence=confidence,
             reason_codes=assessment.reason_codes,
-            features={"implied_pe": str(pe), "last_price": str(quote.last_price), "eps": str(eps), "comparison_pe": str(anchor)},
+            features=features,
             metadata={"quote_timestamp": quote.timestamp.isoformat(), "pe_basis": basis, "eps_period": latest["eps"].period, "llm": payload["llm"]},
             payload=payload,
         )
