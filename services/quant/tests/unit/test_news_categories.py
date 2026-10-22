@@ -60,3 +60,49 @@ def test_threshold_is_at_least_two_standard_deviations() -> None:
     assert event_flags(past + [exact])[-1] is True
 
 
+
+from datetime import datetime, time, timezone
+
+import pytest
+
+from quant_agents.research.news_categories import IST, assign_gdelt_day, assign_timestamp, event_sessions
+
+MONDAY = date(2024, 1, 8)
+TUESDAY = date(2024, 1, 9)
+FRIDAY = date(2024, 1, 12)
+NEXT_MONDAY = date(2024, 1, 15)
+SESSIONS = (MONDAY, TUESDAY, date(2024, 1, 10), FRIDAY, NEXT_MONDAY)
+
+
+def _at(day: date, hour: int, minute: int, second: int = 0) -> datetime:
+    return datetime.combine(day, time(hour, minute, second), tzinfo=IST)
+
+
+def test_news_at_or_after_1530_moves_to_the_next_session() -> None:
+    assert assign_timestamp(_at(MONDAY, 15, 29, 59), SESSIONS) == MONDAY
+    assert assign_timestamp(_at(MONDAY, 15, 30, 0), SESSIONS) == TUESDAY
+    assert assign_timestamp(_at(MONDAY, 18, 0), SESSIONS) == TUESDAY
+    utc = datetime(2024, 1, 8, 10, 0, tzinfo=timezone.utc)  # 15:30 IST
+    assert assign_timestamp(utc, SESSIONS) == TUESDAY
+
+
+def test_weekend_and_missing_session_wait_for_the_next_open_day() -> None:
+    saturday = _at(date(2024, 1, 13), 10, 0)
+    assert assign_timestamp(saturday, SESSIONS) == NEXT_MONDAY
+    thursday = date(2024, 1, 11)
+    assert thursday not in SESSIONS
+    assert assign_timestamp(_at(thursday, 11, 0), SESSIONS) == FRIDAY
+
+
+def test_gdelt_day_never_uses_the_same_session() -> None:
+    assert assign_gdelt_day(MONDAY, SESSIONS) == TUESDAY
+    assert assign_gdelt_day(FRIDAY, SESSIONS) == NEXT_MONDAY
+    days = [(MONDAY, True), (TUESDAY, True), (date(2024, 1, 7), False)]
+    assert event_sessions(days, SESSIONS) == {TUESDAY, date(2024, 1, 10)}
+
+
+def test_naive_timestamp_is_rejected() -> None:
+    with pytest.raises(ValueError, match="timezone-aware"):
+        assign_timestamp(datetime(2024, 1, 8, 10, 0), SESSIONS)
+
+
