@@ -468,6 +468,7 @@ def fetch_json(
     sleeper: Callable[[float], None],
     *,
     pause: float = 5.0,
+    attempts: int | None = None,
 ) -> tuple[object, bool]:
     """Return (payload, did_http). Sleep only after a cache miss, never between hits.
 
@@ -476,7 +477,10 @@ def fetch_json(
     path = cache_file(cache_dir, url)
     if path.exists():
         return json.loads(path.read_text(encoding="utf-8")), False
-    for attempt in range(len(GDELT_RETRY_PAUSES) + 1):
+    limit = len(GDELT_RETRY_PAUSES) + 1 if attempts is None else attempts
+    if limit < 1:
+        raise ValueError("attempts must be positive")
+    for attempt in range(limit):
         if attempt:
             sleeper(GDELT_RETRY_PAUSES[attempt - 1])
         response = client.get(url)  # type: ignore[attr-defined]
@@ -1194,6 +1198,42 @@ def git_protocol_commit(root: Path) -> str:
     return output.strip()
 
 
+def load_gdelt_days(
+    query: str,
+    mode: str,
+    start: date,
+    end: date,
+    cache: Path,
+    client: object,
+    sleeper: Callable[[float], None],
+    label: str,
+) -> dict[date, float]:
+    """Fetch one window. If GDELT still returns 429, split the window and concatenate."""
+    if end < start:
+        return {}
+    print(f"gdelt {label} {mode} {start.isoformat()} {end.isoformat()}", flush=True)
+    url = gdelt_request_url(query, mode, start.strftime("%Y%m%d") + "000000", end.strftime("%Y%m%d") + "000000")
+    try:
+        payload, _ = fetch_json(url, cache, client, sleeper, attempts=2)
+    except RuntimeError as exc:
+        if "429" not in str(exc) or (end - start).days < 14:
+            raise
+        mid = start + timedelta(days=(end - start).days // 2)
+        print(f"split {label} {mode} {start.isoformat()} {end.isoformat()} at {mid.isoformat()}", flush=True)
+        left = load_gdelt_days(query, mode, start, mid, cache, client, sleeper, label)
+        right = load_gdelt_days(query, mode, mid + timedelta(days=1), end, cache, client, sleeper, label)
+        shared = set(left) & set(right)
+        if shared:
+            raise RuntimeError(f"GDELT window overlap on {min(shared).isoformat()}") from exc
+        left.update(right)
+        return left
+    out: dict[date, float] = {}
+    for day, value in volume_by_day(parse_stamped(payload)).items():
+        if start <= day <= end:
+            out[day] = value
+    return out
+
+
 def category_event_days(cache: Path, client: object, sleeper: Callable[[float], None], end_day: date) -> dict[str, list[tuple[date, bool]]]:
     """Pull each frozen query in protocol windows (or read the cache) and flag event days."""
     windows = gdelt_windows(VOLUME_START, end_day)
@@ -1203,16 +1243,11 @@ def category_event_days(cache: Path, client: object, sleeper: Callable[[float], 
         for query in queries:
             merged: dict[date, float] = {}
             for start_stamp, end_stamp in windows:
-                print(f"gdelt {category_id} {start_stamp[:8]}-{end_stamp[:8]}", flush=True)
                 start_day = date(int(start_stamp[0:4]), int(start_stamp[4:6]), int(start_stamp[6:8]))
                 end_bound = date(int(end_stamp[0:4]), int(end_stamp[4:6]), int(end_stamp[6:8]))
-                volume_url = gdelt_request_url(query, "timelinevolraw", start_stamp, end_stamp)
-                tone_url = gdelt_request_url(query, "timelinetone", start_stamp, end_stamp)
-                volume_payload, _ = fetch_json(volume_url, cache, client, sleeper)
-                fetch_json(tone_url, cache, client, sleeper)
-                for day, value in volume_by_day(parse_stamped(volume_payload)).items():
-                    if day < start_day or day > end_bound:
-                        continue
+                piece = load_gdelt_days(query, "timelinevolraw", start_day, end_bound, cache, client, sleeper, category_id)
+                load_gdelt_days(query, "timelinetone", start_day, end_bound, cache, client, sleeper, category_id)
+                for day, value in piece.items():
                     if day in merged:
                         raise RuntimeError(f"GDELT window overlap on {day.isoformat()}")
                     merged[day] = value

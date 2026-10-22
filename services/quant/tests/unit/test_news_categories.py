@@ -218,6 +218,30 @@ def test_gdelt_daily_volume_sums_subdaily_buckets_and_tones_are_weighted() -> No
     assert combined[-1] == (date(2017, 1, 2), 3.0)
 
 
+def test_a_429_on_a_wide_window_is_split(tmp_path: Path) -> None:
+    import urllib.parse
+    from datetime import date
+
+    from quant_agents.research.news_categories import load_gdelt_days
+
+    class _SplitClient:
+        def get(self, url: str) -> _StatusResponse:
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+            start = date(int(query["startdatetime"][0][0:4]), int(query["startdatetime"][0][4:6]), int(query["startdatetime"][0][6:8]))
+            end = date(int(query["enddatetime"][0][0:4]), int(query["enddatetime"][0][4:6]), int(query["enddatetime"][0][6:8]))
+            if (end - start).days > 40:
+                return _StatusResponse("busy", 429)
+            return _StatusResponse(
+                '{"timeline":[{"data":[{"date":"' + query["startdatetime"][0] + '","value":4}]}]}',
+                200,
+            )
+
+    slept: list[float] = []
+    days = load_gdelt_days("(war)", "timelinevolraw", date(2017, 1, 1), date(2017, 3, 15), tmp_path, _SplitClient(), slept.append, "geopolitics_war")
+    assert days[date(2017, 1, 1)] == 4.0
+    assert any(pause == 15.0 for pause in slept)
+
+
 def test_gdelt_windows_cover_every_day_once() -> None:
     from datetime import date, timedelta
 
