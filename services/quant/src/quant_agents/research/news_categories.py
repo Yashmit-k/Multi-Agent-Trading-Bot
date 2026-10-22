@@ -156,3 +156,48 @@ def event_flags(volume: Sequence[float], *, window: int = WINDOW, z: float = Z_S
     return flags
 
 
+
+
+def _as_ist(moment: datetime) -> datetime:
+    if moment.tzinfo is None or moment.utcoffset() is None:
+        raise ValueError("timestamp must be timezone-aware")
+    return moment.astimezone(IST)
+
+
+def assign_timestamp(moment: datetime, sessions: Sequence[date]) -> date | None:
+    """Session that may trade on a timestamped headline.
+
+    Before 15:30 IST on a session, that session. At 15:30 or later, or on a
+    day that is not a session, the next session after the IST date.
+    """
+    ist = _as_ist(moment)
+    day = ist.date()
+    ordered = tuple(sorted(sessions))
+    if day in set(ordered) and ist.time() < SESSION_CLOSE:
+        return day
+    for session in ordered:
+        if session > day:
+            return session
+    return None
+
+
+def assign_gdelt_day(day: date, sessions: Sequence[date]) -> date | None:
+    """GDELT daily buckets have no clock, so they always take the next session."""
+    for session in sorted(sessions):
+        if session > day:
+            return session
+    return None
+
+
+def event_sessions(days: Sequence[tuple[date, bool]], sessions: Sequence[date]) -> set[date]:
+    """Map event calendar days onto sessions. Two days can share one session."""
+    found: set[date] = set()
+    for day, flag in days:
+        if not flag:
+            continue
+        session = assign_gdelt_day(day, sessions)
+        if session is not None:
+            found.add(session)
+    return found
+
+
