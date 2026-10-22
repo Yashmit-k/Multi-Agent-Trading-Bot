@@ -20,3 +20,15 @@ The outcome is the index only. Individual stocks are not tested. This study does
 
 If nothing passes the rule at the end of this file, that negative result is the result. It is not a reason to retune.
 
+## Prices: public read-only candles
+
+Fetch each of these URLs **once**. Do not page, do not retry in a loop, and do not call them again for this study. Cache the body locally.
+
+- `https://13-238-176-73.sslip.io/api/v1/market/candles/NIFTY50?timeframe=1d&limit=2000`
+- `https://13-238-176-73.sslip.io/api/v1/market/candles/INDIAVIX?timeframe=1d&limit=2000`
+- `https://13-238-176-73.sslip.io/api/v1/market/candles/NIFTY50?timeframe=5m&limit=2000`
+
+The daily responses are the Kite-sourced history the live site exposes from 2024 onward. The 5-minute response is whatever that one call returns (the route caps history, so the intraday window may be short). Record the first and last bar in the result. Do not issue a second intraday call to lengthen it.
+
+A daily bar's session date is the `Asia/Kolkata` date of its `end` timestamp. A 5-minute bar belongs to the session whose IST date is the bar's `start` date, and only if its IST start time is in `[09:15, 15:30)`.
+
