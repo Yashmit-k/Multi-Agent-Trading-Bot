@@ -483,7 +483,17 @@ def fetch_json(
     for attempt in range(limit):
         if attempt:
             sleeper(GDELT_RETRY_PAUSES[attempt - 1])
-        response = client.get(url)  # type: ignore[attr-defined]
+        response = None
+        last_error: Exception | None = None
+        for _try in range(3):
+            try:
+                response = client.get(url)  # type: ignore[attr-defined]
+                break
+            except Exception as exc:
+                last_error = exc
+                sleeper(10.0)
+        if response is None:
+            raise RuntimeError(f"GDELT request failed: {url}") from last_error
         status = int(getattr(response, "status_code", 200))
         if status == 429:
             continue

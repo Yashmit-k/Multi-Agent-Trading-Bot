@@ -311,6 +311,26 @@ def test_fetch_sleeps_only_on_a_cache_miss(tmp_path: Path) -> None:
     assert cache_file(tmp_path, url).exists()
 
 
+def test_fetch_retries_a_dropped_connection(tmp_path: Path) -> None:
+    class _Flaky:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def get(self, url: str) -> _Response:
+            self.calls += 1
+            if self.calls == 1:
+                raise ConnectionError("dropped")
+            return _Response('{"timeline":[]}')
+
+    client = _Flaky()
+    slept: list[float] = []
+    payload, did_http = fetch_json("https://api.gdeltproject.org/api/v2/doc/doc?query=flaky", tmp_path, client, slept.append)
+    assert payload == {"timeline": []}
+    assert did_http is True
+    assert slept == [10.0, 5.0]
+    assert client.calls == 2
+
+
 def test_fetch_rejects_a_non_json_body(tmp_path: Path) -> None:
     client = _Client("please slow down")
     with pytest.raises(RuntimeError, match="GDELT"):
