@@ -273,3 +273,29 @@ def test_fetch_rejects_a_non_json_body(tmp_path: Path) -> None:
         fetch_json("https://example.test/gdelt", tmp_path, client, lambda _seconds: None)
 
 
+
+import pytest
+
+from quant_agents.research.news_categories import block_bootstrap_diff
+
+
+def test_bootstrap_difference_and_seed_zero_are_deterministic() -> None:
+    values = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    event = [True, False, True, False, True, False, True, False]
+    first = block_bootstrap_diff(values, event, n_boot=40, seed=0)
+    second = block_bootstrap_diff(values, event, n_boot=40, seed=0)
+    other = block_bootstrap_diff(values, event, n_boot=40, seed=1)
+    assert first.diff == pytest.approx(-1.0)
+    assert first.p == second.p
+    assert first.draws == second.draws
+    assert first.draws != other.draws
+    assert 0.0 < first.p <= 1.0
+
+
+def test_bootstrap_without_two_per_group_does_not_draw() -> None:
+    result = block_bootstrap_diff([1.0, 2.0, 3.0], [True, False, False], n_boot=10, seed=0)
+    assert result.diff is None
+    assert result.p == 1.0
+    assert result.draws == ()
+
+
