@@ -292,3 +292,13 @@ Nothing. The trailing window stays 60. The threshold stays 2 standard deviations
 
 The sentence in the task that train is where we explore and choose is satisfied by writing the choices here, before either split is scored, and by refusing any later choice. A train table that looks strong is not a reason to drop a weak outcome from Holm or to add one.
 
+## Pass rule
+
+A category **matters** only if at least one of its 12 outcomes does all of the following:
+
+1. Holm-adjusted train p < 0.05.
+2. On validate, the unadjusted p of that same outcome is < 0.05.
+3. The sign of the mean difference (event minus other) is the same on train and on validate, and neither difference is zero.
+
+One passing outcome is enough for the category. The matched-weekday statistic is printed beside it and is not required. A category that fails this rule is a miss, including a category that is significant on train and flips sign or loses the validate p-value.
+
