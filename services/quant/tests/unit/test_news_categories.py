@@ -130,3 +130,46 @@ def test_cash_holidays_copy_the_static_nse_list() -> None:
     assert date(2023, 11, 12) in CASH_HOLIDAYS
 
 
+
+from quant_agents.research.news_categories import (
+    close_mismatches,
+    parse_api_daily,
+    parse_api_intraday,
+    prefer_api,
+    session_realised_variance,
+)
+
+
+def test_cross_check_flags_only_gaps_above_half_a_percent() -> None:
+    day = date(2024, 6, 3)
+    yahoo = {day: 100.4, date(2024, 6, 4): 110.0}
+    api = {day: 100.0, date(2024, 6, 4): 100.0}
+    rows = close_mismatches(yahoo, api)
+    assert [row["date"] for row in rows] == ["2024-06-04"]
+    merged = prefer_api(yahoo, api)
+    assert merged[day] == 100.0
+    assert merged[date(2024, 6, 4)] == 100.0
+
+
+def test_api_daily_and_intraday_parsers_use_ist() -> None:
+    payload = [
+        {
+            "close": "200",
+            "end": "2024-06-03T10:00:00+00:00",  # 15:30 IST
+            "start": "2024-06-03T03:45:00+00:00",
+        }
+    ]
+    assert parse_api_daily(payload) == {date(2024, 6, 3): 200.0}
+    bars = parse_api_intraday(
+        [
+            {"start": "2024-06-03T04:00:00+00:00", "close": "100"},  # 09:30 IST
+            {"start": "2024-06-03T04:05:00+00:00", "close": "110"},
+            {"start": "2024-06-03T03:00:00+00:00", "close": "90"},  # 08:30, before the open
+        ]
+    )
+    assert len(bars) == 2
+    variance = session_realised_variance(bars)
+    assert date(2024, 6, 3) in variance
+    assert variance[date(2024, 6, 3)] > 0
+
+
