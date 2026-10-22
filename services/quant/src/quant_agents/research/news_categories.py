@@ -1136,3 +1136,198 @@ def conclude(categories: Sequence[Mapping[str, object]]) -> str:
     )
 
 
+
+import subprocess
+
+
+def repo_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "services" / "quant" / "docs").exists():
+            return parent
+    raise RuntimeError("could not find the repository root")
+
+
+def cache_directory(root: Path) -> Path:
+    path = root / "services" / "quant" / ".cache" / "news-categories"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def git_protocol_commit(root: Path) -> str:
+    output = subprocess.check_output(
+        ["git", "log", "-1", "--format=%H", "--", "services/quant/docs/news-categories-nifty-protocol.md"],
+        cwd=root,
+        text=True,
+    )
+    return output.strip()
+
+
+def category_event_days(cache: Path, client: object, sleeper: Callable[[float], None], end_day: date) -> dict[str, list[tuple[date, bool]]]:
+    """Pull each frozen query once (or read the cache) and flag event days."""
+    end_stamp = end_day.strftime("%Y%m%d") + "000000"
+    flagged: dict[str, list[tuple[date, bool]]] = {}
+    for category_id, _name, queries in CATEGORIES:
+        parts: list[dict[date, float]] = []
+        for query in queries:
+            volume_url = gdelt_request_url(query, "timelinevolraw", "20170101000000", end_stamp)
+            tone_url = gdelt_request_url(query, "timelinetone", "20170101000000", end_stamp)
+            volume_payload, _ = fetch_json(volume_url, cache, client, sleeper)
+            fetch_json(tone_url, cache, client, sleeper)
+            parts.append(volume_by_day(parse_stamped(volume_payload)))
+        series = sum_category_volume(parts, VOLUME_START, end_day)
+        bits = event_flags([value for _day, value in series])
+        flagged[category_id] = [(day, flag) for (day, _value), flag in zip(series, bits)]
+    return flagged
+
+
+def _payload_or_empty(cache: Path, client: object, url: str, errors: dict[str, str]) -> object:
+    try:
+        return fetch_public_json(url, cache, client)
+    except Exception as exc:
+        errors[url] = str(exc)[:200]
+        return []
+
+
+def load_market(
+    cache: Path,
+    client: object,
+    yahoo: Callable[[str, str, str], dict[date, float]],
+    end_day: date,
+) -> dict[str, object]:
+    """Yahoo history plus one cached call to each public candle URL."""
+    end = (end_day + timedelta(days=1)).isoformat()
+    yahoo_nifty = yahoo("^NSEI", "2015-01-01", end)
+    yahoo_vix = yahoo("^INDIAVIX", "2015-01-01", end)
+    errors: dict[str, str] = {}
+    nifty_payload = _payload_or_empty(cache, client, PUBLIC_DAILY_NIFTY, errors)
+    vix_payload = _payload_or_empty(cache, client, PUBLIC_DAILY_VIX, errors)
+    intra_payload = _payload_or_empty(cache, client, PUBLIC_INTRADAY_NIFTY, errors)
+    api_nifty = parse_api_daily(nifty_payload) if isinstance(nifty_payload, list) else {}
+    api_vix = parse_api_daily(vix_payload) if isinstance(vix_payload, list) else {}
+    bars = parse_api_intraday(intra_payload) if isinstance(intra_payload, list) else []
+    nifty = prefer_api(yahoo_nifty, api_nifty)
+    vix = prefer_api(yahoo_vix, api_vix)
+    return {
+        "nifty": nifty,
+        "vix": vix,
+        "sessions": trading_sessions(nifty),
+        "rv": session_realised_variance(bars),
+        "nifty_mismatches": close_mismatches(yahoo_nifty, api_nifty),
+        "vix_mismatches": close_mismatches(yahoo_vix, api_vix),
+        "calendar_audit": calendar_audit(nifty),
+        "nifty_api_coverage": coverage(nifty_payload),
+        "vix_api_coverage": coverage(vix_payload),
+        "intraday_coverage": coverage(intra_payload),
+        "api_errors": errors,
+    }
+
+
+def _dates(values: Mapping[object, float]) -> dict[date, float]:
+    out: dict[date, float] = {}
+    for key, value in values.items():
+        out[key if isinstance(key, date) else date.fromisoformat(str(key))] = float(value)
+    return out
+
+
+def run_train(
+    root: Path,
+    *,
+    today: date,
+    client: object,
+    sleeper: Callable[[float], None],
+    yahoo: Callable[[str, str, str], dict[date, float]],
+    n_boot: int = N_BOOT,
+    protocol_commit: str | None = None,
+) -> Path:
+    """Download inputs if needed and write train scores. Does not score validate."""
+    cache = cache_directory(root)
+    if (cache / "validate-consumed").exists():
+        raise RuntimeError("validate was already scored; refusing to recompute train")
+    market = load_market(cache, client, yahoo, today)
+    sessions = market["sessions"]
+    assert isinstance(sessions, list)
+    days = category_event_days(cache, client, sleeper, today)
+    trained = train_document(
+        sessions,
+        market["nifty"],  # type: ignore[arg-type]
+        market["vix"],  # type: ignore[arg-type]
+        market["rv"],  # type: ignore[arg-type]
+        days,
+        protocol_commit=protocol_commit or git_protocol_commit(root),
+        n_boot=n_boot,
+    )
+    trained["context"] = {
+        "nifty_mismatches": market["nifty_mismatches"],
+        "vix_mismatches": market["vix_mismatches"],
+        "calendar_audit": market["calendar_audit"],
+        "nifty_api_coverage": market["nifty_api_coverage"],
+        "vix_api_coverage": market["vix_api_coverage"],
+        "intraday_coverage": market["intraday_coverage"],
+        "api_errors": market["api_errors"],
+        "sessions": [day.isoformat() for day in sessions],
+        "nifty": {day.isoformat(): value for day, value in market["nifty"].items()},  # type: ignore[attr-defined]
+        "vix": {day.isoformat(): value for day, value in market["vix"].items()},  # type: ignore[attr-defined]
+        "rv": {day.isoformat(): value for day, value in market["rv"].items()},  # type: ignore[attr-defined]
+    }
+    path = cache / "train.json"
+    path.write_text(json.dumps(json_ready(trained)), encoding="utf-8")
+    return path
+
+
+def run_validate(root: Path, *, n_boot: int = N_BOOT) -> dict[str, object]:
+    """Score validate once from the frozen train file and write the result documents."""
+    cache = cache_directory(root)
+    consumed = cache / "validate-consumed"
+    if consumed.exists():
+        raise RuntimeError("validate was already scored")
+    trained = json.loads((cache / "train.json").read_text(encoding="utf-8"))
+    context = trained["context"]
+    sessions = [date.fromisoformat(item) for item in context["sessions"]]
+    result = validate_document(
+        sessions,
+        _dates(context["nifty"]),
+        _dates(context["vix"]),
+        _dates(context["rv"]),
+        trained,
+        n_boot=n_boot,
+        nifty_mismatches=context["nifty_mismatches"],
+        vix_mismatches=context["vix_mismatches"],
+        calendar=context["calendar_audit"],
+        nifty_api_coverage=context["nifty_api_coverage"],
+        vix_api_coverage=context["vix_api_coverage"],
+        intraday_coverage=context["intraday_coverage"],
+    )
+    result["api_errors"] = context.get("api_errors", {})
+    docs = root / "services" / "quant" / "docs"
+    json_path = docs / "results" / "news-categories-nifty-result.json"
+    md_path = docs / "news-categories-nifty-result.md"
+    json_path.parent.mkdir(parents=True, exist_ok=True)
+    json_path.write_text(json.dumps(json_ready(result), indent=2) + "\n", encoding="utf-8")
+    md_path.write_text(render_markdown(result), encoding="utf-8")
+    consumed.write_text("scored\n", encoding="utf-8")
+    return result
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    import sys
+
+    import httpx
+
+    args = list(sys.argv[1:] if argv is None else argv)
+    if len(args) != 1 or args[0] not in {"train", "validate"}:
+        raise SystemExit("usage: python -m quant_agents.research.news_categories train|validate")
+    root = repo_root()
+    if args[0] == "train":
+        client = httpx.Client(timeout=90.0, follow_redirects=True, headers={"User-Agent": "stockx-research/1.0"})
+        try:
+            path = run_train(root, today=date.today(), client=client, sleeper=lambda seconds: __import__("time").sleep(seconds), yahoo=load_yahoo_closes)
+        finally:
+            client.close()
+        print(path)
+        return
+    result = run_validate(root)
+    print(result["conclusion"])
+
+
+if __name__ == "__main__":
+    main()
