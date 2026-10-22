@@ -1008,6 +1008,112 @@ def _event_tone(tone: Mapping[date, float], is_event: Sequence[bool], sessions: 
     return {"event": _avg(event_vals), "other": _avg(other_vals)}
 
 
+
+
+def _round(value: object, digits: int = 6) -> object:
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            return None
+        return round(value, digits)
+    return value
+
+
+def json_ready(value: object) -> object:
+    if isinstance(value, dict):
+        return {str(key): json_ready(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [json_ready(item) for item in value]
+    if isinstance(value, float):
+        return _round(value)
+    return value
+
+
+def render_markdown(result: dict[str, object]) -> str:
+    """Plain-language result note. Numbers come only from the scored JSON."""
+    lines = [
+        "# News categories vs the NIFTY 50 index: result",
+        "",
+        f"Protocol commit: `{result.get('protocol_commit', 'unknown')}`.",
+        "Validate was scored once. No query, window, or threshold was changed after train.",
+        "",
+        "## Price check",
+        "",
+        f"API daily NIFTY bars: {result.get('nifty_api_coverage')}.",
+        f"API daily India VIX bars: {result.get('vix_api_coverage')}.",
+        f"API 5-minute bars: {result.get('intraday_coverage')}.",
+        f"Close mismatches above 0.5%: {len(result.get('nifty_mismatches', []))} NIFTY, {len(result.get('vix_mismatches', []))} VIX.",
+        f"Calendar audit: {result.get('calendar_audit')}.",
+        "",
+    ]
+    categories = result.get("categories")
+    assert isinstance(categories, list)
+    for category in categories:
+        assert isinstance(category, dict)
+        lines.append(f"## {category['name']}")
+        lines.append("")
+        lines.append("| Split | Events | Day-0 return, event | Day-0 return, other | Diff | Abs-move ratio | VIX diff | p | Holm p |")
+        lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+        for split in ("train", "validate"):
+            block = category[split]
+            assert isinstance(block, dict)
+            ret = block["outcomes"]["ret_0"]
+            abs_row = block["outcomes"]["abs_0"]
+            vix_row = block["outcomes"]["vix_0"]
+            holm = ret.get("holm_p")
+            lines.append(
+                "| {split} | {events} | {em} | {om} | {diff} | {ratio} | {vix} | {p} | {holm} |".format(
+                    split=split,
+                    events=block["n_event_sessions"],
+                    em=_fmt(ret.get("event_mean")),
+                    om=_fmt(ret.get("other_mean")),
+                    diff=_fmt(ret.get("diff")),
+                    ratio=_fmt(abs_row.get("mean_ratio")),
+                    vix=_fmt(vix_row.get("diff")),
+                    p=_fmt(ret.get("p")),
+                    holm=_fmt(holm) if split == "train" else "",
+                )
+            )
+        lines.append("")
+        lines.append(f"Matters: **{category['matters']}**. Passing outcomes: {category['passing_outcomes'] or 'none'}.")
+        lines.append("")
+        lines.append("Other windows (difference of means, unadjusted p):")
+        lines.append("")
+        lines.append("| Outcome | Train diff | Train p | Train Holm | Validate diff | Validate p |")
+        lines.append("|---|---:|---:|---:|---:|---:|")
+        for name in OUTCOMES:
+            if name == "ret_0":
+                continue
+            left = category["train"]["outcomes"][name]
+            right = category["validate"]["outcomes"][name]
+            lines.append(
+                f"| {name} | {_fmt(left.get('diff'))} | {_fmt(left.get('p'))} | {_fmt(left.get('holm_p'))} | {_fmt(right.get('diff'))} | {_fmt(right.get('p'))} |"
+            )
+        lines.append("")
+    lines.extend(
+        [
+            "## Conclusion",
+            "",
+            str(result.get("conclusion")),
+            "",
+            "## Limits",
+            "",
+            "GDELT's crawl is global, not an Indian newspaper. A spike is a count of articles, not a measure of how important the news was. Average tone was downloaded into the local cache and is not part of the pass rule. A difference between event days and other days is not a cause, and it is not a trading rule. The daily GDELT bucket has no clock, so the study assigns it to the next NSE session. The 5-minute volatility window is only as long as one public API call. Stored RSS headlines from October 2026 are too short to test and were not used as evidence.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _fmt(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            return ""
+        return f"{value:.4f}"
+    return str(value)
+
+
 NOTHING_PASSES = (
     "Under this pre-registered design, no news category has a volume spike that lines up with "
     "the NIFTY 50 index on 2017-2022 and then again, in the same direction, on 2023 onward. "
