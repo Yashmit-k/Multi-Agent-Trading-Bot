@@ -464,3 +464,75 @@ def fetch_json(
     return payload, True
 
 
+
+
+@dataclass(frozen=True)
+class MeanDiff:
+    diff: float | None
+    p: float
+    event_mean: float | None
+    other_mean: float | None
+    n_event: int
+    n_other: int
+    draws: tuple[float, ...]
+
+
+def _finite_pairs(values: Sequence[float], event: Sequence[bool]) -> tuple[np.ndarray, np.ndarray]:
+    if len(values) != len(event):
+        raise ValueError("values and event mask differ in length")
+    ys: list[float] = []
+    es: list[bool] = []
+    for value, flag in zip(values, event):
+        if value is None or not math.isfinite(float(value)):
+            continue
+        ys.append(float(value))
+        es.append(bool(flag))
+    return np.asarray(ys, dtype=float), np.asarray(es, dtype=bool)
+
+
+def block_bootstrap_diff(
+    values: Sequence[float],
+    event: Sequence[bool],
+    *,
+    block: int = BLOCK,
+    n_boot: int = N_BOOT,
+    seed: int = BOOT_SEED,
+) -> MeanDiff:
+    """Unmatched difference of means and a recentered circular block-bootstrap p-value."""
+    y, mask = _finite_pairs(values, event)
+    n_event = int(mask.sum())
+    n_other = int((~mask).sum())
+    if n_event < 2 or n_other < 2:
+        return MeanDiff(None, 1.0, None, None, n_event, n_other, ())
+    observed = float(y[mask].mean() - y[~mask].mean())
+    n = len(y)
+    generator = np.random.Generator(np.random.PCG64(seed))
+    n_blocks = int(math.ceil(n / block))
+    starts = generator.integers(0, n, size=(n_boot, n_blocks))
+    offsets = np.arange(block)
+    index = (starts[..., None] + offsets) % n
+    index = index.reshape(n_boot, n_blocks * block)[:, :n]
+    samples = y[index]
+    flags = mask[index]
+    event_n = flags.sum(axis=1)
+    other_n = n - event_n
+    event_sum = (samples * flags).sum(axis=1)
+    other_sum = samples.sum(axis=1) - event_sum
+    ok = (event_n > 0) & (other_n > 0)
+    draws = np.full(n_boot, observed, dtype=float)
+    draws[ok] = event_sum[ok] / event_n[ok] - other_sum[ok] / other_n[ok]
+    # 1e-8 relative slack keeps a float tie on the protocol's >= side.
+    gap = np.abs(draws - observed)
+    slack = 1e-8 * max(1.0, abs(observed))
+    p_value = (1.0 + float(np.sum(gap + slack >= np.abs(observed)))) / (n_boot + 1.0)
+    return MeanDiff(
+        observed,
+        float(p_value),
+        float(y[mask].mean()),
+        float(y[~mask].mean()),
+        n_event,
+        n_other,
+        tuple(float(item) for item in draws),
+    )
+
+
