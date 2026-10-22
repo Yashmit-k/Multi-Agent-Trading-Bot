@@ -1223,20 +1223,27 @@ def load_gdelt_days(
         return {}
     print(f"gdelt {label} {mode} {start.isoformat()} {end.isoformat()}", flush=True)
     url = gdelt_request_url(query, mode, start.strftime("%Y%m%d") + "000000", end.strftime("%Y%m%d") + "000000")
+    span = (end - start).days
+    # A long window is refused as a large query. A short window that returns 429 is the rate limit, so wait.
+    attempts = 1 if span > 200 else 5
     try:
-        payload, _ = fetch_json(url, cache, client, sleeper, attempts=2)
+        payload, _ = fetch_json(url, cache, client, sleeper, attempts=attempts)
     except RuntimeError as exc:
-        if "429" not in str(exc) or (end - start).days < 14:
+        if "429" not in str(exc):
             raise
-        mid = start + timedelta(days=(end - start).days // 2)
-        print(f"split {label} {mode} {start.isoformat()} {end.isoformat()} at {mid.isoformat()}", flush=True)
-        left = load_gdelt_days(query, mode, start, mid, cache, client, sleeper, label)
-        right = load_gdelt_days(query, mode, mid + timedelta(days=1), end, cache, client, sleeper, label)
-        shared = set(left) & set(right)
-        if shared:
-            raise RuntimeError(f"GDELT window overlap on {min(shared).isoformat()}") from exc
-        left.update(right)
-        return left
+        if span < 30:
+            sleeper(60.0)
+            payload, _ = fetch_json(url, cache, client, sleeper, attempts=3)
+        else:
+            mid = start + timedelta(days=span // 2)
+            print(f"split {label} {mode} {start.isoformat()} {end.isoformat()} at {mid.isoformat()}", flush=True)
+            left = load_gdelt_days(query, mode, start, mid, cache, client, sleeper, label)
+            right = load_gdelt_days(query, mode, mid + timedelta(days=1), end, cache, client, sleeper, label)
+            shared = set(left) & set(right)
+            if shared:
+                raise RuntimeError(f"GDELT window overlap on {min(shared).isoformat()}") from exc
+            left.update(right)
+            return left
     out: dict[date, float] = {}
     for day, value in volume_by_day(parse_stamped(payload)).items():
         if start <= day <= end:
