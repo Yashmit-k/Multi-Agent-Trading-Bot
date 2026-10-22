@@ -98,3 +98,8 @@ India CPI, GDP, and IIP only. A global CPI print that does not mention India is 
 1. `(CPI OR "consumer price index" OR "retail inflation" OR "wholesale inflation") AND (India OR Indian)`
 2. `(GDP OR "gross domestic product" OR IIP OR "industrial production") AND (India OR Indian)`
 
+### 5. Indian government policy, budget, and tax
+
+1. `("Union Budget" OR "India budget" OR "finance bill") AND (India OR Indian)`
+2. `(GST OR "tax cut" OR "tax hike" OR "import duty" OR "government policy") AND (India OR Indian OR "New Delhi")`
+
