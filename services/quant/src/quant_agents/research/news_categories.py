@@ -1281,6 +1281,8 @@ def load_gdelt_days(
     client: object,
     sleeper: Callable[[float], None],
     label: str,
+    *,
+    split: bool = True,
 ) -> dict[date, float]:
     """Fetch one window. If GDELT still returns 429, split the window and concatenate."""
     if end < start:
@@ -1305,19 +1307,18 @@ def load_gdelt_days(
                 payload, _ = fetch_json(url, cache, client, sleeper, attempts=2, pause=12.0)
             else:
                 print(f"unanswered {label} {mode} {start.isoformat()} {end.isoformat()}", flush=True)
-                remember_coverage(cache, query, mode, start, end)
-                return {}
+                raise RuntimeError(f"GDELT kept returning 429: {url}")
         else:
             sleeper(30.0)
             try:
                 payload, _ = fetch_json(url, cache, client, sleeper, attempts=1, pause=12.0)
             except RuntimeError as exc2:
-                if "429" not in str(exc2):
+                if "429" not in str(exc2) or not split:
                     raise
                 mid = start + timedelta(days=span // 2)
                 print(f"split {label} {mode} {start.isoformat()} {end.isoformat()} at {mid.isoformat()}", flush=True)
-                left = load_gdelt_days(query, mode, start, mid, cache, client, sleeper, label)
-                right = load_gdelt_days(query, mode, mid + timedelta(days=1), end, cache, client, sleeper, label)
+                left = load_gdelt_days(query, mode, start, mid, cache, client, sleeper, label, split=split)
+                right = load_gdelt_days(query, mode, mid + timedelta(days=1), end, cache, client, sleeper, label, split=split)
                 shared = set(left) & set(right)
                 if shared:
                     raise RuntimeError(f"GDELT window overlap on {min(shared).isoformat()}") from exc2
@@ -1427,7 +1428,7 @@ def category_event_days(cache: Path, client: object, sleeper: Callable[[float], 
             tone.update(day for day in coverage_days(cache).get((query, "timelinetone"), ()) if VOLUME_START <= day <= end_day)
             for start_day, end_bound in gap_windows(tone, VOLUME_START, end_day, span_days=150):
                 try:
-                    load_gdelt_days(query, "timelinetone", start_day, end_bound, cache, client, sleeper, category_id)
+                    load_gdelt_days(query, "timelinetone", start_day, end_bound, cache, client, sleeper, category_id, split=False)
                 except RuntimeError as exc:
                     if "429" not in str(exc):
                         raise

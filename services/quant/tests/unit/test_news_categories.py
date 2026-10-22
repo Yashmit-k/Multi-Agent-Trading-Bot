@@ -261,9 +261,9 @@ def test_a_short_volume_window_that_stays_429_is_not_stored_as_zero(tmp_path: Pa
     assert client.calls == 4
     assert 45.0 in slept
 
-    tone = load_gdelt_days("(war)", "timelinetone", date(2020, 10, 20), date(2020, 10, 20), tmp_path, _AlwaysBusy(), slept.append, "geopolitics_war")
-    assert tone == {}
-    assert date(2020, 10, 20) in coverage_days(tmp_path)[("(war)", "timelinetone")]
+    with pytest.raises(RuntimeError, match="429"):
+        load_gdelt_days("(war)", "timelinetone", date(2020, 10, 20), date(2020, 10, 20), tmp_path, _AlwaysBusy(), slept.append, "geopolitics_war", split=False)
+    assert coverage_days(tmp_path) == {}
 
 
 def test_a_short_window_counts_omitted_days_as_answered(tmp_path: Path) -> None:
