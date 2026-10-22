@@ -150,18 +150,22 @@ def test_intraday_limit_entries_expire_after_valid_bars(repository: CoreReposito
     assert repository.list_orders()[0].status == OrderStatus.CANCELLED
 
 
-def _apply(repository: CoreRepository, mode: str) -> TestClient:
+def _apply(repository: CoreRepository, mode: str, **extra: str) -> TestClient:
     client = _ready(repository)
-    repository.save_setting("risk", {"strategy_mode": mode}, updated_by="test", now=DECISION)
+    repository.save_setting("risk", {"strategy_mode": mode, **extra}, updated_by="test", now=DECISION)
     saved = client.post("/api/v1/strategies", json={"definition": STRATEGY}, headers=AUTH).json()
     client.post(f"/api/v1/strategies/{saved['strategy_id']}/apply", json={"confirm": True}, headers=AUTH)
     return client
 
 
-def _tcs_view(repository: CoreRepository, score: float) -> None:
+def _tcs_view(repository: CoreRepository, score: float, agent: str = "news") -> None:
+    from contracts.enums import AgentName
     from test_phase4 import _signal, _store
 
-    _store(repository, _signal(signal_id="sig-tcs-view", symbol="TCS", signal=score, timestamp=DECISION, valid_until=DECISION + timedelta(days=2)))
+    _store(
+        repository,
+        _signal(signal_id=f"sig-tcs-{agent}", symbol="TCS", agent_name=AgentName(agent), signal=score, timestamp=DECISION, valid_until=DECISION + timedelta(days=2)),
+    )
 
 
 def test_alongside_mode_lets_the_strategy_and_the_agents_both_trade(repository: CoreRepository) -> None:
@@ -185,6 +189,38 @@ def test_agents_agree_mode_trades_when_the_agents_are_not_bearish(repository: Co
     assert order.symbol == "TCS"
     proposal = repository.get_proposal(order.proposal_id)
     assert proposal.metadata["strategy_mode"] == "agents_agree" and proposal.metadata["agents_fused_signal"] > 0
+
+
+def test_agents_agree_ignores_trend_agents_not_on_the_list(repository: CoreRepository) -> None:
+    _apply(repository, "agents_agree", agree_agents="news")
+    _tcs_view(repository, -0.8, agent="momentum")  # a dip: the trend agent is bearish, but it was not chosen
+    _cycle(repository, DECISION + timedelta(hours=1))
+    [order] = repository.list_orders()
+    proposal = repository.get_proposal(order.proposal_id)
+    assert order.symbol == "TCS" and proposal.metadata["agree_agents"] == ["news"]
+    assert proposal.metadata["agents_fused_signal"] is None  # no news opinion: nothing to disagree with
+
+
+def test_agents_agree_blocks_when_a_chosen_agent_is_bearish(repository: CoreRepository) -> None:
+    _apply(repository, "agents_agree", agree_agents="news")
+    _tcs_view(repository, 0.9, agent="momentum")  # ignored, even though it is strongly bullish
+    _tcs_view(repository, -0.3, agent="news")
+    _cycle(repository, DECISION + timedelta(hours=1))
+    assert repository.list_orders() == []
+
+
+def test_agents_agree_does_not_block_without_an_opinion_from_the_chosen_agents(repository: CoreRepository) -> None:
+    _apply(repository, "agents_agree", agree_agents="earnings,valuation")
+    _tcs_view(repository, -0.7, agent="news")
+    _cycle(repository, DECISION + timedelta(hours=1))
+    assert [order.symbol for order in repository.list_orders()] == ["TCS"]
+
+
+def test_alongside_mode_ignores_agree_agents(repository: CoreRepository) -> None:
+    _apply(repository, "alongside", agree_agents="news")
+    _tcs_view(repository, -0.9, agent="news")  # the agents' view is not consulted outside agents_agree
+    _cycle(repository, DECISION + timedelta(hours=1))
+    assert "TCS" in {order.symbol for order in repository.list_orders() if order.side == Side.BUY}
 
 
 def test_agents_agree_mode_sends_the_entry_to_the_portfolio_manager(repository: CoreRepository) -> None:
@@ -218,6 +254,27 @@ def test_strategy_mode_setting_is_validated(repository: CoreRepository) -> None:
         assert "strategy_mode" in exc.errors
     else:
         raise AssertionError("bad mode accepted")
+
+
+def test_agree_agents_setting_is_validated(repository: CoreRepository) -> None:
+    from core_risk.settings import DEFAULTS, SettingsError, describe_bounds, parse_settings
+
+    assert DEFAULTS.agree_agents == "news,earnings"
+    assert parse_settings({"agree_agents": " News, earnings,news "}).agree_agents == "news,earnings"
+    for bad in ("news,astrology", "", "ml", 3):
+        try:
+            parse_settings({"agree_agents": bad})
+        except SettingsError as exc:
+            assert "agree_agents" in exc.errors
+        else:
+            raise AssertionError(f"accepted {bad!r}")
+    [bound] = [item for item in describe_bounds() if item["key"] == "agree_agents"]
+    assert bound["multiple"] is True and len(bound["choices"]) == 9  # type: ignore[arg-type]
+    client = _client(repository)
+    refused = client.post("/api/v1/settings/risk", json={"values": {"agree_agents": "news,astrology"}, "operator": "tester"}, headers=AUTH)
+    assert refused.status_code == 422 and "astrology" in str(refused.json())
+    saved = client.post("/api/v1/settings/risk", json={"values": {"agree_agents": "news"}, "operator": "tester"}, headers=AUTH)
+    assert saved.status_code == 200 and saved.json()["settings"]["agree_agents"] == "news"
 
 
 def test_a_daily_signal_from_friday_is_still_fresh_on_monday_morning() -> None:
