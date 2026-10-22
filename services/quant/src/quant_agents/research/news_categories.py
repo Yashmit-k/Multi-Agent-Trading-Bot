@@ -432,3 +432,35 @@ def sum_category_volume(parts: Sequence[Mapping[date, float]], start: date, end:
     return filled_volume(combined, start, end)
 
 
+
+
+def cache_file(cache_dir: Path, url: str) -> Path:
+    digest = hashlib.sha256(url.encode("utf-8")).hexdigest()
+    return cache_dir / f"{digest}.json"
+
+
+def fetch_json(
+    url: str,
+    cache_dir: Path,
+    client: object,
+    sleeper: Callable[[float], None],
+    *,
+    pause: float = 5.0,
+) -> tuple[object, bool]:
+    """Return (payload, did_http). Sleep only after a cache miss, never between hits."""
+    path = cache_file(cache_dir, url)
+    if path.exists():
+        return json.loads(path.read_text(encoding="utf-8")), False
+    response = client.get(url)  # type: ignore[attr-defined]
+    response.raise_for_status()
+    text = response.text
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"GDELT did not return JSON: {text[:180]}") from exc
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    sleeper(pause)
+    return payload, True
+
+
