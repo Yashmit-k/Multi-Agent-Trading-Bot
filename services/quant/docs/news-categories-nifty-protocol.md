@@ -103,3 +103,8 @@ India CPI, GDP, and IIP only. A global CPI print that does not mention India is 
 1. `("Union Budget" OR "India budget" OR "finance bill") AND (India OR Indian)`
 2. `(GST OR "tax cut" OR "tax hike" OR "import duty" OR "government policy") AND (India OR Indian OR "New Delhi")`
 
+### 6. Elections and political instability
+
+1. `("Lok Sabha" OR "assembly election" OR "general election" OR "vote counting") AND (India OR Indian)`
+2. `("political crisis" OR "no-confidence" OR "coalition" OR resignation) AND (India OR "prime minister" OR "chief minister")`
+
