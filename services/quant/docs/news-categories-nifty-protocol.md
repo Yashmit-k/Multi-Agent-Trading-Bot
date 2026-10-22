@@ -52,7 +52,9 @@ For each query below, two calls:
 - `mode=timelinevolraw` (article counts)
 - `mode=timelinetone` (average tone)
 
-Frozen parameters: `format=json`, `startdatetime=20170101000000`, `enddatetime` = the UTC calendar date of the single study run at `000000`. No other mode, no `timespan`, no source-country filter.
+Frozen parameters: `format=json`, coverage from `20170101000000` through the UTC calendar date of the single study run at `000000`. No other mode, no `timespan`, no source-country filter.
+
+GDELT answers `429` ("larger queries") for that full span even when the caller is already waiting 5 seconds, and it does so before any train table exists. Each query is therefore requested in non-overlapping windows of at most 700 calendar days, still with the same mode, format, and query string. The windows are concatenated by UTC date. A date that appears in two windows is an error, not an average. This split does not change a category, the event rule, or the pass rule.
 
 Rate limit: at least **5 seconds** between GDELT HTTP calls. A cache hit does not sleep and is not a new call. Cache every response body under `services/quant/.cache/news-categories/`, which is gitignored. The cache is not a committed artefact.
 
