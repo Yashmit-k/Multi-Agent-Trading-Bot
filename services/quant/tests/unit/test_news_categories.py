@@ -428,3 +428,9 @@ def test_assemble_scores_each_category_without_a_network(monkeypatch: pytest.Mon
     assert "holm_p" not in result["categories"][0]["validate"]["outcomes"]["ret_0"]
 
 
+
+import json
+
+from quant_agents.research.news_categories import NOTHING_PASSES, assemble_study, render_markdown
+
+
