@@ -32,3 +32,14 @@ The daily responses are the Kite-sourced history the live site exposes from 2024
 
 A daily bar's session date is the `Asia/Kolkata` date of its `end` timestamp. A 5-minute bar belongs to the session whose IST date is the bar's `start` date, and only if its IST start time is in `[09:15, 15:30)`.
 
+## Prices: Yahoo Finance, and the cross-check
+
+For history before the public API's daily bars, download Yahoo Finance daily bars from 2015-01-01 through the run date:
+
+- `^NSEI` is the NIFTY 50 index.
+- `^INDIAVIX` is India VIX.
+
+Use the unadjusted `Close` (`auto_adjust` false). Yahoo's row date is the session date.
+
+Where a session has both an API close and a Yahoo close, the study uses the **API** close. It still compares them. A session is a **mismatch** when `abs(yahoo / api - 1) > 0.005` (half of one percent). Every mismatch is listed in the result (date, Yahoo close, API close, absolute percent gap). Mismatched sessions are not dropped and are not a reason to switch the rule. If the public URL fails or returns no bars, say so, use Yahoo for that series, and do not call the URL again.
+
