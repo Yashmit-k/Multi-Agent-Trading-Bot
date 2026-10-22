@@ -1,6 +1,7 @@
 """The valuation prompt must stay the same between cycles so the LLM answer cache hits (and the quota lasts)."""
 
 import hashlib
+from dataclasses import replace
 from datetime import timedelta
 from decimal import Decimal
 
@@ -136,3 +137,18 @@ def test_fundamental_and_earnings_prompts_do_not_change_between_cycles() -> None
             agent.evaluate("RELIANCE", FIXTURE_AS_OF + timedelta(minutes=minutes), context)
         assert len(provider.requests) == 2, agent_class.__name__  # both cycles reached the model...
         assert provider.requests[0].content_hash == provider.requests[1].content_hash, agent_class.__name__  # ...with the same text
+
+
+def test_the_quality_gate_accepts_last_price_on_the_real_valuation_prompt() -> None:
+    # The counting provider above skips the gate; real model answers go through it (openai_compat.py).
+    from intelligence_agents.agents.grounding import quality_gate, sanitize_llm_text
+    from intelligence_agents.llm.types import LLMAssessment
+
+    evidence = sanitize_llm_text(valuation_prompt(Decimal("21.45"), Decimal("20"), "sector_peers"))
+    answer = LLMAssessment(
+        sentiment=-0.1, impact=0.3, confidence=0.5, event_type="valuation.note", reason_codes=("last_price",),
+        horizon="SWING", high_impact=False, model="gemini-test", tier="tier1",
+    )
+    assert quality_gate(answer, task="valuation", evidence=evidence).reason_codes == ("last_price",)
+    # A price-like code from the model maps to the allowed code too.
+    assert quality_gate(replace(answer, reason_codes=("valuation.price",)), task="valuation", evidence=evidence).reason_codes == ("last_price",)
