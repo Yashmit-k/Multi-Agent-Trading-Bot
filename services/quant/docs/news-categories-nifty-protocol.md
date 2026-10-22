@@ -91,3 +91,10 @@ Global wars, missile strikes, military escalation, and terror attacks, plus Indi
 1. `("Reserve Bank of India" OR "repo rate" OR "monetary policy committee" OR "RBI policy")`
 2. `("Federal Reserve" OR FOMC OR "Fed rate" OR "interest rate decision") AND (hike OR cut OR hold OR pause OR decision)`
 
+### 4. Inflation and macro data
+
+India CPI, GDP, and IIP only. A global CPI print that does not mention India is not in this category.
+
+1. `(CPI OR "consumer price index" OR "retail inflation" OR "wholesale inflation") AND (India OR Indian)`
+2. `(GDP OR "gross domestic product" OR IIP OR "industrial production") AND (India OR Indian)`
+
