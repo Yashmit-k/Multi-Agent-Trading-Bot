@@ -114,6 +114,8 @@ services:
       LLM_MIN_INTERVAL_SECONDS: ${LLM_MIN_INTERVAL_SECONDS:-2.5}
       LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
       NEWS_RSS_MAX_ITEMS: ${NEWS_RSS_MAX_ITEMS:-200}
+      # Off by default. true only stores market-wide headlines; it does not change scores or orders.
+      NEWS_KEEP_MARKET_WIDE: ${NEWS_KEEP_MARKET_WIDE:-false}
       LLM_MAX_OUTPUT_TOKENS: ${LLM_MAX_OUTPUT_TOKENS:-600}
       # Groq's JSON validator rejects reasoning-model output, so JSON mode is off by default.
       LLM_JSON_MODE: ${LLM_JSON_MODE:-false}
