@@ -56,6 +56,7 @@ class RssPuller:
         sleeper: Callable[[float], None] = time.sleep,
         interpreter: Callable[..., dict] | None = None,
         user_agent: str = _DEFAULT_UA,
+        keep_market_wide: bool = False,
     ) -> None:
         self._store = store
         self._clock = clock
@@ -71,6 +72,7 @@ class RssPuller:
         )
         self._sleep = sleeper
         self._interpreter = interpreter
+        self._keep_market_wide = keep_market_wide
         self._last_fetch: dict[str, datetime] = {}
         self.last_stats: IngestStats = IngestStats()
 
@@ -142,7 +144,14 @@ class RssPuller:
                 stats.dropped += 1
                 continue
             symbols, evidence = match_symbols(f"{title} {description} {canonical}", self._universe)
-            if not symbols:
+            category = None
+            if not symbols and self._keep_market_wide:
+                from intelligence_agents.news.market_wide import categorise
+
+                category = categorise(f"{title} {description}")
+                symbols = ["NIFTY50"]
+                evidence = {"NIFTY50": f"market_wide:{category}"}
+            elif not symbols:
                 self._store.record_empty_symbol_drop(title)
                 stats.dropped += 1
                 continue
@@ -170,6 +179,9 @@ class RssPuller:
                 "interpretation": interpretation,
                 "item_index": index,
             }
+            if category is not None:
+                metadata["category"] = category
+                metadata["market_wide"] = True
             try:
                 article = NewsArticle(
                     article_id=article_id,
