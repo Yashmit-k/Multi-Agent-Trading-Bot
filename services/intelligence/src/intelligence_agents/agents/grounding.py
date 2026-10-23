@@ -128,10 +128,16 @@ def _blob(evidence: str) -> str:
     return re.sub(r"\s+", " ", evidence.lower())
 
 
+def _has_valuation_price(blob: str) -> bool:
+    # The valuation prompt carries the price only as the bucketed P/E (pe_bucket), so the LLM cache can reuse the
+    # answer between cycles; older prompts carried last_price itself.
+    return "last_price" in blob or "pe_bucket" in blob
+
+
 def evidence_supports(code: str, *, task: str, evidence: str) -> bool:
     blob = _blob(evidence)
     if task == "valuation" and code == "last_price":
-        return "last_price" in blob
+        return _has_valuation_price(blob)
     if task == "fundamental":
         if code == "eps":
             return bool(re.search(r"\beps\b", blob))
@@ -162,7 +168,7 @@ def normalize_reason_code(code: str, *, task: str, evidence: str) -> str | None:
         return None
     if _looks_like_identifier(item):
         return None
-    if task == "valuation" and "price" in item.replace(".", "_") and "last_price" in _blob(evidence):
+    if task == "valuation" and "price" in item.replace(".", "_") and _has_valuation_price(_blob(evidence)):
         item = "last_price"
     allowed = allowlist_for(task)
     if item not in allowed:

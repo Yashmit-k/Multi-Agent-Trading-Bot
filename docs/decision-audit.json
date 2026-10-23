@@ -1,0 +1,2045 @@
+{
+  "generated_at": "2026-10-22T11:54:46.497914+00:00",
+  "api": "https://13-238-176-73.sslip.io",
+  "since": "2026-10-15",
+  "summary": {
+    "proposals": 56,
+    "buys": 48,
+    "sells": 8,
+    "all_buys": {
+      "count": 48,
+      "n_1s": 48,
+      "mean_1s": -0.0037727391656058825,
+      "up_share_1s": 0.375,
+      "n_5s": 0,
+      "mean_5s": null,
+      "up_share_5s": null
+    },
+    "approved_buys": {
+      "count": 20,
+      "n_1s": 20,
+      "mean_1s": 0.006487319909056299,
+      "up_share_1s": 0.7,
+      "n_5s": 0,
+      "mean_5s": null,
+      "up_share_5s": null
+    },
+    "rejected_buys": {
+      "count": 28,
+      "n_1s": 28,
+      "mean_1s": -0.011101352790364585,
+      "up_share_1s": 0.14285714285714285,
+      "n_5s": 0,
+      "mean_5s": null,
+      "up_share_5s": null
+    },
+    "capacity_rejections": {
+      "count": 23,
+      "n_1s": 23,
+      "mean_1s": -0.01223926682438001,
+      "up_share_1s": 0.13043478260869565,
+      "n_5s": 0,
+      "mean_5s": null,
+      "up_share_5s": null
+    },
+    "sells_stats": {
+      "count": 8,
+      "n_1s": 8,
+      "mean_1s": -0.005124763680891972,
+      "up_share_1s": 0.25,
+      "n_5s": 0,
+      "mean_5s": null,
+      "up_share_5s": null
+    },
+    "by_path": {
+      "approved and filled": {
+        "count": 18,
+        "n_1s": 18,
+        "mean_1s": 0.0037222602338956084,
+        "up_share_1s": 0.6666666666666666,
+        "n_5s": 0,
+        "mean_5s": null,
+        "up_share_5s": null
+      },
+      "rejected: max_open_positions": {
+        "count": 16,
+        "n_1s": 16,
+        "mean_1s": -0.018411624632714986,
+        "up_share_1s": 0.0,
+        "n_5s": 0,
+        "mean_5s": null,
+        "up_share_5s": null
+      },
+      "rejected: daily_entry_cap": {
+        "count": 7,
+        "n_1s": 7,
+        "mean_1s": 0.0018689795946713605,
+        "up_share_1s": 0.42857142857142855,
+        "n_5s": 0,
+        "mean_5s": null,
+        "up_share_5s": null
+      },
+      "vetoed by the manager": {
+        "count": 5,
+        "n_1s": 5,
+        "mean_1s": -0.005866948233893621,
+        "up_share_1s": 0.2,
+        "n_5s": 0,
+        "mean_5s": null,
+        "up_share_5s": null
+      },
+      "approved, not filled": {
+        "count": 2,
+        "n_1s": 2,
+        "mean_1s": 0.03137285698550252,
+        "up_share_1s": 1.0,
+        "n_5s": 0,
+        "mean_5s": null,
+        "up_share_5s": null
+      },
+      "reduced (manager or risk)": {
+        "count": 2,
+        "n_1s": 2,
+        "mean_1s": -0.0018417822002327888,
+        "up_share_1s": 0.5,
+        "n_5s": 0,
+        "mean_5s": null,
+        "up_share_5s": null
+      }
+    },
+    "by_agent": {
+      "mean_reversion": {
+        "count": 1,
+        "n_1s": 1,
+        "mean_1s": 0.10011677217134785,
+        "up_share_1s": 1.0,
+        "n_5s": 0,
+        "mean_5s": null,
+        "up_share_5s": null
+      },
+      "momentum": {
+        "count": 41,
+        "n_1s": 41,
+        "mean_1s": -0.0036115408385158218,
+        "up_share_1s": 0.3902439024390244,
+        "n_5s": 0,
+        "mean_5s": null,
+        "up_share_5s": null
+      },
+      "news": {
+        "count": 16,
+        "n_1s": 16,
+        "mean_1s": -0.001089802612745154,
+        "up_share_1s": 0.375,
+        "n_5s": 0,
+        "mean_5s": null,
+        "up_share_5s": null
+      },
+      "regime": {
+        "count": 41,
+        "n_1s": 41,
+        "mean_1s": -0.0036115408385158218,
+        "up_share_1s": 0.3902439024390244,
+        "n_5s": 0,
+        "mean_5s": null,
+        "up_share_5s": null
+      },
+      "technical": {
+        "count": 40,
+        "n_1s": 40,
+        "mean_1s": -0.0062047486637624135,
+        "up_share_1s": 0.375,
+        "n_5s": 0,
+        "mean_5s": null,
+        "up_share_5s": null
+      },
+      "volume": {
+        "count": 21,
+        "n_1s": 21,
+        "mean_1s": -0.0054608169040041765,
+        "up_share_1s": 0.42857142857142855,
+        "n_5s": 0,
+        "mean_5s": null,
+        "up_share_5s": null
+      }
+    },
+    "by_threshold": {
+      "0.25": {
+        "count": 39,
+        "n_1s": 39,
+        "mean_1s": -0.006563795662746017,
+        "up_share_1s": 0.3333333333333333,
+        "n_5s": 0,
+        "mean_5s": null,
+        "up_share_5s": null
+      },
+      "0.35": {
+        "count": 22,
+        "n_1s": 22,
+        "mean_1s": -0.014694128047557013,
+        "up_share_1s": 0.13636363636363635,
+        "n_5s": 0,
+        "mean_5s": null,
+        "up_share_5s": null
+      },
+      "0.45": {
+        "count": 5,
+        "n_1s": 5,
+        "mean_1s": -0.0024842276747642834,
+        "up_share_1s": 0.4,
+        "n_5s": 0,
+        "mean_5s": null,
+        "up_share_5s": null
+      }
+    }
+  },
+  "records": [
+    {
+      "proposal_id": "d63b7f98361f4d03a607e25812d9860f87d335f65331867f1733b58a4dd1bf39",
+      "symbol": "WIPRO",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-15T06:15:00Z",
+      "fused_signal": 0.27472222,
+      "fused_confidence": 0.41666667,
+      "entry_price": 173.79,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "daily_entry_cap"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: daily_entry_cap"
+      ],
+      "return_1s": 0.06105069336555613,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "dbab52482d5bb61fd1be1db11f5bc41d31f85e918862307accdc2e37dfb7c838",
+      "symbol": "ULTRACEMCO",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-15T06:15:00Z",
+      "fused_signal": 0.26872222,
+      "fused_confidence": 0.43666667,
+      "entry_price": 10819.0,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "daily_entry_cap"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: daily_entry_cap"
+      ],
+      "return_1s": 0.008133838617247369,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "6bab1a98f1b2379eb52b3e71e86e6e990b06bf040a007866d5f11a0de3f6e63f",
+      "symbol": "TECHM",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-15T06:15:00Z",
+      "fused_signal": 0.22572222,
+      "fused_confidence": 0.33666667,
+      "entry_price": 1627.1,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "mean_reversion",
+        "momentum",
+        "regime"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": 0.10011677217134785,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "b32d2a444324f078000f5ca20503bce6e462cc03a26925d7c254aee847495bfc",
+      "symbol": "ONGC",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-15T06:15:00Z",
+      "fused_signal": 0.28722222,
+      "fused_confidence": 0.46666667,
+      "entry_price": 225.0,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": -0.013333333333333308,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "05f4e52754b8f0d79cc0061a7ff8949cd58825ea30b3ecefb24825235bc05b6e",
+      "symbol": "JSWSTEEL",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-15T06:15:00Z",
+      "fused_signal": 0.24822222,
+      "fused_confidence": 0.52666667,
+      "entry_price": 1201.5,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": 0.012317935913441547,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "3fc5623885903b68062b14b242287399b1dbc34edb8d8cd874e041bc6a4c86dc",
+      "symbol": "HDFCLIFE",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-15T06:15:00Z",
+      "fused_signal": 0.26872222,
+      "fused_confidence": 0.43666667,
+      "entry_price": 552.35,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": 0.001176790078754264,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "224041d55eac79a60087f5d210b2b3fb1be72a9915161ecfdc7053c35a9ca456",
+      "symbol": "GRASIM",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-15T06:15:00Z",
+      "fused_signal": 0.28722222,
+      "fused_confidence": 0.46666667,
+      "entry_price": 2896.6,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": 0.008078436787958276,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "3853a88c8ba8880796f66a9933738b83de8d3b42bedc6bdb689d79151d4b1e09",
+      "symbol": "BAJAJFINSV",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-15T06:15:00Z",
+      "fused_signal": 0.37122222,
+      "fused_confidence": 0.52666667,
+      "entry_price": 1728.2,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": 0.00046290938548776417,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "d2ab187a68cb9cb2435003fd851a18cf4a37603194d5b8ea4a9b9509b0d9faec",
+      "symbol": "TCS",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-15T10:00:00Z",
+      "fused_signal": 0.28599185,
+      "fused_confidence": 0.61888889,
+      "entry_price": 2355.2,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": false,
+      "paths": [
+        "approved, not filled"
+      ],
+      "return_1s": 0.04662024456521752,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "799b3a071ea2ea71a1f0793b788f3699a7fcdec8cc0cf23d581090f7d7aa7d72",
+      "symbol": "KOTAKBANK",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-15T10:00:00Z",
+      "fused_signal": 0.34734852,
+      "fused_confidence": 0.55388889,
+      "entry_price": 446.0,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": 0.003139013452914785,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "0a938ddb540a7a26ddb49ecf95e71be2b3627364ee121118cffe544921c5e226",
+      "symbol": "HDFCLIFE",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-15T10:00:00Z",
+      "fused_signal": 0.22160185,
+      "fused_confidence": 0.43888889,
+      "entry_price": 550.0,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": 0.005454545454545379,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "d59d5eb10931b20a2813c7753c92002e79e34f67fc032777d536ced3d5a1da26",
+      "symbol": "HCLTECH",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-15T10:00:00Z",
+      "fused_signal": 0.26961852,
+      "fused_confidence": 0.56388889,
+      "entry_price": 1358.1,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": false,
+      "paths": [
+        "approved, not filled"
+      ],
+      "return_1s": 0.016125469405787518,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "3219443f17bda19123fd4f118bd52ccb2164999f7f0929a8b3d6f11a37b96ed0",
+      "symbol": "DRREDDY",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-15T10:00:00Z",
+      "fused_signal": 0.22893519,
+      "fused_confidence": 0.41388889,
+      "entry_price": 1221.7,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": 0.00924940656462292,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "c6f42f0a46cbbaaa8e6ecffbe419ce240ca5bc81559f9104863cfd62b73f0672",
+      "symbol": "AXISBANK",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-15T10:00:00Z",
+      "fused_signal": 0.25601852,
+      "fused_confidence": 0.59722222,
+      "entry_price": 1285.7,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": 0.0033444816053511683,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "04c2cbbd635b6a41dcec33c108bec3dd7d699fa2eeddfabc6f6a7cd0dbef46b2",
+      "symbol": "DRREDDY",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-16T10:00:00Z",
+      "fused_signal": 0.22160185,
+      "fused_confidence": 0.43888889,
+      "entry_price": 1230.3,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": 0.009916280581971915,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "786988b0b38a1c2e81d8a3766dec789ced1a25710d60038ee6d68742bfd61fac",
+      "symbol": "HDFCLIFE",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-16T10:00:00Z",
+      "fused_signal": 0.27785185,
+      "fused_confidence": 0.48055556,
+      "entry_price": 553.0,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": -0.013562386980108476,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "0534cd8e153168ac61191ad57e587e0d35a086e839787ca48d00c62f35af3e2a",
+      "symbol": "WIPRO",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-16T10:00:00Z",
+      "fused_signal": 0.23093519,
+      "fused_confidence": 0.60555556,
+      "entry_price": 184.9,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "max_open_positions"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: max_open_positions"
+      ],
+      "return_1s": -0.014926987560843763,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "a0d977091e03339c9a16af082a9333ff2d01ea53ba1580c24ce68778ef56c922",
+      "symbol": "TECHM",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-16T10:00:00Z",
+      "fused_signal": 0.40367852,
+      "fused_confidence": 0.69222222,
+      "entry_price": 1780.1,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "max_open_positions"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: max_open_positions"
+      ],
+      "return_1s": -0.0005617661929104845,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "bfc79ea91171173d4fa36fb5738a1a8ab7e0c0a8ecf6af4fb08954f029bcf559",
+      "symbol": "TCS",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-16T10:00:00Z",
+      "fused_signal": 0.33515852,
+      "fused_confidence": 0.63555556,
+      "entry_price": 2467.4,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "max_open_positions"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: max_open_positions"
+      ],
+      "return_1s": -0.0026343519494204104,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "f6cc21464507845cf0d243f13af1cc950d1d2b3c78187f0c266a4834bd2ba671",
+      "symbol": "INFY",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-16T10:00:00Z",
+      "fused_signal": 0.25234852,
+      "fused_confidence": 0.58722222,
+      "entry_price": 1163.3,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "max_open_positions"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: max_open_positions"
+      ],
+      "return_1s": -0.02802372560818356,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "cfcf5a926900c9be8fab3ad7e99865fca780ef8f59188518ae3a9fae7c24ae43",
+      "symbol": "HCLTECH",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-16T10:00:00Z",
+      "fused_signal": 0.26420185,
+      "fused_confidence": 0.58888889,
+      "entry_price": 1371.0,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": 0.006491611962071486,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "33d3351a655f46545e7d35f90800a47ca620519e3ab49c99fff3f4b0c404997c",
+      "symbol": "BHARTIARTL",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-16T10:00:00Z",
+      "fused_signal": 0.21310185,
+      "fused_confidence": 0.55555556,
+      "entry_price": 1898.0,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "news",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": -0.01201264488935716,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "a6bc8024646b626b31fce1f244117838a03a925dd04adedd264aa559d0ec004e",
+      "symbol": "ULTRACEMCO",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:00:00Z",
+      "fused_signal": 0.42472222,
+      "fused_confidence": 0.59666667,
+      "entry_price": 11191.0,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "max_open_positions"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: max_open_positions"
+      ],
+      "return_1s": -0.03056027164685904,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "6f616bb7dba52ad92915a5ee1a307289b92e25a52e2a2f0e40f2889fc78561d8",
+      "symbol": "POWERGRID",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:00:00Z",
+      "fused_signal": 0.24322222,
+      "fused_confidence": 0.40666667,
+      "entry_price": 252.8,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "max_open_positions"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: max_open_positions"
+      ],
+      "return_1s": -0.0025712025316455556,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "8e732d7236943dc45284e4e47a3469a87907a4cd952bc20e4d19e58879f9f707",
+      "symbol": "MARUTI",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:00:00Z",
+      "fused_signal": 0.35872222,
+      "fused_confidence": 0.47666667,
+      "entry_price": 11620.0,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "max_open_positions"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: max_open_positions"
+      ],
+      "return_1s": -0.03614457831325302,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "938facd3b7dc9708ff4100859279e264373d8e040eea2fc26f788f9c2efc5259",
+      "symbol": "LT",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:00:00Z",
+      "fused_signal": 0.35872222,
+      "fused_confidence": 0.47666667,
+      "entry_price": 3679.7,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "max_open_positions"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: max_open_positions"
+      ],
+      "return_1s": -0.011875968149577365,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "890ae2f0f36fdaa49bc9e661a8170b4dc9bb0c06983dd78cf95a3df4d99dd9e8",
+      "symbol": "HINDALCO",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:00:00Z",
+      "fused_signal": 0.30722222,
+      "fused_confidence": 0.60666667,
+      "entry_price": 913.2,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "max_open_positions"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: max_open_positions"
+      ],
+      "return_1s": -0.022284275076653537,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "c6cb055c5128aca19bbe72a56b0eaadbd2a6434ae88c5132837bf623f1dbb073",
+      "symbol": "HEROMOTOCO",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:00:00Z",
+      "fused_signal": 0.37122222,
+      "fused_confidence": 0.52666667,
+      "entry_price": 5288.0,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": -0.025434947049924328,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "7974d07bd58a70684a07f8e2c251c8ad5aad873ad8bea42b2e8000da2aaff668",
+      "symbol": "TITAN",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:05:00Z",
+      "fused_signal": 0.35872222,
+      "fused_confidence": 0.47666667,
+      "entry_price": 4480.1,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "max_open_positions"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: max_open_positions"
+      ],
+      "return_1s": -0.02214236289368554,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "c031c1935e588874b699804baa869ba968a960a8dd9e246aa4a69c9aa6706bb1",
+      "symbol": "TATASTEEL",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:05:00Z",
+      "fused_signal": 0.29472222,
+      "fused_confidence": 0.55666667,
+      "entry_price": 175.74,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "max_open_positions"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: max_open_positions"
+      ],
+      "return_1s": -0.018720837601001628,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "41f49fe0efb874d32e07195f3c0cb982ad2dc65fe05f7a30f5dbf9684e594d21",
+      "symbol": "RELIANCE",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:05:00Z",
+      "fused_signal": 0.35872222,
+      "fused_confidence": 0.47666667,
+      "entry_price": 1222.5,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "max_open_positions"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: max_open_positions"
+      ],
+      "return_1s": -0.011042944785276121,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "c976cda413b6786911dd4e7b6b015d526d0e472b9b9bc9a96b64901533352094",
+      "symbol": "MARUTI",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:05:00Z",
+      "fused_signal": 0.35872222,
+      "fused_confidence": 0.47666667,
+      "entry_price": 11613.0,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "max_open_positions"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: max_open_positions"
+      ],
+      "return_1s": -0.035563592525617804,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "c150dfa5cb979862e1d85ffa6b0ef3c987ab2d493ac85a868c90e3333bbc81b3",
+      "symbol": "LT",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:05:00Z",
+      "fused_signal": 0.35872222,
+      "fused_confidence": 0.47666667,
+      "entry_price": 3678.1,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "max_open_positions"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: max_open_positions"
+      ],
+      "return_1s": -0.011446127076479629,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "f61a2cc86b2f2e5a341c41e34ff89ecc385a309321c92a27c3f55e9270441e94",
+      "symbol": "HDFCLIFE",
+      "side": "SELL",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:05:00Z",
+      "fused_signal": -0.31427778,
+      "fused_confidence": 0.47666667,
+      "entry_price": 547.0,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": -0.013436928702010964,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "5a5322e5af98b1de9d59ea96e5f248eb8d5d5a3e5616f5fef8334e5423b0a1b4",
+      "symbol": "EICHERMOT",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:05:00Z",
+      "fused_signal": 0.24322222,
+      "fused_confidence": 0.40666667,
+      "entry_price": 7412.5,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "max_open_positions"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: max_open_positions"
+      ],
+      "return_1s": -0.032647554806070844,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "ae0679a327bc61db6e9c4b3a07cfc1c7761108e65bf3670cb949d9beb4c31e7a",
+      "symbol": "CIPLA",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:05:00Z",
+      "fused_signal": 0.27472222,
+      "fused_confidence": 0.41666667,
+      "entry_price": 1331.9,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "max_open_positions"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: max_open_positions"
+      ],
+      "return_1s": -0.01343944740596148,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "d6ba946c43fb636875c34e59cde6d2a9a6f146e7fc0710e50160a07855ad73db",
+      "symbol": "KOTAKBANK",
+      "side": "SELL",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:10:00Z",
+      "fused_signal": -0.5365,
+      "fused_confidence": 0.61,
+      "entry_price": 443.2,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": -0.012184115523465655,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "ea70bcc080403c3a8176992035fadb525358013cec5484fa08f7a053546d9c06",
+      "symbol": "BAJAJFINSV",
+      "side": "SELL",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:10:00Z",
+      "fused_signal": -0.5025,
+      "fused_confidence": 0.65,
+      "entry_price": 1714.3,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": -0.014174881875984369,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "4ffd3a1f03f3898923c2575b0af2587e55f1636fed0145a154848d5d02d5cfba",
+      "symbol": "BHARTIARTL",
+      "side": "SELL",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:15:00Z",
+      "fused_signal": -0.2205,
+      "fused_confidence": 0.43,
+      "entry_price": 1897.2,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": -0.002899009065991942,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "6c1d4f6229776c2c7d3d27d9c90e9be2ea31d43b96d0eccdc31b9b8f281e1bfd",
+      "symbol": "ONGC",
+      "side": "SELL",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:20:00Z",
+      "fused_signal": -0.2115,
+      "fused_confidence": 0.37,
+      "entry_price": 224.65,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": 0.0043178277320274905,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "24d420da16c9962fc4aadd4723810ea69487a73c9ade7ef76d170bb61f57afb6",
+      "symbol": "HDFCLIFE",
+      "side": "SELL",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:20:00Z",
+      "fused_signal": -0.3545,
+      "fused_confidence": 0.47,
+      "entry_price": 545.45,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": -0.01063342194518302,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "2ab1030227ec8348578fc3a6d010584100a86c23005d24b1b718e266c2ebde0b",
+      "symbol": "DRREDDY",
+      "side": "SELL",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:20:00Z",
+      "fused_signal": -0.2115,
+      "fused_confidence": 0.37,
+      "entry_price": 1233.8,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": 0.008672394229210623,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "2535c84ee61d89fba53494d1091cf5d4a9d923662b05ce5c3f7783c64c4f0044",
+      "symbol": "TATASTEEL",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:25:00Z",
+      "fused_signal": 0.35872222,
+      "fused_confidence": 0.47666667,
+      "entry_price": 175.64,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "daily_entry_cap"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: daily_entry_cap"
+      ],
+      "return_1s": -0.018162149851969955,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "fbd5b331f32beeca01de14ba48b6ed27fcf78c3e99036f4a8af7e8e8e735cd21",
+      "symbol": "LT",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:25:00Z",
+      "fused_signal": 0.37122222,
+      "fused_confidence": 0.52666667,
+      "entry_price": 3675.1,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "daily_entry_cap"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: daily_entry_cap"
+      ],
+      "return_1s": -0.01063916628118955,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "102145acc6116ae5dff992e302fe37f0fd43f2621052c2c0159ecc214e2e69e1",
+      "symbol": "HINDALCO",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:25:00Z",
+      "fused_signal": 0.35872222,
+      "fused_confidence": 0.47666667,
+      "entry_price": 909.35,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "daily_entry_cap"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: daily_entry_cap"
+      ],
+      "return_1s": -0.018144828723813733,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "3701900b51620dc66b1a4fb44e64ff48c46ae5555dcbb99d810734664c2841f7",
+      "symbol": "HCLTECH",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:25:00Z",
+      "fused_signal": 0.27472222,
+      "fused_confidence": 0.41666667,
+      "entry_price": 1389.3,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "daily_entry_cap"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: daily_entry_cap"
+      ],
+      "return_1s": 0.0251205643129635,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "4dbaef5913cc993dd5321d3ba4d4e8aaebda0edf129d4c772e742f9473deee59",
+      "symbol": "EICHERMOT",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:25:00Z",
+      "fused_signal": 0.37122222,
+      "fused_confidence": 0.52666667,
+      "entry_price": 7425.0,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "manager_verdict": null,
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "daily_entry_cap"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "rejected: daily_entry_cap"
+      ],
+      "return_1s": -0.03427609427609424,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "91ffbf89e77baf9f2027e8e9f1d4ef383db2f3cf9be0e7aab455d8713cc5e66c",
+      "symbol": "BPCL",
+      "side": "BUY",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-19T05:25:00Z",
+      "fused_signal": 0.35872222,
+      "fused_confidence": 0.47666667,
+      "entry_price": 295.3,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "regime",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "regime",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": -0.024720623095157546,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "cfac04487f681719e58bd79b246b07bc8be62b4341e89067c7e73237102532db",
+      "symbol": "JSWSTEEL",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-19T10:00:00Z",
+      "fused_signal": 0.56,
+      "fused_confidence": 0.55,
+      "entry_price": 1231.0,
+      "voters": [
+        "news"
+      ],
+      "supporting_agents": [
+        "news"
+      ],
+      "manager_verdict": "REDUCE",
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": true,
+      "filled": true,
+      "paths": [
+        "approved and filled",
+        "reduced (manager or risk)"
+      ],
+      "return_1s": -0.0065800162469535906,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "806c6d1c7652d6e6e7a97011a9a958287c442f2218d29c9c3ab194cc8dd42090",
+      "symbol": "BEL",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-19T10:00:00Z",
+      "fused_signal": 0.42,
+      "fused_confidence": 0.55,
+      "entry_price": 375.35,
+      "voters": [
+        "news"
+      ],
+      "supporting_agents": [
+        "news"
+      ],
+      "manager_verdict": "VETO",
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "portfolio_manager"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "vetoed by the manager"
+      ],
+      "return_1s": -0.011056347409084899,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "750b731007673c630a49e9fc5aca6f78a684d0637bb75bc83a4da0dd559791b3",
+      "symbol": "ADANIENT",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-19T10:00:00Z",
+      "fused_signal": 0.64,
+      "fused_confidence": 0.55,
+      "entry_price": 2653.6,
+      "voters": [
+        "news"
+      ],
+      "supporting_agents": [
+        "news"
+      ],
+      "manager_verdict": "VETO",
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "portfolio_manager"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "vetoed by the manager"
+      ],
+      "return_1s": -0.022271630991860136,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "a8ce1696ee22c5e8528768ab3f8c52ea0f741f36a3ddcc03dbc4d5ad302dd653",
+      "symbol": "TITAN",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-19T10:00:00Z",
+      "fused_signal": 0.42,
+      "fused_confidence": 0.55,
+      "entry_price": 4423.1,
+      "voters": [
+        "news"
+      ],
+      "supporting_agents": [
+        "news"
+      ],
+      "manager_verdict": "VETO",
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "portfolio_manager"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "vetoed by the manager"
+      ],
+      "return_1s": -0.009540819787027366,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "a0bae0ba2423d78ac215d12539e5b63caa7cb960d3c28f72a5bfc95bda019aa2",
+      "symbol": "TCS",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-19T10:00:00Z",
+      "fused_signal": 0.64,
+      "fused_confidence": 0.55,
+      "entry_price": 2461.0,
+      "voters": [
+        "news"
+      ],
+      "supporting_agents": [
+        "news"
+      ],
+      "manager_verdict": "VETO",
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "portfolio_manager"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "vetoed by the manager"
+      ],
+      "return_1s": 0.027631044290938656,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "ff827758e099d16fec81ea8b2f251990baf893938606a1baaeab5e208d365d8a",
+      "symbol": "NESTLEIND",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-19T10:00:00Z",
+      "fused_signal": 0.7,
+      "fused_confidence": 0.55,
+      "entry_price": 1241.4,
+      "voters": [
+        "news"
+      ],
+      "supporting_agents": [
+        "news"
+      ],
+      "manager_verdict": "VETO",
+      "risk_status": "REJECTED",
+      "failed_checks": [
+        "portfolio_manager"
+      ],
+      "reduced": true,
+      "filled": false,
+      "paths": [
+        "vetoed by the manager"
+      ],
+      "return_1s": -0.014096987272434358,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "04c0e0b6966f6ae348b93b6550f942fc21e66cc6f08464764a98d0a275cec546",
+      "symbol": "ICICIBANK",
+      "side": "BUY",
+      "horizon": "SWING",
+      "decision_bar": "2026-10-19T10:00:00Z",
+      "fused_signal": 0.72,
+      "fused_confidence": 0.55,
+      "entry_price": 1381.0,
+      "voters": [
+        "news"
+      ],
+      "supporting_agents": [
+        "news"
+      ],
+      "manager_verdict": "REDUCE",
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": true,
+      "filled": true,
+      "paths": [
+        "approved and filled",
+        "reduced (manager or risk)"
+      ],
+      "return_1s": 0.002896451846488013,
+      "return_5s": null
+    },
+    {
+      "proposal_id": "e46a0a089dddac13d2e61665290c2d941716046d3bf67a195a0293b4ac0a3265",
+      "symbol": "GRASIM",
+      "side": "SELL",
+      "horizon": "INTRADAY",
+      "decision_bar": "2026-10-21T07:05:00Z",
+      "fused_signal": -0.78920705,
+      "fused_confidence": 0.5675,
+      "entry_price": 2878.9,
+      "voters": [
+        "mean_reversion",
+        "momentum",
+        "technical",
+        "volume"
+      ],
+      "supporting_agents": [
+        "momentum",
+        "technical"
+      ],
+      "manager_verdict": null,
+      "risk_status": "APPROVED",
+      "failed_checks": [],
+      "reduced": false,
+      "filled": true,
+      "paths": [
+        "approved and filled"
+      ],
+      "return_1s": -0.0006599742957379418,
+      "return_5s": null
+    }
+  ]
+}

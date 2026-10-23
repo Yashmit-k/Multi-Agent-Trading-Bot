@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { errorText, postApi } from "@/lib/api";
 import { OperatorGate } from "@/components/operator/OperatorGate";
+import { AgreeAgentsField } from "@/components/operator/AgreeAgentsField";
 
-export type Bound = { key: string; label: string; min: string | null; max: string | null; default: string; choices?: Array<{ value: string; label: string }> };
+export type Bound = { key: string; label: string; min: string | null; max: string | null; default: string; choices?: Array<{ value: string; label: string }>; multiple?: boolean };
 export type RiskSettingsView = { settings: Record<string, string | number | boolean>; bounds: Bound[]; updated_at: string | null; updated_by: string | null };
 
 const HINT: Record<string, string> = {
@@ -65,7 +66,20 @@ export function RiskSettingsForm({ initial }: { initial: RiskSettingsView }) {
           className="space-y-3"
         >
           <div className="grid gap-3 md:grid-cols-2">
-            {view.bounds.map((bound) => (
+            {view.bounds.map((bound) =>
+              bound.multiple ? (
+                // agree_agents only matters in "agents agree" mode, so it is shown only then.
+                draft.strategy_mode === "agents_agree" ? (
+                  <AgreeAgentsField
+                    key={bound.key}
+                    label={bound.label}
+                    value={String(draft[bound.key] ?? bound.default)}
+                    choices={bound.choices ?? []}
+                    disabled={!operator}
+                    onChange={(next) => setDraft({ ...draft, [bound.key]: next })}
+                  />
+                ) : null
+              ) : (
               <label key={bound.key} className="block rounded border border-[#26303C] bg-[#0F141B] p-3 text-sm">
                 <span className="font-medium">{bound.label}</span>
                 {bound.choices ? (
@@ -107,7 +121,8 @@ export function RiskSettingsForm({ initial }: { initial: RiskSettingsView }) {
                   {HINT[bound.key]} {bound.min !== null ? `Allowed ${bound.min}–${bound.max}; default ${bound.default}.` : `Default ${bound.default}.`}
                 </span>
               </label>
-            ))}
+              ),
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button type="submit" disabled={!operator || pending} className="rounded bg-[#2563EB] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">

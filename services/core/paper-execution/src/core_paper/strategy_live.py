@@ -19,10 +19,11 @@ import math
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 
-from contracts.enums import Horizon, OrderStatus, RiskStatus, Side, Timeframe, TradingMode
+from contracts.enums import AgentName, Horizon, OrderStatus, RiskStatus, Side, Timeframe, TradingMode
 from contracts.events import EventType
 from contracts.schemas.trade_proposal import TradeProposal
 from core_db.repository import CoreRepository
+from core_risk.settings import agree_agent_names
 from core_paper.strategy_engine import (
     INTRADAY,
     IST,
@@ -175,10 +176,18 @@ def _digest(*parts: str) -> str:
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:32]
 
 
-def agents_view(repository: CoreRepository, symbol: str, horizon: Horizon, moment: datetime, weights: dict | None) -> float | None:
-    """The agents' fused signal on this stock now, or None when no agent has a valid opinion."""
+def agents_view(
+    repository: CoreRepository, symbol: str, horizon: Horizon, moment: datetime, weights: dict | None, only: tuple[str, ...] | None = None
+) -> float | None:
+    """The agents' fused signal on this stock now, or None when no agent has a valid opinion.
+
+    With `only`, just those agents vote, each with weight 1 (the live fusion weights are ignored): a strategy
+    decides which opinions count as disagreement.
+    """
     from core_fusion import fuse
 
+    if only is not None:
+        weights = {horizon: {agent.value: (1.0 if agent.value in only else 0.0) for agent in AgentName}}
     aggregate = fuse(repository.signals_for(symbol), horizon=horizon, as_of=moment, weights=weights)
     return None if aggregate is None else aggregate.aggregated_signal
 
@@ -199,6 +208,7 @@ def strategy_entries(repository: CoreRepository, publisher, *, starting_cash: De
     if book is None:
         return 0
     agree = getattr(settings, "strategy_mode", "replace") == "agents_agree"
+    agree_with = agree_agent_names(settings) if agree else None
     review = agree and manager_review and getattr(settings, "manager_review", False)
     created = 0
     # Entries from earlier cycles still waiting for the portfolio manager.
@@ -261,9 +271,9 @@ def strategy_entries(repository: CoreRepository, publisher, *, starting_cash: De
             continue
         final_target = targets[-1][0] if targets else entry * 10  # no target: exits come from stop/trailing/time/rule
         horizon = Horizon.INTRADAY if definition.timeframe in INTRADAY else Horizon.SWING
-        view = agents_view(repository, symbol, horizon, moment, weights) if agree else None
+        view = agents_view(repository, symbol, horizon, moment, weights, only=agree_with) if agree else None
         if agree and view is not None and view < 0:
-            logger.info("strategy_entry_blocked_by_agents symbol=%s fused=%.3f", symbol, view)
+            logger.info("strategy_entry_blocked_by_agents symbol=%s fused=%.3f agents=%s", symbol, view, ",".join(agree_with or ()))
             continue
         proposal = TradeProposal(
             proposal_id=proposal_id,
@@ -294,6 +304,7 @@ def strategy_entries(repository: CoreRepository, publisher, *, starting_cash: De
                 "decided_at": moment.isoformat(),
                 "strategy_mode": getattr(settings, "strategy_mode", "replace"),
                 "agents_fused_signal": view,
+                "agree_agents": list(agree_with) if agree_with else None,
                 "needs_review": review,
                 "limit_price": None if limit is None else round(limit, 2),
                 "stops_monitored": True,

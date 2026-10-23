@@ -44,6 +44,9 @@ class RiskSettings:
     # replace = only the strategy opens trades; alongside = both open trades independently;
     # agents_agree = only the strategy opens trades, and only when the agents' fused view is not bearish.
     strategy_mode: str = "replace"
+    # agents_agree mode: the agents whose view a strategy entry must not contradict, comma-separated. A dip-buyer
+    # cares whether there is bad news, not whether the trend is down, so the trend agents are left out by default.
+    agree_agents: str = "news,earnings"
 
     def as_json(self) -> dict[str, object]:
         return {key: (str(value) if isinstance(value, Decimal) else value) for key, value in asdict(self).items()}
@@ -77,7 +80,44 @@ CHOICES: dict[str, tuple[tuple[str, str], ...]] = {
     ),
 }
 
+# Agents that may be named in agree_agents (each votes with weight 1 in the agents_agree check).
+AGREE_AGENT_CHOICES: tuple[tuple[str, str], ...] = (
+    ("technical", "Technical"),
+    ("momentum", "Momentum"),
+    ("mean_reversion", "Mean reversion"),
+    ("volume", "Volume"),
+    ("regime", "Market regime"),
+    ("news", "News"),
+    ("fundamental", "Fundamental"),
+    ("valuation", "Valuation"),
+    ("earnings", "Earnings"),
+)
+
 DEFAULTS = RiskSettings()
+
+
+def parse_agree_agents(raw: object) -> str:
+    """'news, Earnings' -> 'news,earnings'. Raises ValueError for an unknown name or an empty list."""
+    if not isinstance(raw, str):
+        raise ValueError("must be a comma-separated list of agent names")
+    allowed = [value for value, _ in AGREE_AGENT_CHOICES]
+    names: list[str] = []
+    for part in raw.split(","):
+        name = part.strip().lower()
+        if not name:
+            continue
+        if name not in allowed:
+            raise ValueError(f"unknown agent {name!r}; choose from {', '.join(allowed)}")
+        if name not in names:
+            names.append(name)
+    if not names:
+        raise ValueError("choose at least one agent")
+    return ",".join(names)
+
+
+def agree_agent_names(settings: object) -> tuple[str, ...]:
+    """The agree_agents setting as a tuple, falling back to the default for an old settings object."""
+    return tuple(getattr(settings, "agree_agents", DEFAULTS.agree_agents).split(","))
 
 
 class SettingsError(ValueError):
@@ -98,6 +138,9 @@ def parse_settings(payload: dict[str, object] | None, *, strict: bool = True) ->
             continue
         default = getattr(DEFAULTS, key)
         try:
+            if key == "agree_agents":
+                values[key] = parse_agree_agents(raw)
+                continue
             if key in CHOICES:
                 allowed = [value for value, _ in CHOICES[key]]
                 if raw not in allowed:
@@ -138,4 +181,6 @@ def describe_bounds() -> list[dict[str, object]]:
         {"key": "manager_review", "label": "Portfolio manager reviews agent buys", "min": None, "max": None, "default": "true"},
         {"key": "strategy_mode", "label": "Applied strategy and the agents", "min": None, "max": None, "default": DEFAULTS.strategy_mode,
          "choices": [{"value": value, "label": label} for value, label in CHOICES["strategy_mode"]]},
+        {"key": "agree_agents", "label": "Agents a strategy must agree with", "min": None, "max": None, "default": DEFAULTS.agree_agents,
+         "multiple": True, "choices": [{"value": value, "label": label} for value, label in AGREE_AGENT_CHOICES]},
     ]
