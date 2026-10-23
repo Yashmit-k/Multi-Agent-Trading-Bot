@@ -21,6 +21,7 @@ class NewsInsertResult:
     quarantined: bool
     duplicate: bool
     dropped_empty_symbols: bool = False
+    updated: bool = False
 
 
 class NewsStore(Protocol):
@@ -28,6 +29,7 @@ class NewsStore(Protocol):
     def articles_for(self, symbol: str, as_of: datetime) -> list[NewsArticle]: ...
     def graduate_quarantine(self, now: datetime) -> int: ...
     def record_empty_symbol_drop(self, title: str = "") -> None: ...
+    def latest_published_at(self) -> datetime | None: ...
     @property
     def dropped_empty_symbols(self) -> int: ...
 
@@ -82,22 +84,52 @@ class SqliteNewsStore:
 
     def record_empty_symbol_drop(self, title: str = "") -> None:
         self._dropped_empty_symbols += 1
-        # Most market headlines name no NIFTY 50 company; that is expected, so this is debug, not a warning.
-        logger.debug(
-            "articles_dropped_empty_symbols",
-            extra={"count": self._dropped_empty_symbols, "title": title[:80]},
-        )
+        if self._dropped_empty_symbols <= 3 or self._dropped_empty_symbols % 50 == 0:
+            logger.info(
+                "articles_dropped_empty_symbols",
+                extra={"count": self._dropped_empty_symbols, "title": title[:80]},
+            )
 
     def insert(self, article: NewsArticle, *, now: datetime) -> NewsInsertResult:
         aware_now = require_aware(now, "now")
         if not article.symbols:
             self.record_empty_symbol_drop(article.article_id)
             return NewsInsertResult(False, False, False, dropped_empty_symbols=True)
-        existing = self._conn.execute(
-            "SELECT 1 FROM articles WHERE article_id = ? OR content_hash = ?",
-            (article.article_id, article.content_hash),
+        by_id = self._conn.execute(
+            "SELECT article_id, content_hash, metadata FROM articles WHERE article_id = ?",
+            (article.article_id,),
         ).fetchone()
-        if existing is not None:
+        if by_id is not None:
+            if by_id["content_hash"] == article.content_hash:
+                return NewsInsertResult(False, False, True)
+            metadata = dict(article.metadata)
+            previous = json.loads(by_id["metadata"]) if by_id["metadata"] else {}
+            metadata["content_updated"] = True
+            metadata["previous_content_hash"] = by_id["content_hash"]
+            metadata["original_metadata_keys"] = sorted(previous.keys())[:20]
+            self._conn.execute(
+                """
+                UPDATE articles SET title = ?, raw_text = ?, content_hash = ?, metadata = ?,
+                    symbols = ?, source = ?
+                WHERE article_id = ?
+                """,
+                (
+                    article.title,
+                    article.raw_text,
+                    article.content_hash,
+                    json.dumps(metadata),
+                    json.dumps(list(article.symbols)),
+                    article.source,
+                    article.article_id,
+                ),
+            )
+            self._conn.commit()
+            return NewsInsertResult(False, False, False, updated=True)
+        existing_hash = self._conn.execute(
+            "SELECT 1 FROM articles WHERE content_hash = ?",
+            (article.content_hash,),
+        ).fetchone()
+        if existing_hash is not None:
             return NewsInsertResult(False, False, True)
         quarantined = article.published_at > aware_now
         self._conn.execute(
@@ -153,6 +185,12 @@ class SqliteNewsStore:
         self._conn.commit()
         return int(cursor.rowcount or 0)
 
+    def latest_published_at(self) -> datetime | None:
+        row = self._conn.execute("SELECT MAX(published_at) AS ts FROM articles WHERE quarantined = 0").fetchone()
+        if row is None or row["ts"] is None:
+            return None
+        return datetime.fromisoformat(row["ts"])
+
 
 @dataclass
 class MemoryNewsStore:
@@ -163,21 +201,28 @@ class MemoryNewsStore:
 
     def record_empty_symbol_drop(self, title: str = "") -> None:
         self.dropped_empty_symbols += 1
-        # Most market headlines name no NIFTY 50 company; that is expected, so this is debug, not a warning.
-        logger.debug(
-            "articles_dropped_empty_symbols",
-            extra={"count": self.dropped_empty_symbols, "title": title[:80]},
-        )
+        if self.dropped_empty_symbols <= 3 or self.dropped_empty_symbols % 50 == 0:
+            logger.info(
+                "articles_dropped_empty_symbols",
+                extra={"count": self.dropped_empty_symbols, "title": title[:80]},
+            )
 
     def insert(self, article: NewsArticle, *, now: datetime) -> NewsInsertResult:
         aware_now = require_aware(now, "now")
         if not article.symbols:
             self.record_empty_symbol_drop(article.article_id)
             return NewsInsertResult(False, False, False, dropped_empty_symbols=True)
-        if any(
-            existing.article_id == article.article_id or existing.content_hash == article.content_hash
-            for existing, _ in self._rows
-        ):
+        for index, (existing, quarantined) in enumerate(self._rows):
+            if existing.article_id == article.article_id:
+                if existing.content_hash == article.content_hash:
+                    return NewsInsertResult(False, False, True)
+                metadata = dict(article.metadata)
+                metadata["content_updated"] = True
+                metadata["previous_content_hash"] = existing.content_hash
+                replaced = article.model_copy(update={"metadata": metadata})
+                self._rows[index] = (replaced, quarantined)
+                return NewsInsertResult(False, False, False, updated=True)
+        if any(existing.content_hash == article.content_hash for existing, _ in self._rows):
             return NewsInsertResult(False, False, True)
         quarantined = article.published_at > aware_now
         self._rows.append((article, quarantined))
@@ -207,3 +252,7 @@ class MemoryNewsStore:
                 updated.append((article, quarantined))
         self._rows = updated
         return graduated
+
+    def latest_published_at(self) -> datetime | None:
+        visible = [article.published_at for article, quarantined in self._rows if not quarantined]
+        return max(visible) if visible else None

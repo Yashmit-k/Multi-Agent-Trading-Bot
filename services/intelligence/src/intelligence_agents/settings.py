@@ -8,9 +8,11 @@ from dataclasses import dataclass
 from contracts.enums import TradingMode
 
 from intelligence_agents.errors import ConfigError
+from intelligence_agents.news.universe import DEFAULT_MARKET_FEEDS, NIFTY50_SYMBOLS
 
 LIVE_SOURCES = frozenset({"rss", "csv-live"})
 LIVE_MODES = frozenset({TradingMode.PAPER, TradingMode.SHADOW, TradingMode.LIVE})
+_FIXTURE_SYMBOLS = "RELIANCE,TCS,INFY,HDFCBANK,ICICIBANK"
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,6 +38,9 @@ class IntelligenceSettings:
     rss_max_bytes: int
     rss_max_items: int
     service_mode: str
+    news_ingest: bool = False
+    news_interpret: bool = False
+    rss_symbol_batch: int = 5
     fundamentals_csv: str = ""
     llm_min_interval_seconds: float = 0.0
     llm_max_output_tokens: int = 160
@@ -50,14 +55,26 @@ class IntelligenceSettings:
     # Empty: they share the News agent's model as before.
     llm_context_model: str = ""
     llm_context_reasoning_effort: str = ""
+    # Off by default. When true, headlines that name no company are stored as NIFTY50.
+    news_keep_market_wide: bool = False
 
     @classmethod
     def from_env(cls) -> IntelligenceSettings:
         mode = TradingMode(os.environ.get("INTELLIGENCE_TRADING_MODE", "BACKTEST"))
         source = os.environ.get("INTELLIGENCE_DATA_SOURCE", "fixtures").strip().lower()
         store = os.environ.get("INTELLIGENCE_STORE", "sqlite").strip().lower()
-        symbols_raw = os.environ.get("INTELLIGENCE_SYMBOLS", "RELIANCE,TCS,INFY,HDFCBANK,ICICIBANK")
+        if "INTELLIGENCE_SYMBOLS" in os.environ:
+            symbols_raw = os.environ["INTELLIGENCE_SYMBOLS"]
+        elif source == "rss":
+            symbols_raw = ",".join(NIFTY50_SYMBOLS)
+        else:
+            symbols_raw = _FIXTURE_SYMBOLS
         rss_raw = os.environ.get("NEWS_RSS_URLS", "")
+        rss_urls = tuple(item.strip() for item in rss_raw.split(",") if item.strip())
+        if source == "rss" and not rss_urls:
+            rss_urls = DEFAULT_MARKET_FEEDS
+        # Opt-in only. Production reads RSS inside the evaluation loop; a second ingest loop must be asked for.
+        news_ingest = os.environ.get("INTELLIGENCE_NEWS_INGEST", "false").strip().lower() == "true"
         settings = cls(
             data_source=source,
             trading_mode=mode,
@@ -74,12 +91,15 @@ class IntelligenceSettings:
             llm_tier2_model=os.environ.get("LLM_TIER2_MODEL", "fixture"),
             llm_daily_budget_usd=float(os.environ.get("LLM_DAILY_BUDGET_USD", "0")),
             llm_timeout_seconds=float(os.environ.get("LLM_TIMEOUT_SECONDS", "30")),
-            news_rss_urls=tuple(item.strip() for item in rss_raw.split(",") if item.strip()),
+            news_rss_urls=rss_urls,
             tier2_enabled=os.environ.get("INTELLIGENCE_TIER2_ENABLED", "false").lower() == "true",
             rss_interval_seconds=int(os.environ.get("NEWS_RSS_INTERVAL_SECONDS", "300")),
             rss_max_bytes=int(os.environ.get("NEWS_RSS_MAX_BYTES", str(1024 * 1024))),
             rss_max_items=int(os.environ.get("NEWS_RSS_MAX_ITEMS", "100")),
             service_mode=os.environ.get("INTELLIGENCE_SERVICE_MODE", "oneshot").strip().lower(),
+            news_ingest=news_ingest,
+            news_interpret=os.environ.get("INTELLIGENCE_NEWS_INTERPRET", "false").lower() == "true",
+            rss_symbol_batch=int(os.environ.get("NEWS_RSS_SYMBOL_BATCH", "5")),
             fundamentals_csv=os.environ.get("INTELLIGENCE_FUNDAMENTALS_CSV", "").strip(),
             llm_min_interval_seconds=float(os.environ.get("LLM_MIN_INTERVAL_SECONDS", "0")),
             llm_max_output_tokens=int(os.environ.get("LLM_MAX_OUTPUT_TOKENS", "160")),
@@ -90,6 +110,7 @@ class IntelligenceSettings:
             llm_context_model=os.environ.get("LLM_CONTEXT_MODEL", "").strip(),
             llm_context_reasoning_effort=os.environ.get("LLM_CONTEXT_REASONING_EFFORT", "").strip().lower(),
             llm_fallback_models=tuple(item.strip() for item in os.environ.get("LLM_FALLBACK_MODELS", "").split(",") if item.strip()),
+            news_keep_market_wide=os.environ.get("NEWS_KEEP_MARKET_WIDE", "false").strip().lower() == "true",
         )
         settings.validate()
         return settings
@@ -122,12 +143,16 @@ class IntelligenceSettings:
             raise ConfigError("BACKTEST is oneshot only; do not serve it from uvicorn")
         if self.trading_mode is TradingMode.BACKTEST and self.data_source in LIVE_SOURCES:
             raise ConfigError("BACKTEST cannot use RSS or csv-live; fixtures only")
-        if self.data_source == "rss" and not self.news_rss_urls and self.trading_mode in LIVE_MODES:
+        if self.data_source == "rss" and not self.news_rss_urls:
             raise ConfigError("NEWS_RSS_URLS required when INTELLIGENCE_DATA_SOURCE=rss")
         if self.data_source == "csv-live" and not self.fundamentals_csv and self.trading_mode in LIVE_MODES:
             raise ConfigError("INTELLIGENCE_FUNDAMENTALS_CSV required when INTELLIGENCE_DATA_SOURCE=csv-live")
         if not self.symbols:
             raise ConfigError("INTELLIGENCE_SYMBOLS must list at least one symbol")
+        if self.rss_interval_seconds < 30:
+            raise ConfigError("NEWS_RSS_INTERVAL_SECONDS must be >= 30 to respect provider limits")
+        if self.news_ingest and self.data_source != "rss":
+            raise ConfigError("INTELLIGENCE_NEWS_INGEST=true requires INTELLIGENCE_DATA_SOURCE=rss")
         if self.service_mode == "serve" and self.trading_mode in LIVE_MODES:
             if not self.internal_signal_token or not self.core_api_url:
                 raise ConfigError("PAPER/SHADOW/LIVE serve requires CORE_API_URL and INTERNAL_SIGNAL_TOKEN")

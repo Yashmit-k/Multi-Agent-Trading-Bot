@@ -28,6 +28,8 @@ class NewsAgent(BaseIntelligenceAgent):
 
     def evaluate(self, symbol: str, as_of: datetime, context: AgentContext) -> AgentSignal:
         articles = recent_news(context.news_provider.get_articles(symbol, as_of), as_of)
+        # Index-level headlines are stored under NIFTY50. They must not move a stock's News score.
+        articles = [article for article in articles if "NIFTY50" not in {item.upper() for item in article.symbols}]
         payload = {
             "kind": "news",
             "articles": [article.model_dump(mode="json") for article in articles],
