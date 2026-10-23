@@ -360,3 +360,89 @@ The bootstrap draws already defined above also supply a 95% percentile interval:
 ### No table until coverage is complete
 
 Train is not scored while any category is missing volume days inside 2017-01-01 through the study end date. The run writes the missing ranges and stops. It does not fill them with zero and it does not print a pass or a fail. Validate is not opened. A later resume uses the cache and does not repeat a request whose body is already stored.
+
+## Amendment B — news source: GDELT raw daily GKG files instead of the DOC API
+
+Status: **PROPOSED, not in force.** It takes effect only when a later commit adds the line "Amendment B approved by <name>, <date>" below this heading. Until then, Amendment A and the sections above apply unchanged, and the study stays BLOCKED.
+
+### Why
+
+No train table has been computed. Everything below changes only *where the daily news volume comes from*. It does not change the 60-day window, the 2 standard-deviation rule, the clock and calendar rules, the twelve outcomes, the Holm family, the split, the bootstrap, the pass rule, or the "if nothing passes" sentence.
+
+The DOC API (`api.gdeltproject.org/api/v2/doc/doc`) returned HTTP 429 to even a single two-week request on 2026-10-22 and again on 2026-10-23, despite 12–90 s waits. About 435 windows remain, so the study cannot finish that way. GDELT also publishes the same crawl as static daily files with no rate limit.
+
+### Disclosure before this amendment
+
+Before this amendment was written, two files were opened to confirm the format, and nothing else:
+- `20261020.gkg.csv.zip` (a validate-period date). Its header, its theme vocabulary and that day's row count per theme were printed.
+- `20170103.gkg.csv.zip` (a train-period date). This confirmed the same 11-column header, that each of the 27 themes in the rules below already existed then (each with a non-zero row count), and the counts of the three organisation names.
+
+No price was read, no event rule was run, no category volume was built, and nothing was compared with any outcome. The rules were written from GDELT's theme names to match the DOC queries' intent. They were not tuned on those two days' numbers.
+
+### Source
+
+- One file per UTC calendar date `D`, from 2017-01-01 through the day before the single study run: `https://data.gdeltproject.org/gkg/YYYYMMDD.gkg.csv.zip` (GDELT 1.0 Global Knowledge Graph, daily).
+- **Columns, exactly:** `DATE NUMARTS COUNTS THEMES LOCATIONS PERSONS ORGANIZATIONS TONE CAMEOEVENTIDS SOURCES SOURCEURLS` (tab-separated, with a header row).
+- **When a day counts as observed:** the file is downloaded with HTTP 200, unzips, and has exactly that header.
+- **When it counts as missing:** any other result (404, a truncated zip, a different header). Missing follows Amendment A: not a zero, not an event, not a control day.
+- **Downloads:** at least 2 s apart and at most one at a time. Each zip is streamed, reduced to that day's per-category numbers, and deleted. Only those per-day numbers, plus each file's byte size and SHA-256, are cached under `services/quant/.cache/news-categories/` (gitignored).
+- **Old DOC cache:** the partial DOC responses already cached are not used for scoring and are not mixed with GKG numbers.
+
+### One record
+
+For each row:
+- `T` is the set of `THEMES` (split on `;`).
+- `C` is the set of country codes in `LOCATIONS`: each location is `type#name#COUNTRY#…`, and the third field is the FIPS code (IN India, PK Pakistan, CH China, US United States, HK Hong Kong).
+- `O` is the set of `ORGANIZATIONS`, lower-cased.
+- `n` is `NUMARTS` (articles).
+- `tone` is the first number in `TONE`.
+
+A row whose `DATE` is not the file's date `D` is not counted, and the number of such rows is reported in a calendar audit.
+
+### Category volume, replacing the ten DOC query lists
+
+The category volume for day `D` is the **sum of `n` over rows that match the category's rule**. A row counts **once per category**, even when it matches several clauses. This removes the within-category double count that Amendment A had to accept. A row may count in several categories.
+
+The rules are frozen now:
+
+| # | Category | Rule |
+|---|---|---|
+| 1 | Geopolitics and war | `T` contains `ARMEDCONFLICT` or `TERROR` |
+| 2 | Crude oil and commodity shocks | `T` contains `ECON_OILPRICE`, `ECON_GOLDPRICE` or `FUELPRICES` |
+| 3 | Central banks | (`O` contains `reserve bank of india`) **or** (`O` contains `federal reserve` or `federal reserve bank`, **and** `T` contains `ECON_INTEREST_RATES`, `ECON_CENTRALBANK` or `EPU_POLICY_MONETARY_POLICY`) **or** (`IN` in `C` **and** `T` contains `ECON_CENTRALBANK`, `EPU_POLICY_CENTRAL_BANK` or `EPU_POLICY_MONETARY_POLICY`) |
+| 4 | Inflation and macro data (India) | `IN` in `C` **and** `T` contains `ECON_INFLATION` |
+| 5 | Indian government policy, budget and tax | `IN` in `C` **and** `T` contains `ECON_TAXATION`, `EPU_POLICY_TAX`, `EPU_CATS_TAXES`, `EPU_POLICY_BUDGET` or `ECON_BUDGET_DEFICIT` |
+| 6 | Elections and political instability (India) | `IN` in `C` **and** `T` contains `ELECTION`, `ELECTION_FRAUD` or `EPU_POLICY_POLITICAL` |
+| 7 | Global market sell-offs | `T` contains `ECON_STOCKMARKET` **and** `C` contains `US`, `CH` or `HK` **and** `IN` not in `C` **and** `tone < 0` |
+| 8 | Foreign investor flows and the rupee | (`IN` in `C` **and** `T` contains `ECON_FOREIGNINVEST`) **or** `T` contains `ECON_WORLDCURRENCIES_INDIAN_RUPEE` or `ECON_WORLDCURRENCIES_INDIAN_RUPEES` |
+| 9 | Disasters and pandemics | `T` contains `HEALTH_PANDEMIC` **or** (`T` contains `NATURAL_DISASTER` **and** `IN` in `C`) |
+| 10 | Trade wars, tariffs and sanctions | `T` contains `ECON_TRADE_DISPUTE`, `SANCTIONS` or `EPU_CATS_TRADE_POLICY` **and** `C` contains `CH`, `IN` or `US` |
+
+**Descriptive sub-series only.** For category 1, also store the volume of matching rows whose `C` contains both `IN` and `PK`, and both `IN` and `CH`. These show the India–Pakistan and India–China parts the DOC queries named. They are **not** extra categories and are **not** in the Holm family.
+
+**Tone.** The `n`-weighted mean of `tone` per category per day replaces DOC `timelinetone`. It is still descriptive only and not an outcome.
+
+**Not a query match.** These are fixed theme rules, not the DOC free-text queries, so they are not the same filter:
+- Category 2 cannot require "surge / plunge / shock".
+- Category 4 has no GDP or IIP theme.
+- Category 7 uses negative tone as its stand-in for "sell-off".
+
+The volume-spike rule is what still picks out unusual days. These differences are a limitation of the new source, and the result must state them.
+
+### Everything else stays
+
+- **Timing:** the GKG `DATE` bucket has no clock, so the "GDELT days have no clock" rule above applies unchanged. Day `D` goes to the first trading session strictly after `D`.
+- **Coverage:** Amendment A's "no table until coverage is complete" applies to the GKG days. For example, if any of the 60 trailing days is missing, that day is not tested.
+- **Order:** the run order is unchanged. Train first in one process, a freeze commit, then validate once in a later process.
+
+### What changes in the code (after approval)
+
+- A GKG reader that streams one zip, applies the ten rules and returns that day's per-category volume, tone and audit counts.
+- Unit tests on small synthetic GKG rows:
+  - each rule's clauses;
+  - a row counting once per category;
+  - a wrong-date row being dropped;
+  - a bad header making the day missing.
+- The DOC fetch path stays in the module for reference, but is not called by `plan` or `train` once this amendment is in force.
+
+Expected size: about 3,580 daily files of 30–60 MB each, roughly 150 GB downloaded once. Only a few kilobytes per day are kept.
