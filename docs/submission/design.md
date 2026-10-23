@@ -42,11 +42,12 @@ Every arrow uses one of these channels:
 | **Portfolio manager** | **LLM + tools** (1.0.0) | a proposed BUY, plus whatever its tools return | Plans, gathers evidence, names conflicts, asks agents to re-check, then approves, shrinks or vetoes. |
 | ML | model, **not loaded** | research features | Off: no model passed its pre-registered gate. |
 | Signal ingestion | code | `AgentSignal` | Rejects non-NSE, unknown, future-dated or expired signals; stores a `signal_id` once. |
-| Signal fusion | code | newest valid opinion per agent | Confidence-weighted average with per-agent reliability weights (see (c)). |
+| Specialist decision | code (live) | newest valid swing opinion of every agent | Each agent has one job in a swing BUY: trigger, confirm, not overstretched, event check, quality check, market size (table below). Every verdict is stored with the proposal. |
+| Signal fusion | code | newest valid opinion per agent | Confidence-weighted average with per-agent reliability weights (see (c)). Decides buys in fusion mode; decides exits of held stocks in both modes. |
 | Decision engine | code | fused signal (fusion mode) or the specialists' verdicts (specialists mode) + the bar's close | Fusion mode: `TradeProposal` when \|signal\| ≥ 0.2 and confidence ≥ 0.3; agent BUYs also need ≥ 0.35 / ≥ 0.4. Specialists mode: see below. Stop −2%, target +4%. |
 | Review gate | code | proposal + manager verdict | Waits up to 240 s. REDUCE scales the quantity; no verdict is recorded as UNAVAILABLE. |
 | Risk engine | code (1.3.0) | proposal, paper book, market, supporting opinions, verdict | 6 order checks always. On a BUY: 5 portfolio and 7 trade checks, the manager's verdict, and the market regime for intraday buys (table below). |
-| Strategy (Strategy Lab) | code, optional | a user-built rule algorithm applied to paper | Per the `strategy_mode` setting: **replace** the agents' entries, trade **alongside** them, or trade only when the **agents agree** (fused view not bearish, then a manager review). |
+| Strategy (Strategy Lab) | code, optional | a user-built rule algorithm applied to paper | Per the `strategy_mode` setting: **replace** the agents' entries, trade **alongside** them, or trade only when the **agents agree** (the agents chosen in `agree_agents`, default News and Earnings, are not bearish, then a manager review). |
 | Paper execution | code | approved proposal | CNC limit order at the last daily close + 25 bp, filled on a later 5-minute bar in the 09:20–15:15 IST entry window, Zerodha charges, kill switch. |
 | Trace recorder | code | every bus | Append-only record of every handoff. |
 
@@ -98,7 +99,7 @@ The split is deliberate: *agents give opinions; code makes the decisions.* An LL
 ### How the agents coordinate: the real trace of 21 Oct 2026 ([JSWSTEEL](agent-trace/20261021-jswsteel-trade.md))
 
 1. **Blackboard.** The News agent's Gemini opinion (+0.56, confidence 0.55, from 10 articles) was stored and published as `agent.signal`.
-2. **Orchestrator.** Fusion and the decision engine proposed BUY 16 JSWSTEEL at ₹1,231.00 (stop ₹1,206.38, target ₹1,280.24). The review gate queued it (`review.requested`).
+2. **Orchestrator** (fusion mode, before specialists went live on 23 Oct). Fusion and the decision engine proposed BUY 16 JSWSTEEL at ₹1,231.00 (stop ₹1,206.38, target ₹1,280.24). The review gate queued it (`review.requested`).
 3. **Planning and tools.** The manager wrote a plan and called `get_agent_opinions`, `get_market_context` (NIFTY −1.11% on the day, risk-off) and `get_price_features`.
 4. **Code critiques the LLM.** Its first draft (REDUCE ×0.5) was sent back. The only voting agent's current opinion rested on a fallback heuristic, so it had to ask for a re-check first.
 5. **Recovery from its own error.** It called a non-existent tool (`agent_to_recheck`), received `error: unknown tool`, and corrected itself to `ask_agent_to_recheck`.
@@ -121,16 +122,16 @@ The system slows down; it does not crash.
 **Blackboard + orchestrator-worker, with an LLM supervisor that critiques the orchestrator's output.** The supervisor can ask workers to redo their part.
 
 - **Blackboard (independent specialists).** The 9 specialists run in their own containers on their own schedules:
-  - quant: daily bars and 5-minute bars, a pass every 300 s;
+  - quant: daily bars (and 5-minute bars, kept for future intraday trading), a pass every 300 s;
   - intelligence: a pass every 600 s.
 
   They never call each other. Each writes opinions to the shared signal store in Postgres. One agent can fail or lag without affecting the others.
-- **Orchestrator-worker (deterministic pipeline).** `core-worker` runs settle → exits → fusion → decision → review gate → risk → execution every 30 s during the cash session. The order is fixed, so no opinion can skip risk.
+- **Orchestrator-worker (deterministic pipeline).** `core-worker` runs settle → exits → agent decision (specialists, or fusion) → proposal → review gate → risk → execution every 30 s during the cash session, on swing (daily-bar) decisions only. The order is fixed, so no opinion can skip the manager or risk.
 - **Supervisor and critic (the portfolio manager).** The pipeline hands each BUY to the manager and waits.
-  - The manager decides what to look at, can disagree with the fused signal, and can ask a specialist to look again.
+  - The manager decides what to look at, can disagree with the proposal, and can ask a specialist to look again.
   - Its verdict changes what the pipeline does next: approve, shrink or block.
   - Code critiques the manager in turn: a draft that ignores a disagreeing agent or an unverified fallback opinion goes back for revision. Each side checks the other.
-- **Fusion formula** for one stock and horizon, over the newest valid signal from each agent with weight wᵢ > 0:
+- **Fusion formula** (fusion mode, and exits of held stocks) for one stock and horizon, over the newest valid signal from each agent with weight wᵢ > 0:
   - fused signal = Σ wᵢ·sᵢ·cᵢ / Σ wᵢ·cᵢ, clipped to [−1, 1];
   - fused confidence = Σ wᵢ·cᵢ / Σ wᵢ.
 
@@ -163,4 +164,5 @@ The system slows down; it does not crash.
 - A manager verdict can only be APPROVE (×1), REDUCE (×0.1–0.9), VETO (×0) or UNAVAILABLE. A reduced quantity is passed to the order as a cap.
 - Tool results, headlines and agent reasons go to the LLM as untrusted data, and the system prompt says so. LLM output cannot contain an order: only a score and a closed list of reason codes are accepted.
 - The public proxy refuses writes. Settings, manual orders, strategies, the kill switch and questions to the manager need the operator sign-in (5 failed attempts lock that address out). Paper start and stop are not reachable from the browser at all.
-- The worker sits behind a Compose profile. The manager review, agent entries and intraday entries can each be switched off in Settings.
+- The worker sits behind a Compose profile. The manager review and agent entries can each be switched off in Settings. The worker is swing-only (`swing_only`), so no intraday trade can open.
+- An LLM agent with no model answer reports no opinion (`llm_unavailable`). It cannot trigger, block or support a trade.
