@@ -56,7 +56,7 @@ Every arrow uses one of these channels:
 |---|---|
 | Order (always) | `mode_is_paper` · `universe_member` · `sufficient_cash` · `notional_cap` (₹20,000; BUYs only) · `no_short` · `stop_and_target_side` |
 | Portfolio (BUY) | `max_open_positions` (10) · `sector_concentration` (2 per sector) · `exposure_cap` (30% of starting cash) · `per_stock_cap` (₹40,000) · `daily_entry_cap` (6) |
-| Trade (BUY) | `daily_loss_limit` (2%) · `drawdown_limit` (10%) · `risk_per_trade` (1% of starting cash lost at the stop) · `reward_to_risk` (≥ 1×) · `price_drift` (3% from the signal close) · `stop_out_cooldown` (24 h) · `evidence_quality` (no buy that rests only on fallback heuristics) |
+| Trade (BUY) | `daily_loss_limit` (2%) · `drawdown_limit` (10%) · `risk_per_trade` (1% of starting cash lost at the stop) · `reward_to_risk` (≥ 1× by default; 0.5× in the deployment) · `price_drift` (3% from the signal close) · `stop_out_cooldown` (24 h) · `evidence_quality` (no buy that rests only on fallback heuristics) |
 | Agents (BUY) | `portfolio_manager` (fails on VETO) · `market_regime` (intraday buys only: NIFTY downtrend *and* VIX rising) |
 
 **Two decision modes** (Settings → "How agent buys are decided"; the deployment uses **specialists**):
@@ -82,14 +82,14 @@ Every arrow uses one of these channels:
 
 **Fusion weights now.** They are refreshed hourly from the live scorecard and stored in `user_settings.agent_weights`.
 - Swing: News 0.5 ("unproven", because its graded record is still short); every other agent 0.
-- Intraday: Technical 1.5 (proven better than a coin flip), Momentum 0.575 and Volume 0.125 (backtest priors), Mean reversion 0 (proven worse than a coin flip). Intraday agent entries are off in Settings.
+- Intraday: Technical 1.5 (proven better than a coin flip), Momentum 0.575 and Volume 0.125 (backtest priors), Mean reversion 0 (proven worse than a coin flip). They are not used: the live worker is swing-only (`swing_only` setting), and intraday is future scope.
 
 ### Which parts are agentic
 
 | Part | Plans | Reasons with an LLM | Uses tools | Memory | Adapts / replans | Talks to other agents |
 |---|---|---|---|---|---|---|
 | **Portfolio manager** | yes: writes a plan, then picks tools by what it finds | yes | 8 tools + `submit_verdict` | its past reviews and how the price moved since (`get_track_record`) | yes: retries, switches model, turn budget | asks News, Fundamental, Valuation or Earnings to re-check |
-| News, Fundamental, Valuation, Earnings | — | yes | data providers | on-disk answer cache keyed by content | fall back across models, then to a labelled heuristic | answer re-check requests |
+| News, Fundamental, Valuation, Earnings | — | yes | data providers | on-disk answer cache keyed by content | fall back across models; if none answers, report no opinion (`llm_unavailable`) | answer re-check requests |
 | Quant agents | — | no: deterministic rules | feature engine | — | — | publish opinions |
 | Fusion, decision, risk, execution | — | no: code | — | — | — | — |
 
@@ -111,6 +111,7 @@ The split is deliberate: *agents give opinions; code makes the decisions.* An LL
 - an LLM 429, 5xx or timeout is retried once;
 - a failed model switches to the backup;
 - if no model answers, a labelled `rule_fallback` review is used;
+- an intelligence agent with no model answer reports no opinion (score 0, `llm_unavailable`); it cannot block or support a trade;
 - if there is no verdict within 240 s, `UNAVAILABLE` is recorded and the risk engine decides alone.
 
 The system slows down; it does not crash.
@@ -146,7 +147,7 @@ The system slows down; it does not crash.
 | Choice | Why |
 |---|---|
 | **Custom agent loop** (no LangGraph or CrewAI) | The manager's loop is about 250 lines over OpenAI-compatible tool calling. A framework would add a dependency and hide the steps we need on the bus. Our loop posts every plan, tool call, result, critique and replan as a typed event. It preserves Gemini 3's thought signatures between turns, and lets plain code critique each draft verdict. |
-| **Google Gemini, model chosen per agent** | News: `gemini-3.1-flash-lite` (500 free requests a day, kept for the only voting swing agent). Fundamental, valuation and earnings: `gemini-3.5-flash-lite`, a separate quota. Backups for both: `gemini-3.6-flash`, then `gemini-3-flash-preview`. Re-checks: `gemini-3-flash-preview`, a second independent look. Manager: `gemini-3.5-flash-lite`, backup `gemini-3.5-flash`. Gemini reports whether a 429 is a daily or per-minute limit; the model is paused for exactly its `retryDelay`. Answers are cached on disk by content hash, so unchanged news costs no quota. Any OpenAI-compatible provider works. |
+| **Google Gemini, model chosen per agent** | News: `gemini-3.1-flash-lite` (500 free requests a day, kept for the only voting swing agent). Fundamental, valuation and earnings: `gemini-3.5-flash-lite`, a separate quota. Backups for both: `gemini-3.6-flash`, then `gemini-3-flash-preview`; if none answers, the agent reports no opinion. Re-checks: `gemini-3-flash-preview`, a second independent look. Manager: `gemini-3.5-flash-lite`, backup `gemini-3.5-flash`. Gemini reports whether a 429 is a daily or per-minute limit; the model is paused for exactly its `retryDelay`. Answers are cached on disk by content hash, so unchanged news costs no quota. Any OpenAI-compatible provider works. |
 | **Python 3.12, FastAPI, Pydantic v2** | One language for research, agents and execution; typed request and response validation from the shared contracts |
 | **`packages/contracts`** | One validated schema per message, exported as JSON Schema; the TypeScript types are generated from it |
 | **PostgreSQL 16 + SQLAlchemy + Alembic** | Transactions for cash reservations, orders, the daily entry cap and the review queue (`FOR UPDATE SKIP LOCKED`); 15 reviewed migrations |

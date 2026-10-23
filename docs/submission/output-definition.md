@@ -12,7 +12,9 @@ None of these are backtest results or fabricated examples. The forward paper run
 
 ## 1. `TradeProposal` — Decision Engine output
 
-Created when the fused signal for a symbol and horizon has |signal| ≥ 0.2 and confidence ≥ 0.3. An agent BUY must also reach the Settings minimums: fused signal ≥ 0.35 and confidence ≥ 0.4. SELLs keep the lower bar, so exits are not delayed.
+- **Specialists mode (live):** created when Technical or Momentum triggers (score ≥ +0.30, confidence ≥ 0.40) and no specialist blocks. `metadata.specialists` holds every agent's verdict (trigger / pass / block / no opinion / ignored fallback / size), and `metadata.size_fraction` is 0.5 when the market is risk-off.
+- **Fusion mode:** created when the fused signal has |signal| ≥ 0.2 and confidence ≥ 0.3. An agent BUY must also reach fused signal ≥ 0.35 and confidence ≥ 0.4.
+- SELLs keep the lower bar, so exits are not delayed.
 
 | Field | Meaning |
 |---|---|
