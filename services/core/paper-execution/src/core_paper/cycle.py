@@ -439,8 +439,8 @@ def _monitor_brackets(repository, publisher, schedule, starting_cash, mode: Trad
         if _is_strategy_position(repository, position.symbol):
             continue  # managed by core_paper.strategy_live (targets, breakeven, trailing, time exits)
         entry = _entry_execution(repository, position.symbol)
-        if entry is None:
-            continue
+        if entry is None or entry.executed_at.astimezone(timezone.utc) < position.opened_at.astimezone(timezone.utc):
+            continue  # an entry from before this position opened belongs to an earlier, closed trade
         if "stop_loss" not in entry.metadata or "take_profit" not in entry.metadata:
             continue
         stop = Decimal(str(entry.metadata["stop_loss"]))

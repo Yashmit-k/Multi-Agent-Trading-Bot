@@ -1164,7 +1164,10 @@ class CoreRepository:
             rows = session.scalars(
                 self._scoped(select(ExecutionRow), ExecutionRow.session_id, session_id).order_by(ExecutionRow.execution_id)
             )
-            return [Execution.model_validate(dict(row.payload)) for row in rows]
+            # Oldest fill first. The id is a hash, so id order is not time order: "the newest entry" (rows[-1]) must
+            # come from the fill time, or a re-bought stock picks up an old position's stop and target.
+            executions = [Execution.model_validate(dict(row.payload)) for row in rows]
+            return sorted(executions, key=lambda item: (item.executed_at, item.execution_id))
 
     def execution_count(self) -> int:
         with self._session_factory() as session:
