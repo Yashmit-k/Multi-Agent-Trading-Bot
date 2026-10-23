@@ -215,7 +215,7 @@ def test_schema_failure_then_fallback():
     result = fallback.complete(LLMRequest("h", wrap_untrusted("steady"), "news"), tier="tier1")
     assert result.fallback is True
     assert fallback.last_failure_type == "schema_failure"
-    assert fallback.last_generation == "fixture_fallback"
+    assert fallback.last_generation == "llm_unavailable"
 
 
 def test_http_429_then_fallback():
@@ -413,6 +413,20 @@ def test_unsupported_reason_retries_then_fallback():
         tier="tier1",
     )
     assert result.fallback is True
-    assert result.reason_codes == ("fixture.heuristic",)
+    assert result.reason_codes == ("llm_unavailable",)
     assert fallback.last_failure_type == "unsupported_reason"
     assert calls["n"] == 2
+
+
+def test_no_model_answer_is_a_labelled_no_opinion_not_a_keyword_guess():
+    """The keyword heuristic leaned positive ("profit falls 40%" still scored +0.2), so a failed model gives no opinion."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, text="quota exceeded for metric generate_content_free_tier_requests, quotaId GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    primary = OpenAICompatibleProvider("https://example.test/v1", "k", "m", retries=0, client=client, sleeper=lambda _: None)
+    fallback = FallbackProvider(primary, FixtureLLMProvider())
+    result = fallback.complete(LLMRequest("h", wrap_untrusted("Record profit and strong growth, analysts upgrade the stock"), "news"), tier="tier1")
+    assert (result.sentiment, result.impact, result.confidence) == (0.0, 0.0, 0.1)
+    assert result.fallback is True and result.model == "none" and result.reason_codes == ("llm_unavailable",)

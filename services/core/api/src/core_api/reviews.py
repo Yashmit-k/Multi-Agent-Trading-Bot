@@ -59,7 +59,7 @@ def _short_metadata(metadata: dict) -> dict:
 
 def _used_fallback(metadata: dict, reason_codes: list[str] | None = None) -> bool | None:
     """True when an LLM agent's opinion came from the fixture heuristic instead of the model; None for rule agents."""
-    if "fixture.heuristic" in (reason_codes or []):
+    if {"fixture.heuristic", "llm_unavailable"} & set(reason_codes or []):
         return True
     llm = metadata.get("llm")
     if not isinstance(llm, list) or not llm:

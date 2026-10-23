@@ -78,6 +78,22 @@ class ModelChain:
         raise last
 
 
+def no_opinion(request: LLMRequest, *, failure: str = "") -> LLMAssessment:
+    """The answer when no model responded: neutral, low confidence, and labelled so every consumer can see it."""
+    return LLMAssessment(
+        sentiment=0.0,
+        impact=0.0,
+        confidence=0.1,
+        event_type="llm_unavailable",
+        reason_codes=("llm_unavailable",),
+        horizon="SWING",
+        high_impact=False,
+        model="none",
+        tier="none",
+        fallback=True,
+    )
+
+
 class FallbackProvider:
     def __init__(self, primary: LLMProvider, secondary: LLMProvider) -> None:
         self._primary = primary
@@ -108,9 +124,10 @@ class FallbackProvider:
                     "agent": request.task,
                 },
             )
-            result = self._secondary.complete(request, tier=tier)
-            self.last_generation = "fixture_fallback"
-            return replace(result, fallback=True)
+            # No model answered: say so, with no opinion. The keyword heuristic leaned positive (it counts words like
+            # "profit" and "growth" that appear in most business stories, even bad ones), so it is not used as a guess.
+            self.last_generation = "llm_unavailable"
+            return no_opinion(request, failure=str(failure_type))
 
 
 class LLMRouter:

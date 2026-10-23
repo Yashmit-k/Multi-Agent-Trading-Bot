@@ -18,7 +18,8 @@ export function provenance(payload: Record<string, unknown>): Provenance {
   const first = llmItems[0];
   let llm: string | null = null;
   if (first) {
-    if (first.fallback || first.model === "fixture") llm = "fixture heuristic (no live LLM)";
+    if (first.fallback && first.model === "none") llm = "no LLM answer (quota used up): no opinion";
+    else if (first.fallback || first.model === "fixture") llm = "fixture heuristic (no live LLM)";
     else llm = `LLM ${first.model}`;
   }
   return {

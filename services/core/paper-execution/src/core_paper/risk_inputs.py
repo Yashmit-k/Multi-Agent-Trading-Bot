@@ -15,7 +15,7 @@ STOP_REASONS = {"stop", "strategy_stop", "strategy_trailing_stop"}
 
 def is_fallback(signal: AgentSignal) -> bool:
     """An LLM agent's opinion produced by its fixed heuristic instead of the model."""
-    if "fixture.heuristic" in signal.reason_codes:
+    if {"fixture.heuristic", "llm_unavailable"} & set(signal.reason_codes):
         return True
     llm = signal.metadata.get("llm")
     return isinstance(llm, list) and bool(llm) and all(isinstance(item, dict) and (item.get("fallback") or item.get("model") == "fixture") for item in llm)
