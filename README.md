@@ -80,7 +80,7 @@ A separate Compose check the same day left Postgres and the core API healthy, in
 - Project report: [`docs/project-report.md`](docs/project-report.md)
 - Current system and H001 status: [`docs/current-status.md`](docs/current-status.md)
 
-H001 is approved as a method and is not authorized to run. The eligibility audit is `INCONCLUSIVE` because the training minority class is 34, below the approved bar of 50. No H001 model was fit. Teammates: check out **`dev1/intelligence`** and follow [`services/quant/docs/h001-dev1-handoff.md`](services/quant/docs/h001-dev1-handoff.md) for live RSS ingest and official H001. This is not on `main`. Do not use `experiment/h001-threshold-34` for the official result.
+H001 is approved as a method and is not authorized to run. The eligibility audit is `INCONCLUSIVE` because the training minority class is 34, below the approved bar of 50. No H001 model was fit.
 
 ## Optional ML demo
 
