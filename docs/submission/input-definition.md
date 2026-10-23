@@ -84,7 +84,7 @@ Every agent, deterministic or LLM, sends the same message to `POST /api/v1/inter
  "schema_version": "1.0"}
 ```
 
-**Real sample: News agent scored by the LLM** (TCS, 20 Oct 2026; nine live headlines, two shown). `model` names the LLM. When the LLM fails or its quota is used up, the same agent falls back to a heuristic: `model` becomes `"fixture"`, the reason code is `fixture.heuristic`, and the portfolio manager treats that opinion as unchecked.
+**Real sample: News agent scored by the LLM** (TCS, 20 Oct 2026; nine live headlines, two shown). `model` names the LLM. When every model fails or its quota is used up, the agent reports no opinion: score 0, confidence 0.1, `model: "none"`, `fallback: true`, reason code `llm_unavailable`. Until 23 Oct 2026 a keyword heuristic answered instead (`fixture.heuristic`), but it leaned positive. The specialists, the portfolio manager and the risk engine all treat either label as no evidence.
 
 ```json
 {"agent_name": "news", "agent_version": "1.1.0", "symbol": "TCS", "horizon": "SWING",

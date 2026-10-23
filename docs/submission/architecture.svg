@@ -48,8 +48,8 @@
   <!-- row 4: orchestrator -->
   <rect class="box orch" x="20" y="410" width="960" height="104"/>
   <text class="t" x="966" y="432" text-anchor="end">core-worker orchestrator · every 30 s · fixed order</text>
-  <rect class="box stage" x="40" y="448" width="150" height="50"/><text class="t" x="115" y="470" text-anchor="middle">Fusion</text><text class="s" x="115" y="488" text-anchor="middle">Σwsc / Σwc</text>
-  <rect class="box stage" x="225" y="448" width="150" height="50"/><text class="t" x="300" y="470" text-anchor="middle">Decision engine</text><text class="s" x="300" y="488" text-anchor="middle">BUY if S≥0.35, C≥0.4</text>
+  <rect class="box stage" x="40" y="448" width="150" height="50"/><text class="t" x="115" y="470" text-anchor="middle">Agent decision</text><text class="s" x="115" y="488" text-anchor="middle">specialists (live) · fusion</text>
+  <rect class="box stage" x="225" y="448" width="150" height="50"/><text class="t" x="300" y="470" text-anchor="middle">Proposal</text><text class="s" x="300" y="488" text-anchor="middle">size ₹20k · stop −2% · +4%</text>
   <rect class="box stage" x="410" y="448" width="150" height="50"/><text class="t" x="485" y="470" text-anchor="middle">Review gate</text><text class="s" x="485" y="488" text-anchor="middle">waits ≤ 240 s</text>
   <rect class="box stage" x="595" y="448" width="160" height="50"/><text class="t" x="675" y="470" text-anchor="middle">Risk engine 1.3.0</text><text class="s" x="675" y="488" text-anchor="middle">up to 20 checks</text>
   <rect class="box stage" x="790" y="448" width="170" height="50"/><text class="t" x="875" y="470" text-anchor="middle">Paper execution</text><text class="s" x="875" y="488" text-anchor="middle">CNC limit · writes fills</text>
