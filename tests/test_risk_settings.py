@@ -87,9 +87,16 @@ def test_intraday_entries_are_off_by_default(repository: CoreRepository) -> None
 
 def test_intraday_entries_when_enabled(repository: CoreRepository) -> None:
     _intraday_ready(repository)
-    repository.save_setting("risk", {"intraday_auto_entries": True}, updated_by="test", now=DECISION)
+    repository.save_setting("risk", {"intraday_auto_entries": True, "swing_only": False}, updated_by="test", now=DECISION)
     _cycle(repository)
     assert "INTRADAY" in _horizons(repository)
+
+
+def test_swing_only_blocks_intraday_even_when_intraday_entries_are_on(repository: CoreRepository) -> None:
+    _intraday_ready(repository)
+    repository.save_setting("risk", {"intraday_auto_entries": True}, updated_by="test", now=DECISION)  # swing_only stays on (the default)
+    _cycle(repository)
+    assert "INTRADAY" not in _horizons(repository)
 
 
 def test_market_filter_does_not_block_swing_buys(repository: CoreRepository) -> None:

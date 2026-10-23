@@ -125,10 +125,11 @@ def run_paper_cycle(
     capped = False
     applied = _applied_strategy(repository)
     extension = paper_test_entry_window(moment) if allow_test_extension and mode == TradingMode.PAPER else None
-    for instrument in _strongest_first(repository, repository.list_instruments(), moment, weights):
+    horizons = {Horizon.SWING: Timeframe.D1} if settings.swing_only else HORIZON_TIMEFRAME
+    for instrument in _strongest_first(repository, repository.list_instruments(), moment, weights, horizons):
         if capped:
             break
-        for horizon, timeframe in HORIZON_TIMEFRAME.items():
+        for horizon, timeframe in horizons.items():
             if max_new_orders is not None and created_orders >= max_new_orders:
                 capped = True
                 break
@@ -142,13 +143,23 @@ def run_paper_cycle(
             proposal_id = proposal_id_for(instrument.symbol, horizon, as_of, session_id=book.session_id)
             proposal = repository.get_proposal(proposal_id)
             if proposal is None:
-                aggregate = fuse(repository.signals_for(instrument.symbol), horizon=horizon, as_of=as_of, weights=weights)
+                specialist = None
+                if settings.decision_mode == "specialists" and horizon == Horizon.SWING and repository.held_quantity(instrument.symbol) <= 0:
+                    # Each agent has one job; exits of held stocks and intraday still use fusion.
+                    from core_decision.specialists import decide
+
+                    specialist = decide(repository.signals_for(instrument.symbol), as_of=as_of)
+                    if not specialist.buy:
+                        continue
+                    aggregate = specialist.aggregate(instrument.symbol)
+                else:
+                    aggregate = fuse(repository.signals_for(instrument.symbol), horizon=horizon, as_of=as_of, weights=weights)
                 if aggregate is None:
                     continue
                 proposal = build_proposal(aggregate, candle, as_of, session_id=book.session_id)
                 if proposal is None:
                     continue
-                if proposal.side == Side.BUY and (
+                if specialist is None and proposal.side == Side.BUY and (
                     Decimal(str(proposal.aggregated_signal)) < settings.min_entry_signal or Decimal(str(proposal.aggregated_confidence)) < settings.min_entry_confidence
                 ):
                     continue  # fewer, stronger entries: a weak BUY is not worth its charges (exits keep the lower bar)
@@ -169,6 +180,12 @@ def run_paper_cycle(
                 if proposal.side == Side.SELL:
                     proposal = proposal.model_copy(update={"quantity": held})  # a signal exit sells the whole holding
                 proposal = _with_brackets(_sized(proposal, repository.available_cash(starting_cash), costs, settings.max_order_notional), settings)
+                if specialist is not None:
+                    # Regime halves the size in a risk-off market; every agent's verdict travels with the proposal.
+                    proposal = proposal.model_copy(update={
+                        "quantity": max(1, int(proposal.quantity * specialist.size_fraction)),
+                        "metadata": {**proposal.metadata, "decision_mode": "specialists", "specialists": specialist.verdicts, "size_fraction": specialist.size_fraction},
+                    })
                 proposal = proposal.model_copy(update={"metadata": {**proposal.metadata, "stops_monitored": True, "same_bar_exit": "stop_first", "decided_at": moment.isoformat()}})
                 if repository.insert_proposal(proposal):
                     _publish(publisher, EventType.DECISION_CREATED, f"decision.created:{proposal.proposal_id}", as_of, proposal.proposal_id, proposal)
@@ -212,6 +229,8 @@ def run_paper_cycle(
                 continue
             before = {item.order_id for item in repository.list_orders()}
             reduced = decision.approved_quantity if decision.approved_quantity < proposal.quantity else None  # a manager REDUCE
+            if reduced is None and float(proposal.metadata.get("size_fraction", 1.0)) < 1.0:
+                reduced = decision.approved_quantity  # specialists: a risk-off market already halved this BUY
             queue_entry(repository, proposal, as_of, entry_window=extension, placed_at=moment, cap=settings.max_order_notional, daily_limit=settings.daily_entry_limit, quantity_limit=reduced)
             queued = [item for item in repository.list_orders() if item.order_id not in before]
             created_orders += len(queued)
@@ -632,13 +651,13 @@ def holding_horizon(repository: CoreRepository, symbol: str) -> Horizon:
     return proposal.horizon if proposal is not None else Horizon.SWING
 
 
-def _strongest_first(repository: CoreRepository, instruments, moment: datetime, weights) -> list:  # type: ignore[no-untyped-def]
+def _strongest_first(repository: CoreRepository, instruments, moment: datetime, weights, horizons=None) -> list:  # type: ignore[no-untyped-def]
     """Visit the stocks with the strongest fused BUY view first, so a daily cap keeps the best entries, not
     the first ones alphabetically. Exits are unaffected: every stock is still visited."""
     def strength(instrument) -> float:  # type: ignore[no-untyped-def]
         best = 0.0
         signals = repository.signals_for(instrument.symbol)
-        for horizon in HORIZON_TIMEFRAME:
+        for horizon in horizons or HORIZON_TIMEFRAME:
             aggregate = fuse(signals, horizon=horizon, as_of=moment, weights=weights)
             if aggregate is not None:
                 best = max(best, aggregate.aggregated_signal * aggregate.aggregated_confidence)

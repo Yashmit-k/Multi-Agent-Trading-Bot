@@ -43,7 +43,7 @@ Every arrow uses one of these channels:
 | ML | model, **not loaded** | research features | Off: no model passed its pre-registered gate. |
 | Signal ingestion | code | `AgentSignal` | Rejects non-NSE, unknown, future-dated or expired signals; stores a `signal_id` once. |
 | Signal fusion | code | newest valid opinion per agent | Confidence-weighted average with per-agent reliability weights (see (c)). |
-| Decision engine | code | fused signal + the bar's close | `TradeProposal` when \|signal\| ≥ 0.2 and confidence ≥ 0.3; agent BUYs also need ≥ 0.35 / ≥ 0.4 (Settings). Stop −2%, target +4%. |
+| Decision engine | code | fused signal (fusion mode) or the specialists' verdicts (specialists mode) + the bar's close | Fusion mode: `TradeProposal` when \|signal\| ≥ 0.2 and confidence ≥ 0.3; agent BUYs also need ≥ 0.35 / ≥ 0.4. Specialists mode: see below. Stop −2%, target +4%. |
 | Review gate | code | proposal + manager verdict | Waits up to 240 s. REDUCE scales the quantity; no verdict is recorded as UNAVAILABLE. |
 | Risk engine | code (1.3.0) | proposal, paper book, market, supporting opinions, verdict | 6 order checks always. On a BUY: 5 portfolio and 7 trade checks, the manager's verdict, and the market regime for intraday buys (table below). |
 | Strategy (Strategy Lab) | code, optional | a user-built rule algorithm applied to paper | Per the `strategy_mode` setting: **replace** the agents' entries, trade **alongside** them, or trade only when the **agents agree** (fused view not bearish, then a manager review). |
@@ -58,6 +58,27 @@ Every arrow uses one of these channels:
 | Portfolio (BUY) | `max_open_positions` (10) · `sector_concentration` (2 per sector) · `exposure_cap` (30% of starting cash) · `per_stock_cap` (₹40,000) · `daily_entry_cap` (6) |
 | Trade (BUY) | `daily_loss_limit` (2%) · `drawdown_limit` (10%) · `risk_per_trade` (1% of starting cash lost at the stop) · `reward_to_risk` (≥ 1×) · `price_drift` (3% from the signal close) · `stop_out_cooldown` (24 h) · `evidence_quality` (no buy that rests only on fallback heuristics) |
 | Agents (BUY) | `portfolio_manager` (fails on VETO) · `market_regime` (intraday buys only: NIFTY downtrend *and* VIX rising) |
+
+**Two decision modes** (Settings → "How agent buys are decided"; the deployment uses **specialists**):
+- **Fusion:** one confidence-weighted average of the agents (formula in (c)).
+- **Specialists:** every agent has one job in a swing BUY, checked in this order (`core_decision/specialists.py`):
+
+| Step | Agent | Rule |
+|---|---|---|
+| Trigger | Technical, Momentum | a candidate when either scores ≥ +0.30 with confidence ≥ 0.40 |
+| Confirm | Volume | blocks at ≤ −0.30 (heavy selling) |
+| Not overstretched | Mean reversion | blocks at ≤ −0.50 (closed above the upper band) |
+| Event check | News, Earnings | blocks at ≤ −0.30 with confidence ≥ 0.30 |
+| Quality check | Fundamental + Valuation | blocks only when both are ≤ −0.50 |
+| Market | Regime | NIFTY downtrend with India VIX rising halves the size; it never blocks |
+| Review | Portfolio manager | approve, shrink or veto (unchanged) |
+| Final say | Risk engine | all 20 checks (unchanged) |
+
+  - Every agent's verdict is stored with the proposal (`metadata.specialists`).
+  - LLM opinions that came from the keyword fallback are ignored, so they can neither block nor trigger.
+  - Only rule agents trigger, so trading continues when the LLM quota is used up.
+  - Exits of held stocks and intraday decisions still use fusion.
+  - The thresholds are design choices, not a validated edge.
 
 **Fusion weights now.** They are refreshed hourly from the live scorecard and stored in `user_settings.agent_weights`.
 - Swing: News 0.5 ("unproven", because its graded record is still short); every other agent 0.

@@ -4,6 +4,7 @@ import { ErrorState } from "@/components/States";
 import { PageFrame } from "@/components/shell/PageFrame";
 import { Badge, Card, Table, Td } from "@/components/ui";
 import { excludedAgents, provenance, sourceLabel } from "@/lib/signal-provenance";
+import { ROLE } from "@/lib/specialist-roles";
 
 export const dynamic = "force-dynamic";
 
@@ -164,12 +165,18 @@ export default async function AgentsPage() {
                   <span className={agent.enabled ? "text-[#22C55E]" : "text-[#94A3B8]"}>{agent.enabled ? "enabled" : "disabled"}</span>
                 </div>
                 {excluded.includes(agent.agent_name) ? (
-                  <div className="text-xs text-[#F59E0B]">Excluded from fusion: no live data source, so it cannot influence trades.</div>
+                  <div className="text-xs text-[#F59E0B]">Excluded from the fusion average. In specialists mode it can still block a buy (its role is below).</div>
                 ) : null}
                 <div className="text-xs text-[#94A3B8]">
                   {KIND[agent.agent_name] ?? "agent"} · {agent.mode} · features {agent.feature_version}
                   {agent.reason ? ` · ${agent.reason}` : ""}
                 </div>
+                {ROLE[agent.agent_name] ? (
+                  <div data-testid={`role-${agent.agent_name}`} className="mt-1 text-xs text-[#E6EDF3]">
+                    <span className="text-[#94A3B8]">Specialist role · </span>
+                    {ROLE[agent.agent_name]}
+                  </div>
+                ) : null}
                 {last ? (
                   <div className="mt-2 text-xs">
                     <div>

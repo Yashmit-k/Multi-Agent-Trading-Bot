@@ -38,12 +38,18 @@ class RiskSettings:
     # Intraday (5-minute) agent entries. Off by default since the exit-rules study (2026-10-15): the fused
     # 5-minute signal flips within minutes and each round trip loses about 0.4% to charges.
     intraday_auto_entries: bool = False
+    # Swing only (the default): the worker decides on daily bars alone and skips the intraday and long-term horizons.
+    # Intraday stays in the code as future scope; turn this off (and intraday_auto_entries on) to bring it back.
+    swing_only: bool = True
     # The LLM portfolio manager reviews each agent BUY before risk: approve, shrink or veto (never enlarge).
     manager_review: bool = True
     # How an applied Strategy-lab strategy and the agents share the book:
     # replace = only the strategy opens trades; alongside = both open trades independently;
     # agents_agree = only the strategy opens trades, and only when the agents' fused view is not bearish.
     strategy_mode: str = "replace"
+    # How agent swing BUYs are decided: "fusion" = one confidence-weighted average of the agents;
+    # "specialists" = each agent has one job (trigger, confirm, event check, ...), see core_decision.specialists.
+    decision_mode: str = "fusion"
     # agents_agree mode: the agents whose view a strategy entry must not contradict, comma-separated. A dip-buyer
     # cares whether there is bad news, not whether the trend is down, so the trend agents are left out by default.
     agree_agents: str = "news,earnings"
@@ -73,6 +79,10 @@ BOUNDS: dict[str, tuple[Decimal, Decimal, str]] = {
 }
 
 CHOICES: dict[str, tuple[tuple[str, str], ...]] = {
+    "decision_mode": (
+        ("fusion", "Fusion: one weighted average of the agents"),
+        ("specialists", "Specialists: each agent has one job"),
+    ),
     "strategy_mode": (
         ("replace", "Strategy replaces the agents"),
         ("alongside", "Strategy and agents both trade"),
@@ -176,9 +186,12 @@ def describe_bounds() -> list[dict[str, object]]:
         for key, (low, high, label) in BOUNDS.items()
     ] + [
         {"key": "auto_entries", "label": "Agents may open new positions", "min": None, "max": None, "default": "true"},
+        {"key": "swing_only", "label": "Swing trading only (daily bars; intraday is future scope)", "min": None, "max": None, "default": "true"},
         {"key": "intraday_auto_entries", "label": "Agents may open intraday (5-minute) positions", "min": None, "max": None, "default": "false"},
         {"key": "block_fallback_evidence", "label": "Block buys backed only by fallback heuristics", "min": None, "max": None, "default": "true"},
         {"key": "manager_review", "label": "Portfolio manager reviews agent buys", "min": None, "max": None, "default": "true"},
+        {"key": "decision_mode", "label": "How agent buys are decided", "min": None, "max": None, "default": DEFAULTS.decision_mode,
+         "choices": [{"value": value, "label": label} for value, label in CHOICES["decision_mode"]]},
         {"key": "strategy_mode", "label": "Applied strategy and the agents", "min": None, "max": None, "default": DEFAULTS.strategy_mode,
          "choices": [{"value": value, "label": label} for value, label in CHOICES["strategy_mode"]]},
         {"key": "agree_agents", "label": "Agents a strategy must agree with", "min": None, "max": None, "default": DEFAULTS.agree_agents,
