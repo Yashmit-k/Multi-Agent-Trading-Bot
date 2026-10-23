@@ -1,15 +1,14 @@
 # H001 Historical Earnings/Events Source Audit
 
-Status of this audit: **source discovery**. Candidate-source analysis below is unchanged. No labels were created, no target/features/horizon were frozen, and no market snapshots were modified.
+Status of this audit: **source discovery only**. No dataset was built, no labels were created, no target/features/horizon were frozen, and no market snapshots were modified.
 
-**Later overlay (Task 3 documentation reconciliation):** a Gate 2 NSE freeze was subsequently acquired (see [`h001-data-readiness.md`](../../quant/docs/h001-data-readiness.md)). That freeze does **not** make H001 PIT-ready. Gate 2’s `DATA READY` conclusion is **withdrawn**. This discovery document is **not** an extract audit and does **not** independently verify the freeze.
+Project state after this document (unchanged):
 
-Project state:
-
-- `DATA NOT READY`
-- `EVENT_DATA_BLOCKED` (timestamp semantics, immutability, 49×quarter coverage, and restatement-safe values remain unproven)
+- `EVENT_DATA_BLOCKED`
 - `H001 = BLOCKED_PRECONDITION`
 - `READY_TO_RUN = NO`
+
+Developer 2 must still acquire a candidate extract and perform a timestamp audit on that extract before H001 can become data-ready.
 
 ## 1. Objective
 
@@ -21,7 +20,7 @@ The deciding requirement is an `available_at` timestamp that means:
 
 This is **not** the same as period end, retrieval time, vendor load time, or a guessed offset from an announcement date.
 
-This repository does **not** currently contain such a **PIT-certified** dataset. A later Gate 2 NSE freeze exists under gitignored `datasets/`; it is **not** that certified dataset (Gate 2 `DATA READY` withdrawn). Fixture fundamentals in `packages/contracts/src/contracts/fixtures.py` (`metadata.fixture = true`) are test data and are not evidence of historical PIT coverage.
+This repository does **not** currently contain such a dataset. Fixture fundamentals in `packages/contracts/src/contracts/fixtures.py` (`metadata.fixture = true`) are test data and are not evidence of historical PIT coverage.
 
 ## 2. Required universe
 
@@ -550,26 +549,23 @@ It does **not** yet prove:
 
 Do **not** call this PIT-ready. Do **not** buy CMIE/FactSet/I/B/E/S for `available_at`. Do **not** derive availability from period end or RSS `retrieved_at`.
 
-**Task 3 note:** a freeze of NSE corporate announcements for the 49 snapshot names (2024–2025 window) was later stored under gitignored `datasets/` (`h001-nse-raw-20261010T140237Z`). Acquisition of that freeze does **not** complete items below. Exchange Dissemination Time remains a **candidate proxy**, not proven first-public availability.
-
 ## 7. Exact remaining blocker
 
-A candidate extract **has been acquired**. H001 stays **event-data blocked** because Gate 2 did **not** prove timestamp semantics, archive immutability, 49×quarter results coverage, integrity-hash reproducibility, or restatement-safe values. The Gate 2 `DATA READY` conclusion is withdrawn.
+H001 stays **event-data blocked** because we still lack an **acquired, frozen candidate extract** on which Developer 2 can prove timestamp semantics.
 
-Remaining work (still not modelling; see also readiness §14–§18):
+Remaining work (Developer 2), still not modelling:
 
-1. ~~Pull NSE announcements for the exact 49 symbols and 2024–2025 window.~~ **Done as a freeze** (not recertified here). Financial-results/XBRL vintage and 2023-Q4/2026-Q1 censoring buffers remain open if Scope B or period-print completeness is required.
-2. Persist **raw rows** (do not overwrite). Keep `source_id` / announcement id, subject, PDF URL, XBRL URL, broadcast time, dissemination time, period end, original vs revised. Freeze exists; restatement **values** still missing.
-3. Timestamp audit on the extract (still required):
+1. Pull NSE announcements + financial-results/XBRL for the **exact 49 symbols** and `from_date=01-01-2024` … `to_date=31-12-2025` (IST), plus enough 2023-Q4/2026-Q1 rows only if needed to avoid censoring fiscal periods that printed inside the window.
+2. Persist **raw rows** (do not overwrite). Keep `source_id` / announcement id, subject, PDF URL, XBRL URL, broadcast time, dissemination time, period end, original vs revised.
+3. Timestamp audit on the extract:
    - Are broadcast/dissemination fields present on ≥ required earnings events?
-   - Timezone: store as aware `Asia/Kolkata` (or offset `+05:30`), never naive. IST tagging in the freeze is a **convention**, not verified vendor metadata.
-   - Does a later revision **change** the original row’s timestamps/values in the live API, or only add a new row? **Unresolved.**
-   - PDF vs XBRL lag for 2024 (up to 24h) vs 2025 (same-day XBRL). **Unresolved.**
-4. Coverage table: 49 × quarters in 2024–2025; missing events listed, not imputed. **Not produced.** Proposed classifier and table spec live in readiness §§15–16; do not run them without authorization.
-5. Define `available_at` **from provider fields** (candidate: dissemination / `exchdisstime`, else broadcast) **only after** authoritative semantics or an approved limitation. **No +2 hour rule.**
-6. Reproducible artifact-integrity recipe (historical digest `b0f4760f…` is UNVERIFIED). Only after the above can H001 move toward `DATA READY`. Until then:
+   - Timezone: store as aware `Asia/Kolkata` (or offset `+05:30`), never naive.
+   - Does a later revision **change** the original row’s timestamps/values in the live API, or only add a new row?
+   - PDF vs XBRL lag for 2024 (up to 24h) vs 2025 (same-day XBRL).
+4. Coverage table: 49 × quarters in 2024–2025; missing events listed, not imputed.
+5. Define `available_at` **from provider fields** (likely `disseminatedAt`, else broadcast). **No +2 hour rule.**
+6. Only after that audit passes can H001 move toward `DATA READY`. Until then:
 
-`DATA NOT READY`  
 `EVENT_DATA_BLOCKED`  
 `H001 = BLOCKED_PRECONDITION`  
 `READY_TO_RUN = NO`
