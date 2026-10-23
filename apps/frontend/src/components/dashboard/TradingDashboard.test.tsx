@@ -7,6 +7,7 @@ import { PnlCalendar } from "@/components/dashboard/PnlCalendar";
 import { TradingDashboard } from "@/components/dashboard/TradingDashboard";
 import { demoDashboard } from "@/lib/demo/dashboard-fixtures";
 import { visualState } from "@/lib/cell-state";
+import type { DailyPnlDay } from "@/lib/daily-pnl";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn() }),
@@ -202,5 +203,18 @@ describe("calendar missing series", () => {
     expect(tip.textContent).toContain("No data");
     expect(tip.textContent).not.toContain("Daily Net P&L");
     expect(tip.textContent).not.toContain("₹0.00");
+  });
+});
+
+
+describe("today's P&L card", () => {
+  it("shows the running figure during the session, labelled provisional", async () => {
+    const snap = demoDashboard();
+    const key = snap.trading_date_ist!;
+    const day: DailyPnlDay = { ...(snap.days.find((item) => item.calendar_date_ist === key) ?? snap.days[snap.days.length - 1]), calendar_date_ist: key, complete: false, net_pnl_inr: 1234.5, has_activity: true, trading_calendar_state: "open", pnl_basis: "net_equity" };
+    const { SummaryCardsForTest } = await import("@/components/dashboard/TradingDashboard");
+    render(<SummaryCardsForTest snapshot={{ ...snap, days: [day] }} endKey={key} />);
+    expect(screen.getByTestId("kpi-row").textContent).toContain("1,234.50");
+    expect(screen.getByTestId("today-label").textContent).toBe("so far today · provisional");
   });
 });

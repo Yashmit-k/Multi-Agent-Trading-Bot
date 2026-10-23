@@ -180,7 +180,10 @@ function SummaryCards({
 
   const realized = snapshot.portfolio.realized_pnl;
   const unrealized = snapshot.portfolio.unrealized_pnl;
-  const showToday = today?.net_pnl_inr != null && todayState?.kind !== "missing" && todayState?.kind !== "market_closed";
+  // During the session Core updates today's figure continuously and marks it provisional (complete = false);
+  // the calendar waits for the final close, but this card shows the running number.
+  const showToday = today?.net_pnl_inr != null && todayState?.kind !== "market_closed" && today.pnl_basis !== "unavailable";
+  const provisional = showToday && today?.complete === false;
 
   return (
     <div data-testid="kpi-row" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -192,7 +195,9 @@ function SummaryCards({
       </Card>
       <Card title="Today’s P&L">
         <Amount value={showToday ? today!.net_pnl_inr! : null} />
-        <p className="text-sm text-[#94A3B8]">{endKey ? formatDateKeyLong(endKey) : "—"}</p>
+        <p className="text-sm text-[#94A3B8]" data-testid="today-label">
+          {provisional ? "so far today · provisional" : endKey ? formatDateKeyLong(endKey) : "—"}
+        </p>
       </Card>
       <Card title="Realised">
         <Amount value={realized} />
@@ -318,4 +323,9 @@ function CalendarSkeleton() {
   return (
     <div data-testid="calendar-skeleton" className="h-40 animate-pulse rounded-[12px] border border-[#26303C] bg-[#121922]" />
   );
+}
+
+// Test hook: the summary cards on their own, with the real session wiring stubbed out.
+export function SummaryCardsForTest({ snapshot, endKey }: { snapshot: DashboardSnapshot; endKey: string }) {
+  return <SummaryCards snapshot={snapshot} sessionLabel={snapshot.sessions[0]?.label ?? "—"} endKey={endKey} sessionDays={snapshot.days} sessionBelongsToSeries />;
 }
