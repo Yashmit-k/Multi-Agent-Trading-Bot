@@ -139,7 +139,19 @@ def test_in_process_migration_keeps_application_loggers(tmp_path, monkeypatch) -
     assert logging.getLogger("core_api.app").disabled is False
 
 
-def test_callback_logs_the_report_on_every_run(caplog: pytest.LogCaptureFixture) -> None:
+class _FixedNow(datetime):
+    """The seed window ends at "now"; a fixed weekday morning keeps the fake bar inside it on any run date."""
+
+    @classmethod
+    def now(cls, tz=None):  # type: ignore[no-untyped-def, override]
+        moment = datetime(2026, 10, 22, 20, 30, tzinfo=UTC)
+        return moment if tz is None else moment.astimezone(tz)
+
+
+def test_callback_logs_the_report_on_every_run(caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    import core_api.app
+
+    monkeypatch.setattr(core_api.app, "datetime", _FixedNow)
     repository = _repository("RELIANCE", "TATAMOTORS")
     with caplog.at_level(logging.INFO, logger="core_api.app"):
         _ingest_seed_history(repository, ReportingKite(), RequestPace(0))
