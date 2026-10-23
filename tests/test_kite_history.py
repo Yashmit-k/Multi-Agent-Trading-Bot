@@ -186,7 +186,9 @@ def test_backfill_uses_the_in_memory_session_and_hides_the_token() -> None:
     assert report["running"] is False
     assert report["appended"] == 1
     assert "access_token" not in report
-    stored = repository.stored_candles("RELIANCE", Timeframe.M5)
+    # The login callback also queues a background seed of recent history; whether that adds a bar depends on
+    # today's date. Count only the session this backfill asked for.
+    stored = [bar for bar in repository.stored_candles("RELIANCE", Timeframe.M5) if bar.start.date().isoformat() == "2024-06-03"]
     assert len(stored) == 1
 
 
