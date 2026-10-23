@@ -4,7 +4,7 @@ Paper-trading worker was **not** started. No trading cycle was executed. Live-tr
 
 ## What was implemented
 
-Intelligence owns a background RSS ingest loop (`news_ingest_loop`) started from FastAPI lifespan when `INTELLIGENCE_DATA_SOURCE=rss` and `INTELLIGENCE_NEWS_INGEST` is true (default for rss). It does **not** start `evaluation_loop`. `INTELLIGENCE_SERVICE_MODE=oneshot` + `PAPER` is enough; no Core sink token is required for ingest-only.
+Intelligence owns a background RSS ingest loop (`news_ingest_loop`) started from FastAPI lifespan when `INTELLIGENCE_DATA_SOURCE=rss` and `INTELLIGENCE_NEWS_INGEST=true` (opt-in; default false). It does **not** start `evaluation_loop`. `INTELLIGENCE_SERVICE_MODE=oneshot` + `PAPER` is enough; no Core sink token is required for ingest-only.
 
 Default source: **Google News RSS** (`hl=en-IN&gl=IN`) for a Nifty/NSE query plus a rotating per-symbol query over the NIFTY 50 list. No API key.
 

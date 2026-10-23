@@ -72,6 +72,6 @@ The smoke script fetches the real RSS endpoints, stores matching articles, re-po
 | `NEWS_RSS_URLS` | Optional override of default feeds |
 | `NEWS_RSS_INTERVAL_SECONDS` | Poll period (default 300, min 30) |
 | `NEWS_RSS_SYMBOL_BATCH` | Per-poll Google News symbol queries (default 5) |
-| `INTELLIGENCE_NEWS_INGEST` | Default true when source is `rss` |
+| `INTELLIGENCE_NEWS_INGEST` | Default false; set true to run the separate ingest loop (requires source `rss`) |
 | `INTELLIGENCE_NEWS_INTERPRET` | Optional LLM notes; default false |
 | `LLM_BASE_URL` / `LLM_API_KEY` | Required for interpretation only |

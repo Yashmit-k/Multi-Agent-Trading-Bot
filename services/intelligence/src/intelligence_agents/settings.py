@@ -73,11 +73,8 @@ class IntelligenceSettings:
         rss_urls = tuple(item.strip() for item in rss_raw.split(",") if item.strip())
         if source == "rss" and not rss_urls:
             rss_urls = DEFAULT_MARKET_FEEDS
-        ingest_raw = os.environ.get("INTELLIGENCE_NEWS_INGEST")
-        if ingest_raw is None:
-            news_ingest = source == "rss"
-        else:
-            news_ingest = ingest_raw.strip().lower() == "true"
+        # Opt-in only. Production reads RSS inside the evaluation loop; a second ingest loop must be asked for.
+        news_ingest = os.environ.get("INTELLIGENCE_NEWS_INGEST", "false").strip().lower() == "true"
         settings = cls(
             data_source=source,
             trading_mode=mode,

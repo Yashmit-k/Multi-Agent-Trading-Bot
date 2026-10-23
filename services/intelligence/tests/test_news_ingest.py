@@ -31,8 +31,9 @@ def test_rss_defaults_to_market_feeds_and_nifty(monkeypatch):
     monkeypatch.delenv("INTELLIGENCE_SYMBOLS", raising=False)
     monkeypatch.delenv("NEWS_RSS_URLS", raising=False)
     monkeypatch.delenv("INTERNAL_SIGNAL_TOKEN", raising=False)
+    monkeypatch.delenv("INTELLIGENCE_NEWS_INGEST", raising=False)
     settings = IntelligenceSettings.from_env()
-    assert settings.news_ingest is True
+    assert settings.news_ingest is False  # opt-in: rss alone never starts the separate ingest loop
     assert settings.news_rss_urls
     assert settings.symbols == NIFTY50_SYMBOLS
     assert settings.rss_interval_seconds >= 30
@@ -207,3 +208,28 @@ def test_interpret_success_and_failures(monkeypatch):
     )
     assert failed["available"] is False
     assert "llm_http_429" in str(failed["reason"])
+
+
+def test_production_rss_settings_start_no_ingest_loop_and_stay_healthy(monkeypatch):
+    """docker-compose.yml runs rss + serve without INTELLIGENCE_NEWS_INGEST: only the evaluation loop may pull feeds."""
+    from fastapi.testclient import TestClient
+
+    import intelligence_agents.service as service
+
+    monkeypatch.setenv("INTELLIGENCE_TRADING_MODE", "PAPER")
+    monkeypatch.setenv("INTELLIGENCE_SERVICE_MODE", "oneshot")
+    monkeypatch.setenv("INTELLIGENCE_DATA_SOURCE", "rss")
+    monkeypatch.setenv("INTELLIGENCE_STORE", "memory")
+    monkeypatch.setenv("INTELLIGENCE_SYMBOLS", "RELIANCE")
+    monkeypatch.delenv("INTELLIGENCE_NEWS_INGEST", raising=False)
+    started: list[str] = []
+
+    async def refuse(*args, **kwargs):
+        started.append("news_ingest_loop")
+
+    monkeypatch.setattr(service, "news_ingest_loop", refuse)
+    with TestClient(service.create_app(IntelligenceSettings.from_env())) as client:
+        body = client.get("/health").json()
+    assert started == []
+    assert body.get("reason") not in {"news_stale", "news_ingest_failures"}
+
