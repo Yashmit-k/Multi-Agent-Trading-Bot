@@ -143,7 +143,7 @@ class RssPuller:
                 stats.skipped_no_url += 1
                 stats.dropped += 1
                 continue
-            symbols, evidence = match_symbols(f"{title} {description} {canonical}", self._universe)
+            symbols, evidence = match_symbols(f"{title} {description}", self._universe)  # as before: never the URL slug
             category = None
             if not symbols and self._keep_market_wide:
                 from intelligence_agents.news.market_wide import categorise

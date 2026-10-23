@@ -233,3 +233,12 @@ def test_production_rss_settings_start_no_ingest_loop_and_stay_healthy(monkeypat
     assert started == []
     assert body.get("reason") not in {"news_stale", "news_ingest_failures"}
 
+
+def test_universe_is_the_current_nifty50_and_matches_on_word_boundaries():
+    assert {"BEL", "SHRIRAMFIN", "TMPV", "TRENT"} <= set(NIFTY50_SYMBOLS)
+    assert not {"DIVISLAB", "LTIM", "TATAMOTORS", "TATAPOWER"} & set(NIFTY50_SYMBOLS)
+    assert len(NIFTY50_SYMBOLS) == 50
+    universe = set(NIFTY50_SYMBOLS)
+    assert match_symbols("Titanic sequel tops the box office", universe)[0] == []
+    assert match_symbols("A pitch for new investors", universe)[0] == []
+    assert match_symbols("Titan Company beats estimates; TRENT rallies", universe)[0] == ["TITAN", "TRENT"]

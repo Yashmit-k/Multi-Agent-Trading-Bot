@@ -3,113 +3,14 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 
-NIFTY50_SYMBOLS: tuple[str, ...] = (
-    "ADANIENT",
-    "ADANIPORTS",
-    "APOLLOHOSP",
-    "ASIANPAINT",
-    "AXISBANK",
-    "BAJAJ-AUTO",
-    "BAJAJFINSV",
-    "BAJFINANCE",
-    "BHARTIARTL",
-    "BPCL",
-    "BRITANNIA",
-    "CIPLA",
-    "COALINDIA",
-    "DIVISLAB",
-    "DRREDDY",
-    "EICHERMOT",
-    "GRASIM",
-    "HCLTECH",
-    "HDFCBANK",
-    "HDFCLIFE",
-    "HEROMOTOCO",
-    "HINDALCO",
-    "HINDUNILVR",
-    "ICICIBANK",
-    "INDUSINDBK",
-    "INFY",
-    "ITC",
-    "JSWSTEEL",
-    "KOTAKBANK",
-    "LT",
-    "LTIM",
-    "M&M",
-    "MARUTI",
-    "NESTLEIND",
-    "NTPC",
-    "ONGC",
-    "POWERGRID",
-    "RELIANCE",
-    "SBILIFE",
-    "SBIN",
-    "SUNPHARMA",
-    "TATACONSUM",
-    "TATAMOTORS",
-    "TATAPOWER",
-    "TATASTEEL",
-    "TCS",
-    "TECHM",
-    "TITAN",
-    "ULTRACEMCO",
-    "WIPRO",
-)
+from intelligence_agents.news.aliases import _TICKER, ALIASES, build_matcher, map_symbols
 
-# Longer aliases first so "HDFC Bank" wins over a generic "HDFC" collision in caller order.
-COMPANY_ALIASES: dict[str, tuple[str, ...]] = {
-    "ADANIENT": ("Adani Enterprises",),
-    "ADANIPORTS": ("Adani Ports",),
-    "APOLLOHOSP": ("Apollo Hospitals",),
-    "ASIANPAINT": ("Asian Paints",),
-    "AXISBANK": ("Axis Bank",),
-    "BAJAJ-AUTO": ("Bajaj Auto",),
-    "BAJAJFINSV": ("Bajaj Finserv",),
-    "BAJFINANCE": ("Bajaj Finance",),
-    "BHARTIARTL": ("Bharti Airtel", "Airtel"),
-    "BPCL": ("Bharat Petroleum",),
-    "BRITANNIA": ("Britannia Industries", "Britannia"),
-    "CIPLA": ("Cipla",),
-    "COALINDIA": ("Coal India",),
-    "DIVISLAB": ("Divi's Laboratories", "Divis Lab",),
-    "DRREDDY": ("Dr Reddy", "Dr. Reddy",),
-    "EICHERMOT": ("Eicher Motors", "Royal Enfield",),
-    "GRASIM": ("Grasim",),
-    "HCLTECH": ("HCL Tech", "HCL Technologies",),
-    "HDFCBANK": ("HDFC Bank",),
-    "HDFCLIFE": ("HDFC Life",),
-    "HEROMOTOCO": ("Hero MotoCorp", "Hero Motocorp",),
-    "HINDALCO": ("Hindalco",),
-    "HINDUNILVR": ("Hindustan Unilever", "HUL"),
-    "ICICIBANK": ("ICICI Bank",),
-    "INDUSINDBK": ("IndusInd Bank", "Indusind Bank",),
-    "INFY": ("Infosys",),
-    "ITC": ("ITC Ltd", "ITC Limited"),
-    "JSWSTEEL": ("JSW Steel",),
-    "KOTAKBANK": ("Kotak Mahindra Bank", "Kotak Bank",),
-    "LT": ("Larsen & Toubro", "Larsen and Toubro"),
-    "LTIM": ("LTIMindtree", "LTI Mindtree",),
-    "M&M": ("Mahindra & Mahindra", "Mahindra and Mahindra",),
-    "MARUTI": ("Maruti Suzuki", "Maruti"),
-    "NESTLEIND": ("Nestle India", "Nestlé India",),
-    "NTPC": ("NTPC",),
-    "ONGC": ("Oil and Natural Gas", "ONGC"),
-    "POWERGRID": ("Power Grid", "Powergrid",),
-    "RELIANCE": ("Reliance Industries", "Reliance Jio", "Jio-BlackRock"),
-    "SBILIFE": ("SBI Life",),
-    "SBIN": ("State Bank of India",),
-    "SUNPHARMA": ("Sun Pharma", "Sun Pharmaceutical",),
-    "TATACONSUM": ("Tata Consumer",),
-    "TATAMOTORS": ("Tata Motors",),
-    "TATAPOWER": ("Tata Power",),
-    "TATASTEEL": ("Tata Steel",),
-    "TCS": ("Tata Consultancy", "TCS"),
-    "TECHM": ("Tech Mahindra",),
-    "TITAN": ("Titan Company", "Titan"),
-    "ULTRACEMCO": ("UltraTech Cement", "Ultratech"),
-    "WIPRO": ("Wipro",),
-}
+# One source of truth: the alias table production already uses (news/aliases.py), which lists exactly the
+# current NIFTY 50 (BEL, SHRIRAMFIN, TMPV and TRENT in; DIVISLAB, LTIM, TATAMOTORS and TATAPOWER out).
+NIFTY50_SYMBOLS: tuple[str, ...] = tuple(sorted(ALIASES))
+COMPANY_ALIASES: dict[str, tuple[str, ...]] = ALIASES
 
 DEFAULT_MARKET_FEEDS: tuple[str, ...] = (
     "https://news.google.com/rss/search?q=Nifty+50+OR+NSE+India&hl=en-IN&gl=IN&ceid=IN:en",
@@ -131,19 +32,28 @@ def google_news_symbol_feed(symbol: str) -> str:
     )
 
 
+@lru_cache(maxsize=8)
+def _matcher(universe: frozenset[str]) -> list[tuple[re.Pattern[str], str]]:
+    return build_matcher(set(universe))
+
+
 def match_symbols(text: str, universe: set[str]) -> tuple[list[str], dict[str, str]]:
-    """Return mapped tickers and the evidence string used for each match."""
+    """Return mapped tickers and the evidence string used for each match.
+
+    Same rules as production's map_symbols (news/aliases.py): company names match on word boundaries
+    ("Titan" never matches "Titanic", "ITC" never matches "pitch"), then exact upper-case tickers.
+    """
     haystack = text or ""
-    upper = haystack.upper()
     evidence: dict[str, str] = {}
-    for ticker in sorted(universe, key=len, reverse=True):
-        ticker_u = ticker.upper()
-        pattern = r"(?<![A-Z0-9])" + re.escape(ticker_u) + r"(?![A-Z0-9])"
-        if re.search(pattern, upper):
-            evidence[ticker_u] = f"ticker:{ticker_u}"
-            continue
-        for alias in COMPANY_ALIASES.get(ticker_u, ()):
-            if alias and alias.upper() in upper:
-                evidence[ticker_u] = f"alias:{alias}"
-                break
-    return sorted(evidence), evidence
+    remaining = haystack
+    for pattern, symbol in _matcher(frozenset(universe)):
+        found = pattern.search(remaining)
+        if found:
+            evidence.setdefault(symbol, f"alias:{found.group(0)}")
+            remaining = pattern.sub(" ", remaining)
+    for found in _TICKER.finditer(remaining):
+        token = found.group(1)
+        if token in universe:
+            evidence.setdefault(token, f"ticker:{token}")
+    symbols = map_symbols(haystack, set(universe), _matcher(frozenset(universe)))
+    return symbols, {symbol: evidence.get(symbol, "alias") for symbol in symbols}
