@@ -2,7 +2,7 @@
 
 Incremental polling asks only for the gap after the last stored bar.
 The 100-day seed remains a separate recovery path.
-A daily bar is complete at 15:30 IST. Five-minute freshness accepts the
+A daily bar is complete 30 minutes after the 15:30 IST close (see DAILY_OFFICIAL_DELAY). Five-minute freshness accepts the
 last 15 minutes of the session as unpublished when the provider omits them.
 """
 
@@ -14,6 +14,10 @@ from contracts.enums import Timeframe
 from core_market_data.nse_sessions import IST, SESSION_CLOSE, SESSION_OPEN, is_trading_day
 
 PUBLICATION_DELAY = timedelta(seconds=90)
+# NSE's official closing price (the weighted average of the last 30 minutes) is published a few minutes after
+# 15:30. A daily bar fetched 90 s after the close could carry the last traded price instead (JSWSTEEL, 19 Oct
+# 2026: 1231.00 stored, 1241.30 official), and swing entries are priced from it. Wait until the official close.
+DAILY_OFFICIAL_DELAY = timedelta(minutes=30)
 CLOSE_GRACE = timedelta(minutes=15)
 _FIVE = timedelta(minutes=5)
 
@@ -28,7 +32,7 @@ def candle_is_fresh(stored_end: datetime | None, timeframe: Timeframe, now: date
 
 def expected_completed_end(timeframe: Timeframe, now: datetime, delay: timedelta = PUBLICATION_DELAY) -> datetime:
     if timeframe == Timeframe.D1:
-        return _completed_daily_end(now, delay)
+        return _completed_daily_end(now, max(delay, DAILY_OFFICIAL_DELAY))
     return _completed_intraday_end(now, delay)
 
 

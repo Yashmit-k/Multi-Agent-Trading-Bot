@@ -76,7 +76,10 @@ def test_incremental_range_is_the_gap_after_the_last_bar() -> None:
 def test_daily_bar_stays_incomplete_until_after_the_close_delay() -> None:
     during = datetime(2026, 10, 12, 6, 0, tzinfo=UTC)
     assert expected_completed_end(Timeframe.D1, during) == datetime(2026, 10, 9, 10, 0, tzinfo=UTC)
-    after = datetime(2026, 10, 12, 10, 2, tzinfo=UTC)
+    # The official NSE close is published after 15:30: the daily bar waits 30 minutes for it.
+    for still_previous in (datetime(2026, 10, 12, 10, 2, tzinfo=UTC), datetime(2026, 10, 12, 10, 29, tzinfo=UTC)):  # 15:32 and 15:59 IST
+        assert expected_completed_end(Timeframe.D1, still_previous) == datetime(2026, 10, 9, 10, 0, tzinfo=UTC)
+    after = datetime(2026, 10, 12, 10, 30, tzinfo=UTC)  # 16:00 IST
     assert expected_completed_end(Timeframe.D1, after) == datetime(2026, 10, 12, 10, 0, tzinfo=UTC)
 
 
