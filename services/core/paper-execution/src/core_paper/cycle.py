@@ -471,7 +471,9 @@ def _monitor_brackets(repository, publisher, schedule, starting_cash, mode: Trad
         reason = exit_on_bar(Side.BUY, stop, target, bar)
         if reason is None:
             continue
-        price = stop if reason == "stop" else target
+        # A bar that opens beyond the level gapped through it: the realistic fill is the open (worse for a stop,
+        # better for a target), as in the Strategy-lab backtester. Otherwise the level itself.
+        price = min(stop, bar.open) if reason == "stop" else max(target, bar.open)
         _exit_proposal(repository, publisher, position, price, bar.end, reason, schedule, starting_cash, mode, fill_at="level")
 
 

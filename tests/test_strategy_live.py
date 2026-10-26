@@ -364,3 +364,33 @@ def test_preflight_warns_about_settings_that_will_block_entries(repository: Core
     assert "every entry will be rejected" in text and "open positions in total" in text and "mode:" in text
     no_stop = client.post("/api/v1/strategies", json={"definition": {**tight, "stop": {"kind": "none"}}}, headers=AUTH).json()
     assert client.get(f"/api/v1/strategies/{no_stop['strategy_id']}/preflight", headers=AUTH).json()["problems"]
+
+
+def _filled_strategy_position(repository: CoreRepository) -> int:
+    client = _ready(repository)
+    saved = client.post("/api/v1/strategies", json={"definition": STRATEGY}, headers=AUTH).json()
+    client.post(f"/api/v1/strategies/{saved['strategy_id']}/apply", json={"confirm": True}, headers=AUTH)
+    _cycle(repository, DECISION + timedelta(hours=1))
+    repository.upsert_candles([_bar(SESSION, open_=Decimal("400"), low=Decimal("399"), symbol="TCS")])
+    _cycle(repository, SESSION + timedelta(minutes=5))
+    position = repository.position_for("TCS")
+    assert position is not None
+    return position.quantity
+
+
+def test_a_gap_down_through_the_stop_fills_at_the_open_not_the_stop(repository: CoreRepository) -> None:
+    _filled_strategy_position(repository)  # entry 400, stop 380
+    gap = SESSION + timedelta(minutes=5)
+    repository.upsert_candles([_bar(gap, open_=Decimal("370"), low=Decimal("365"), symbol="TCS").model_copy(update={"high": Decimal("372"), "close": Decimal("368")})])
+    _cycle(repository, gap + timedelta(minutes=5))
+    [stop] = [order for order in repository.list_orders() if order.side == Side.SELL]
+    assert stop.metadata["reason"] == "strategy_stop" and Decimal(str(stop.metadata["level_price"])) == Decimal("370")
+
+
+def test_a_gap_up_through_a_target_fills_at_the_open_not_the_target(repository: CoreRepository) -> None:
+    _filled_strategy_position(repository)  # target 1 at 420
+    gap = SESSION + timedelta(minutes=5)
+    repository.upsert_candles([_bar(gap, open_=Decimal("426"), low=Decimal("424"), symbol="TCS").model_copy(update={"high": Decimal("428"), "close": Decimal("427")})])
+    _cycle(repository, gap + timedelta(minutes=5))
+    [target] = [order for order in repository.list_orders() if order.side == Side.SELL]
+    assert target.metadata["reason"] == "strategy_target_1" and Decimal(str(target.metadata["level_price"])) == Decimal("426")

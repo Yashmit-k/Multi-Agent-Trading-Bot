@@ -532,7 +532,7 @@ def manage_strategy_positions(repository: CoreRepository, publisher, schedule, s
                     atr = _atr_now(repository, position.symbol, int(trailing.get("period") or 14), moment)
                     level = best - float(trailing["value"]) * atr if atr else current_stop
                 current_stop = max(current_stop, level)
-        low, high = float(bar.low), float(bar.high)
+        low, high, open_ = float(bar.low), float(bar.high), float(bar.open)
         local = bar.end.astimezone(IST)
         exit_quantity, reason, price, fill_at = 0, "", float(bar.close), "next_open"
         # Added shares with their own target are kept out of the initial targets' quantity.
@@ -540,14 +540,14 @@ def manage_strategy_positions(repository: CoreRepository, publisher, schedule, s
         initial_left = position.quantity - reserved
         if low <= current_stop:
             label = "strategy_stop" if current_stop == stop or (added and not taken) else ("strategy_breakeven" if math.isclose(current_stop, entry) else "strategy_trailing_stop")
-            exit_quantity, reason, price, fill_at = position.quantity, label, current_stop, "level"
+            exit_quantity, reason, price, fill_at = position.quantity, label, min(current_stop, open_), "level"  # a gap down fills at the open
         elif taken < len(targets) and initial_left > 0 and high >= float(targets[taken]["price"]):
             share = int(math.floor(original * float(targets[taken]["fraction"]) + 1e-9))
             last_target = taken == len(targets) - 1
             exit_quantity = initial_left if last_target or share >= initial_left else max(1, share)
-            reason, price, fill_at = f"strategy_target_{taken + 1}", float(targets[taken]["price"]), "level"
+            reason, price, fill_at = f"strategy_target_{taken + 1}", max(float(targets[taken]["price"]), open_), "level"  # a gap up fills at the open
         elif reserved > 0 and high >= float(add_target):
-            exit_quantity, reason, price, fill_at = reserved, "strategy_add_on_target", float(add_target), "level"
+            exit_quantity, reason, price, fill_at = reserved, "strategy_add_on_target", max(float(add_target), open_), "level"
         elif plan.get("square_off_intraday") and (local.time() >= SQUARE_OFF or local.date() != filled_at.astimezone(IST).date()):
             exit_quantity, reason = position.quantity, "strategy_square_off"
         elif plan.get("max_hold_bars") and _bars_held(repository, proposal, position.symbol, filled_at, bar.end) >= int(plan["max_hold_bars"]):
