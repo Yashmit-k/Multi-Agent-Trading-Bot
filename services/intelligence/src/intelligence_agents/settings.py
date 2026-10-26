@@ -50,6 +50,9 @@ class IntelligenceSettings:
     # Empty: they share the News agent's model as before.
     llm_context_model: str = ""
     llm_context_reasoning_effort: str = ""
+    # "HH:MM-HH:MM" in IST, Monday to Friday: score with the LLM only inside this window (RSS is still pulled and
+    # stored outside it). Empty: always score. Overnight scoring used up Gemini's free quota before the market opened.
+    active_hours: str = ""
 
     @classmethod
     def from_env(cls) -> IntelligenceSettings:
@@ -89,6 +92,7 @@ class IntelligenceSettings:
             llm_reassess_model=os.environ.get("LLM_REASSESS_MODEL", "").strip(),
             llm_context_model=os.environ.get("LLM_CONTEXT_MODEL", "").strip(),
             llm_context_reasoning_effort=os.environ.get("LLM_CONTEXT_REASONING_EFFORT", "").strip().lower(),
+            active_hours=os.environ.get("INTELLIGENCE_ACTIVE_HOURS", "").strip(),
             llm_fallback_models=tuple(item.strip() for item in os.environ.get("LLM_FALLBACK_MODELS", "").split(",") if item.strip()),
         )
         settings.validate()
@@ -128,6 +132,10 @@ class IntelligenceSettings:
             raise ConfigError("INTELLIGENCE_FUNDAMENTALS_CSV required when INTELLIGENCE_DATA_SOURCE=csv-live")
         if not self.symbols:
             raise ConfigError("INTELLIGENCE_SYMBOLS must list at least one symbol")
+        if self.active_hours:
+            from intelligence_agents.schedule import parse_active_hours
+
+            parse_active_hours(self.active_hours)  # raises ConfigError on a bad value
         if self.service_mode == "serve" and self.trading_mode in LIVE_MODES:
             if not self.internal_signal_token or not self.core_api_url:
                 raise ConfigError("PAPER/SHADOW/LIVE serve requires CORE_API_URL and INTERNAL_SIGNAL_TOKEN")

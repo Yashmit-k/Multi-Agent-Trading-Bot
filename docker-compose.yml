@@ -127,6 +127,8 @@ services:
       # (gemini-3.1-flash-lite: 500 requests a day on the free tier). 3.5-flash-lite rejects reasoning "none".
       LLM_CONTEXT_MODEL: ${LLM_CONTEXT_MODEL:-gemini-3.5-flash-lite}
       LLM_CONTEXT_REASONING_EFFORT: ${LLM_CONTEXT_REASONING_EFFORT:-low}
+      # Score with the LLM only 08:30-15:45 IST on weekdays; overnight scoring used up the free quota before the open.
+      INTELLIGENCE_ACTIVE_HOURS: ${INTELLIGENCE_ACTIVE_HOURS:-08:30-15:45}
     depends_on:
       core-api:
         condition: service_healthy

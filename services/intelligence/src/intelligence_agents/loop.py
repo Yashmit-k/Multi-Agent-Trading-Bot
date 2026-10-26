@@ -63,6 +63,13 @@ def _load_fundamentals(runner, path: str) -> None:
 
 def run_cycle(settings: IntelligenceSettings, runner, health: RunnerHealth, router, puller=None) -> None:
     refresh_sources(settings, runner, puller)
+    from intelligence_agents.schedule import scoring_allowed
+
+    if not scoring_allowed(settings.active_hours, runner.clock.now()):
+        # News keeps arriving in the store; the agents score it when the window opens, so the free quota is spent
+        # on market hours, not overnight.
+        logger.info("eval_paused_outside_active_hours", extra={"active_hours": settings.active_hours})
+        return
     as_of = cycle_as_of(runner.clock.now(), settings.eval_interval_seconds)
     produced = runner.run(list(settings.symbols), as_of)
     health.last_run_at = datetime.now(timezone.utc).isoformat()
