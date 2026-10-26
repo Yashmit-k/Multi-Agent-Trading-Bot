@@ -26,6 +26,14 @@ def heartbeat_view(
     return {"status": "available", "heartbeat_at": _aware(recorded_at).isoformat()}
 
 
+BEAT_GRACE_SECONDS = 30
+
+
+def expected_beat_seconds(interval: int, last_loop_seconds: float) -> int:
+    """How long until the next heartbeat should arrive: the sleep, the last loop's own duration, and a grace."""
+    return int(interval + max(0.0, last_loop_seconds) + BEAT_GRACE_SECONDS)
+
+
 def publish_heartbeat(
     base_url: str,
     token: str,

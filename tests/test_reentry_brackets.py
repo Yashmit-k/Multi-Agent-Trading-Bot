@@ -58,3 +58,44 @@ def test_brackets_never_use_an_entry_from_before_the_position_opened(repository:
                                       low=Decimal("1183.3"), close=Decimal("1184.9"), volume=1000, start=bar - timedelta(minutes=5), end=bar)])
     _monitor_brackets(repository, MemoryEventPublisher(), CostSchedule.research(Decimal("2"), Decimal("0")), CASH, TradingMode.PAPER)
     assert [order for order in repository.list_orders() if order.side == Side.SELL and order.metadata.get("reason") == "stop"] == []
+
+
+def _agent_position_with_bar(repository: CoreRepository, open_: str, low: str, high: str) -> None:
+    repository.open_paper_session(CASH)
+    _fill(repository, "entry", NEW, "1000.00", "980.00", "1040.00")  # stop -2%, target +4%
+    repository.save_position(Position(symbol="RELIANCE", quantity=16, average_price=Decimal("1000"), market_price=Decimal("1000"), market_value=Decimal("16000"),
+                                      realized_pnl=Decimal("0"), unrealized_pnl=Decimal("0"), opened_at=NEW, updated_at=NEW))
+    bar = NEW + timedelta(minutes=5)
+    repository.upsert_candles([Candle(symbol="RELIANCE", exchange=Exchange.NSE, timeframe=Timeframe.M5, open=Decimal(open_), high=Decimal(high),
+                                      low=Decimal(low), close=Decimal(open_), volume=1000, start=bar - timedelta(minutes=5), end=bar)])
+    _monitor_brackets(repository, MemoryEventPublisher(), CostSchedule.research(Decimal("2"), Decimal("0")), CASH, TradingMode.PAPER)
+
+
+def _exit(repository: CoreRepository):  # type: ignore[no-untyped-def]
+    [order] = [order for order in repository.list_orders() if order.side == Side.SELL and order.metadata.get("reason") in {"stop", "target"}]
+    return order.metadata["reason"], Decimal(str(order.metadata["level_price"]))
+
+
+def test_agent_stop_fills_at_the_open_after_a_gap_down(repository: CoreRepository) -> None:
+    _agent_position_with_bar(repository, open_="960", low="955", high="965")
+    assert _exit(repository) == ("stop", Decimal("960"))
+
+
+def test_agent_stop_fills_at_the_stop_when_the_bar_trades_down_through_it(repository: CoreRepository) -> None:
+    _agent_position_with_bar(repository, open_="990", low="975", high="992")
+    assert _exit(repository) == ("stop", Decimal("980.00"))
+
+
+def test_agent_target_fills_at_the_open_after_a_gap_up(repository: CoreRepository) -> None:
+    _agent_position_with_bar(repository, open_="1055", low="1050", high="1060")
+    assert _exit(repository) == ("target", Decimal("1055"))
+
+
+def test_the_heartbeat_allows_for_a_slow_cycle_but_not_a_hung_worker() -> None:
+    from core_worker.heartbeat import expected_beat_seconds, heartbeat_view
+
+    beat = datetime(2026, 10, 26, 4, 0, tzinfo=UTC)
+    allowed = expected_beat_seconds(30, 120.0)  # a 2-minute cycle
+    assert allowed == 180
+    assert heartbeat_view(beat, beat + timedelta(seconds=150), allowed)["status"] == "available"  # mid-cycle: still fine
+    assert heartbeat_view(beat, beat + timedelta(seconds=600), allowed)["status"] == "unavailable"  # hung: alert

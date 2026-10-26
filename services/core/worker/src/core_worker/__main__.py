@@ -12,13 +12,15 @@ from core_db.session import create_schema
 from core_ingestion.service import MemoryEventPublisher, RedisEventPublisher
 from core_paper.costs import CostSchedule
 from core_paper.trading_calendar import cash_session_open
-from core_worker.heartbeat import publish_heartbeat
+from core_worker.heartbeat import expected_beat_seconds, publish_heartbeat
 from core_worker.loop import run_once
 from core_paper.daily import write_daily_if_due
 from core_worker.agent_weights import current_weights
 from core_worker.notify import Notifier, health_problems_from_api, maybe_notify
 from core_worker.paper_schedule import broker_allows_entries, excluded_agent_weights, run_scheduled_cycle
 
+# Without this the worker printed nothing, so a slow or failing cycle was invisible in `docker logs`.
+logging.basicConfig(level=os.environ.get("WORKER_LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
 
@@ -50,9 +52,13 @@ manager_review = os.environ.get("PORTFOLIO_MANAGER_REVIEW", "on").strip().lower(
 logger.info("portfolio_manager_review enabled=%s", manager_review)
 site_url = os.environ.get("PUBLIC_SITE_URL", "")
 logger.info("notifications configured=%s", notifier.configured)
+last_loop_seconds = 0.0
 while True:
     now = datetime.now(timezone.utc)
-    publish_heartbeat(api_base, api_token, now, interval_seconds=interval, failed_cycles=failed_cycles, last_error=last_error)
+    started = time.monotonic()
+    # The next beat comes one interval plus however long this loop takes: report that, so a slow cycle is not
+    # mistaken for a dead worker (a hung one still goes stale).
+    publish_heartbeat(api_base, api_token, now, interval_seconds=expected_beat_seconds(interval, last_loop_seconds), failed_cycles=failed_cycles, last_error=last_error)
     if mode != TradingMode.PAPER:
         logger.error("paper_worker_refused mode=%s", mode.value)
     elif cash_session_open(now):
@@ -103,4 +109,7 @@ while True:
             logger.info("notification_sent kind=%s", key)
     except Exception:
         logger.exception("notification_failed")
+    last_loop_seconds = time.monotonic() - started
+    if cash_session_open(now):
+        logger.info("cycle_done seconds=%.1f failed_cycles=%s", last_loop_seconds, failed_cycles)
     time.sleep(interval)
