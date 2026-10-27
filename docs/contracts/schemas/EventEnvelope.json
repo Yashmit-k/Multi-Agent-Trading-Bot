@@ -92,7 +92,8 @@
         "news",
         "fundamental",
         "valuation",
-        "earnings"
+        "earnings",
+        "global_markets"
       ],
       "title": "AgentName",
       "type": "string"

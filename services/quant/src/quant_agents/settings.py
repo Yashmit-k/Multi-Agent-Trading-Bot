@@ -27,6 +27,7 @@ class QuantSettings:
     timeframe: str = "1d"
     ml_demo: bool = False
     ml_demo_dir: str | None = None
+    global_markets: bool = True
 
     @classmethod
     def from_env(cls) -> QuantSettings:
@@ -61,6 +62,7 @@ class QuantSettings:
             timeframe=os.environ.get("QUANT_TIMEFRAME", "1d"),
             ml_demo=ml_demo,
             ml_demo_dir=os.environ.get("QUANT_ML_DEMO_DIR") or None,
+            global_markets=os.environ.get("QUANT_GLOBAL_MARKETS", "true").strip().lower() not in {"0", "false", "no"},
         )
         _reject_bad_ml(settings)
         return settings

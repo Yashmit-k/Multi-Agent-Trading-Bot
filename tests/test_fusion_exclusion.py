@@ -56,3 +56,19 @@ def test_entry_end_env_is_bounded() -> None:
     assert _entry_end_from_env("09:15") == DEFAULT_ENTRY_END
     assert _entry_end_from_env("12:07") == DEFAULT_ENTRY_END
     assert _entry_end_from_env("noon") == DEFAULT_ENTRY_END
+
+
+def test_global_markets_agent_never_votes() -> None:
+    """Observe-only (services/quant/docs/global-markets-result.md): weight 0 by default and in the worker's table."""
+    from core_decision.specialists import decide
+    from core_worker.agent_weights import prior_table
+
+    quant = _signal("sig-momentum", AgentName.MOMENTUM, 0.5)
+    world = _signal("sig-global", AgentName.GLOBAL_MARKETS, -1.0)
+    assert fuse([world], horizon=Horizon.SWING, as_of=FIXTURE_AS_OF) is None
+    alone = fuse([quant], horizon=Horizon.SWING, as_of=FIXTURE_AS_OF)
+    mixed = fuse([quant, world], horizon=Horizon.SWING, as_of=FIXTURE_AS_OF)
+    assert alone == mixed
+    assert all(table["global_markets"] == 0.0 for table in prior_table(set()).values())
+    verdicts = decide([quant, world], as_of=FIXTURE_AS_OF).verdicts
+    assert "global_markets" not in {item["agent"] for item in verdicts}

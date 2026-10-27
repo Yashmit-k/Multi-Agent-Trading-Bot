@@ -48,5 +48,6 @@ export function sourceLabel(agent: string, payload: Record<string, unknown>): st
     if (agent !== "news") return "sample data, no live feed: not used in trades";
     return "LLM score (model not recorded on this signal)";
   }
+  if (agent === "global_markets") return "rules on world-market prices (Yahoo Finance), observe-only";
   return "deterministic rules on live candles";
 }

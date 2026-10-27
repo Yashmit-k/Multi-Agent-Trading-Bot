@@ -27,6 +27,7 @@ export const LANES: Array<{ key: string; label: string; kind: string }> = [
   { key: "mean_reversion", label: "Mean reversion", kind: "Quant (rules)" },
   { key: "volume", label: "Volume", kind: "Quant (rules)" },
   { key: "regime", label: "Regime", kind: "Quant (rules)" },
+  { key: "global_markets", label: "Global markets", kind: "Quant (rules, observe-only)" },
   { key: "news", label: "News", kind: "Intelligence (LLM)" },
   { key: "fundamental", label: "Fundamental", kind: "Intelligence (LLM)" },
   { key: "valuation", label: "Valuation", kind: "Intelligence (LLM)" },

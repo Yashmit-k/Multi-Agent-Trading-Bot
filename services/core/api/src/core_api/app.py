@@ -1390,6 +1390,7 @@ _AGENT_ROWS = (
     ("mean_reversion", True),
     ("volume", True),
     ("regime", True),
+    ("global_markets", True),
     ("ml", False),
     ("news", True),
     ("fundamental", True),

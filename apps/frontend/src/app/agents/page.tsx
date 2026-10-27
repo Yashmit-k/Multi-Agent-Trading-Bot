@@ -5,6 +5,7 @@ import { PageFrame } from "@/components/shell/PageFrame";
 import { Badge, Card, Table, Td } from "@/components/ui";
 import { excludedAgents, provenance, sourceLabel } from "@/lib/signal-provenance";
 import { ROLE } from "@/lib/specialist-roles";
+import { INPUT_LABEL, globalView, moodLabel, signedPct } from "@/lib/global-markets";
 
 export const dynamic = "force-dynamic";
 
@@ -126,6 +127,7 @@ const KIND: Record<string, string> = {
   mean_reversion: "Quant · deterministic rules",
   volume: "Quant · deterministic rules",
   regime: "Quant · deterministic rules",
+  global_markets: "Quant · world-market rules · observe-only",
   ml: "Quant · ML model (not loaded)",
   news: "Intelligence · LLM",
   fundamental: "Intelligence · LLM",
@@ -159,7 +161,7 @@ export default async function AgentsPage() {
           {agents.map((agent) => {
             const last = latest.get(agent.agent_name);
             return (
-              <section key={agent.agent_name} className="rounded border border-[#26303C] bg-[#0F141B] p-3 text-sm">
+              <section key={agent.agent_name} id={agent.agent_name} className="rounded border border-[#26303C] bg-[#0F141B] p-3 text-sm">
                 <div className="flex items-baseline justify-between gap-2">
                   <h2 className="font-semibold">{agent.agent_name}</h2>
                   <span className={agent.enabled ? "text-[#22C55E]" : "text-[#94A3B8]"}>{agent.enabled ? "enabled" : "disabled"}</span>
@@ -184,6 +186,7 @@ export default async function AgentsPage() {
                     </div>
                     <div className="text-[#64748B]">{last.timestamp}</div>
                     <Detail signal={last} />
+                    {agent.agent_name === "global_markets" ? <GlobalDetail signal={last} /> : null}
                   </div>
                 ) : (
                   <p className="mt-2 text-xs text-[#94A3B8]">No stored signal from this agent.</p>
@@ -215,6 +218,35 @@ function Detail({ signal }: { signal: SignalRow }) {
           “{item.title}” <span className="text-[#64748B]">({item.source})</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+function GlobalDetail({ signal }: { signal: SignalRow }) {
+  const view = globalView(signal);
+  if (!view) return null;
+  return (
+    <div data-testid="global-detail" className="mt-2 space-y-1 text-[#CBD5E1]">
+      <div>
+        Expected NIFTY open for {view.sessionDate}: <b>{signedPct(view.expectedGapPct)}</b>{" "}
+        <span className="text-[#64748B]">
+          (usually {signedPct(view.rangePct[0])} to {signedPct(view.rangePct[1])}) · {moodLabel(view)}
+        </span>
+      </div>
+      <table className="text-[11px]">
+        <tbody>
+          {view.inputs.map((item) => (
+            <tr key={item.name}>
+              <td className="pr-3 text-[#94A3B8]">{INPUT_LABEL[item.name]}</td>
+              <td className="pr-3 text-right">{signedPct(item.move_pct)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="text-[10px] text-[#64748B]">
+        In the 2015–2026 study this predicted the opening gap well, but not the move after the open, so it never affects a trade. Past-year fit with the gap: correlation{" "}
+        {view.correlation.toFixed(2)}.
+      </div>
     </div>
   );
 }

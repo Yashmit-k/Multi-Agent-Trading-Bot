@@ -10,4 +10,5 @@ export const ROLE: Record<string, string> = {
   valuation: "Quality check: blocks a buy only together with fundamental (both −0.50 or lower)",
   regime: "Market: halves the size of a buy when NIFTY is in a downtrend and India VIX is rising; never blocks",
   ml: "No role: not loaded",
+  global_markets: "No role: observe-only. It predicts the opening gap, not returns after the open, so it never blocks, sizes or triggers a buy",
 };

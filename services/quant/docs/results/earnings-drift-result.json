@@ -1,0 +1,203 @@
+{
+ "protocol": "services/quant/docs/earnings-drift-protocol.md",
+ "events_with_reaction": 1866,
+ "periods": {
+  "train": [
+   "2015-03-01",
+   "2019-12-31"
+  ],
+  "validate": [
+   "2020-01-01",
+   "2022-12-31"
+  ],
+  "test": [
+   "2023-01-01",
+   "2025-02-28"
+  ]
+ },
+ "rules": {
+  "pos2_h20": {
+   "periods": {
+    "train": {
+     "trades": 184,
+     "mean_net_excess": -0.005269440481692756,
+     "median_net_excess": -0.008241732424732515,
+     "win_rate_vs_universe": 0.4673913043478261,
+     "mean_net_raw": -0.003974849543358687,
+     "net_excess_low10": -0.008804208175069104
+    },
+    "validate": {
+     "trades": 159,
+     "mean_net_excess": 0.005495379232570502,
+     "median_net_excess": -0.010262489738794373,
+     "win_rate_vs_universe": 0.44654088050314467,
+     "mean_net_raw": 0.02955195044075633,
+     "net_excess_low10": -0.0031348942091277312
+    },
+    "test": {
+     "trades": 104,
+     "mean_net_excess": 0.001790602117332262,
+     "median_net_excess": -0.005158398417865246,
+     "win_rate_vs_universe": 0.46153846153846156,
+     "mean_net_raw": 0.011796687860659618,
+     "net_excess_low10": -0.0017291034944743576
+    }
+   },
+   "pooled_trades": 447,
+   "pooled_mean": 0.00020226145313153825,
+   "pooled_low10": -0.0031689617977000103,
+   "pooled_low025": -0.005171762890416351,
+   "works": false,
+   "survives_bonferroni": false
+  },
+  "pos4_h20": {
+   "periods": {
+    "train": {
+     "trades": 69,
+     "mean_net_excess": -0.002877905652002304,
+     "median_net_excess": -0.0119096998384788,
+     "win_rate_vs_universe": 0.4782608695652174,
+     "mean_net_raw": -0.008105893032280466,
+     "net_excess_low10": -0.010167819199972847
+    },
+    "validate": {
+     "trades": 85,
+     "mean_net_excess": 0.004169523588207216,
+     "median_net_excess": -0.010262489738794373,
+     "win_rate_vs_universe": 0.4470588235294118,
+     "mean_net_raw": 0.03302887379136135,
+     "net_excess_low10": -0.005095772344694966
+    },
+    "test": {
+     "trades": 55,
+     "mean_net_excess": -0.001340982628154062,
+     "median_net_excess": -0.006411373148839974,
+     "win_rate_vs_universe": 0.45454545454545453,
+     "mean_net_raw": 0.0065589380911210025,
+     "net_excess_low10": -0.01117069982469455
+    }
+   },
+   "pooled_trades": 209,
+   "pooled_mean": 0.000392727131392254,
+   "pooled_low10": -0.00508989477317121,
+   "pooled_low025": -0.007685888822626413,
+   "works": false,
+   "survives_bonferroni": false
+  },
+  "pos2_h40": {
+   "periods": {
+    "train": {
+     "trades": 184,
+     "mean_net_excess": -0.0015220001936272656,
+     "median_net_excess": -0.004872139652160154,
+     "win_rate_vs_universe": 0.4673913043478261,
+     "mean_net_raw": 0.02169395073395694,
+     "net_excess_low10": -0.011261419123014258
+    },
+    "validate": {
+     "trades": 159,
+     "mean_net_excess": 0.005823559167208919,
+     "median_net_excess": -0.012249241218485977,
+     "win_rate_vs_universe": 0.4339622641509434,
+     "mean_net_raw": 0.050815247575495576,
+     "net_excess_low10": -0.006340279279934703
+    },
+    "test": {
+     "trades": 104,
+     "mean_net_excess": 0.0010452378054288448,
+     "median_net_excess": 0.002580184159671596,
+     "win_rate_vs_universe": 0.5288461538461539,
+     "mean_net_raw": 0.034792400806575134,
+     "net_excess_low10": -0.007040144649388921
+    }
+   },
+   "pooled_trades": 447,
+   "pooled_mean": 0.001688149001618348,
+   "pooled_low10": -0.004143363268098577,
+   "pooled_low025": -0.0074038317166228015,
+   "works": false,
+   "survives_bonferroni": false
+  },
+  "pos4_h40": {
+   "periods": {
+    "train": {
+     "trades": 69,
+     "mean_net_excess": 0.01546019206708295,
+     "median_net_excess": 0.017573819259586614,
+     "win_rate_vs_universe": 0.5797101449275363,
+     "mean_net_raw": 0.0313641470410713,
+     "net_excess_low10": 0.002385360196288992
+    },
+    "validate": {
+     "trades": 85,
+     "mean_net_excess": 0.008375594873468213,
+     "median_net_excess": -0.0022945111417888384,
+     "win_rate_vs_universe": 0.47058823529411764,
+     "mean_net_raw": 0.059322574819173676,
+     "net_excess_low10": -0.007390589522107185
+    },
+    "test": {
+     "trades": 55,
+     "mean_net_excess": 0.005944506940262869,
+     "median_net_excess": 0.014859058236021157,
+     "win_rate_vs_universe": 0.6,
+     "mean_net_raw": 0.0338470857659066,
+     "net_excess_low10": -0.007809148527044255
+    }
+   },
+   "pooled_trades": 209,
+   "pooled_mean": 0.010074768892765457,
+   "pooled_low10": 0.0015195743680011886,
+   "pooled_low025": -0.0032354871497412693,
+   "works": true,
+   "survives_bonferroni": false
+  }
+ },
+ "drift_by_reaction_quintile": {
+  "Q1": {
+   "reaction_range": [
+    null,
+    -0.023308599924003113
+   ],
+   "events": 362,
+   "mean_reaction": -0.04584012847694334,
+   "mean_excess_20": -0.007287776221564903
+  },
+  "Q2": {
+   "reaction_range": [
+    -0.023308599924003113,
+    -0.0066038861915896615
+   ],
+   "events": 362,
+   "mean_reaction": -0.014080362213141585,
+   "mean_excess_20": 0.003306514546708025
+  },
+  "Q3": {
+   "reaction_range": [
+    -0.0066038861915896615,
+    0.005602298995198882
+   ],
+   "events": 362,
+   "mean_reaction": -0.0007924005497529395,
+   "mean_excess_20": 0.001055296814602854
+  },
+  "Q4": {
+   "reaction_range": [
+    0.005602298995198882,
+    0.02489378277246034
+   ],
+   "events": 362,
+   "mean_reaction": 0.01430842692942777,
+   "mean_excess_20": 0.0012180979718950098
+  },
+  "Q5": {
+   "reaction_range": [
+    0.02489378277246034,
+    null
+   ],
+   "events": 362,
+   "mean_reaction": 0.053113398159496755,
+   "mean_excess_20": 0.003947750206574272
+  }
+ }
+}

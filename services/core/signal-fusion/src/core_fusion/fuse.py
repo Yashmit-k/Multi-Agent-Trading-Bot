@@ -11,7 +11,7 @@ from contracts.schemas.agent_signal import AgentSignal
 _QUANTUM = Decimal("0.00000001")
 # Market-wide agents are filters on new buys (core_paper.cycle.market_risk_off), not per-stock votes:
 # the same market reading would otherwise be counted once for every stock. Default weight 0.
-MARKET_FILTER_AGENTS = frozenset({"regime"})
+MARKET_FILTER_AGENTS = frozenset({"regime", "global_markets"})
 
 
 @dataclass(frozen=True, slots=True)

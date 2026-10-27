@@ -46,6 +46,7 @@ export const AGENT_KIND: Record<string, "quant" | "llm" | "ml"> = {
   mean_reversion: "quant",
   volume: "quant",
   regime: "quant",
+  global_markets: "quant",
   ml: "ml",
   news: "llm",
   fundamental: "llm",

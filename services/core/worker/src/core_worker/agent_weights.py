@@ -17,7 +17,7 @@ from core_db.repository import CoreRepository
 logger = logging.getLogger(__name__)
 REFRESH = timedelta(hours=1)
 WINDOW_DAYS = 20
-MARKET_FILTER_AGENTS = frozenset({"regime"})
+MARKET_FILTER_AGENTS = frozenset({"regime", "global_markets"})
 # Priors from the pre-registered backtest (services/quant/docs/agent-tuning-result.md), used while an agent's live
 # record is unproven. Swing: no quant agent kept a validated edge. Intraday: the validated weights.
 BACKTEST_PRIORS: dict[Horizon, dict[str, float]] = {

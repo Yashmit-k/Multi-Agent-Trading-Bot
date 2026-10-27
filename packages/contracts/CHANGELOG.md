@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.0 - 2026-10-27
+
+Additive: agent id `global_markets`, the observe-only world-markets agent (services/quant/docs/global-markets-result.md).
+
 ## 1.1.0 - 2026-10-20
 
 Additive: the portfolio-manager review loop.

@@ -40,11 +40,13 @@ def create_app(settings: QuantSettings | None = None, *, sink: object | None = N
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        task = None
+        tasks = []
         if _can_publish(resolved) and app.state.sink is not None:
-            task = asyncio.create_task(_publish_loop(resolved, app.state.sink))
+            tasks.append(asyncio.create_task(_publish_loop(resolved, app.state.sink)))
+            if resolved.global_markets:
+                tasks.append(asyncio.create_task(_global_markets_loop(app.state.sink)))
         yield
-        if task is not None:
+        for task in tasks:
             task.cancel()
 
     app = FastAPI(title="Quant agents", version="1.0.0", lifespan=lifespan)
@@ -88,6 +90,28 @@ async def _publish_loop(settings: QuantSettings, sink: object) -> None:
         except Exception:
             logger.exception("quant paper pass failed")
         await asyncio.sleep(settings.eval_interval_seconds)
+
+
+async def _global_markets_loop(sink: object) -> None:
+    """Observe-only world-markets view at 08:45 and 09:10 IST (quant_agents.global_markets). Retries every 5 minutes."""
+    from datetime import datetime, timezone
+
+    from quant_agents import global_markets as gm
+
+    done: set = set()
+    retry_at = None
+    while True:
+        now = datetime.now(timezone.utc)
+        try:
+            slot = gm.due_slot(now, done, gm.trading_day)
+            if slot is not None and (retry_at is None or now >= retry_at):
+                await asyncio.to_thread(gm.run_once, sink, now, slot)
+                done.add((now.astimezone(gm.IST).date(), slot))
+                retry_at = None
+        except Exception:
+            logger.exception("global markets pass failed")
+            retry_at = now + gm.RETRY
+        await asyncio.sleep(60)
 
 
 app = create_app()

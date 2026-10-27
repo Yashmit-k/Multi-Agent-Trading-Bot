@@ -14,6 +14,7 @@ class AgentName(StrEnum):
     FUNDAMENTAL = "fundamental"
     VALUATION = "valuation"
     EARNINGS = "earnings"
+    GLOBAL_MARKETS = "global_markets"
 
 
 class Horizon(StrEnum):
