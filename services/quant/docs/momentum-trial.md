@@ -3,7 +3,7 @@
 Status: **set up 2026-10-28. The first decision is at the close of 2026-10-30, and the first fills at the open of 2026-11-02.** Paper only: no order is ever sent to a broker.
 
 **Book: ₹1,00,000 invested once, never topped up or withdrawn. At every month-end the whole book is split equally across the top 10** (changed 2026-10-29, before the first decision, to match how the owner plans to invest; first 20 × ₹20,000, then 10 × ₹10,000 fixed slots).
-- In the backtest this book grew ₹1,00,000 to ₹12,70,774 over 2016-02 to 2026-10: 26.7% a year, with a worst fall of 39% ([momentum-compound.md](momentum-compound.md)).
+- In the backtest this book, with the leftover filled, grew ₹1,00,000 to ₹12,78,473 over 2016-02 to 2026-10: 26.8% a year, with a worst fall of 39% ([momentum-compound.md](momentum-compound.md)).
 - The equal split was kept over "new buys only" after a pre-registered test ([momentum-rebalance-result.md](momentum-rebalance-result.md)).
 
 Why: 12-1 momentum was the only rule of 14 to pass [whole-market-result.md](whole-market-result.md). A backtest, however careful, can still be wrong in ways nobody has thought of. This trial runs the **same rule, unchanged**, on prices that did not exist when it was chosen.
@@ -16,13 +16,13 @@ Why: 12-1 momentum was the only rule of 14 to pass [whole-market-result.md](whol
 - **Score:** the return from 252 to 21 sessions ago, using corporate-action-adjusted prices.
 - **Portfolio:** the top 10, rebalanced at the next session's open.
   - Holdings that left the top 10 are sold; the rest are trimmed or topped up so that each of the 10 is one tenth of the whole book (cash included); new ones are bought.
-  - Whole shares only, so a high-priced stock can hold less than its tenth, and some cash can stay idle.
+  - Whole shares only. **The cash left by rounding then buys one more share at a time of the most underweight holding, until no share fits** (added 2026-10-29, before the first decision). This keeps idle cash near 0.1% instead of up to 13–20% while the book is small; see [momentum-compound.md](momentum-compound.md).
   - A stock that cannot be bought at that open is skipped and the next one taken: an open locked at the upper circuit, a price above one tenth of the book, or no EQ series.
   - A sell locked at the lower circuit waits.
 - **Costs:** Zerodha delivery charges, plus 10 bp of slippage each way.
 
 **Code:**
-- `quant_agents/momentum_trial.py` runs the book through `research.momentum_compound.simulate`, the backtest engine.
+- `quant_agents/momentum_trial.py` runs the book through `research.momentum_compound.simulate(fill_leftover=True)`, the backtest engine.
 - On the 2026-09 to 2026-10 data it reproduces that engine's 20 trades and final value exactly, from a two-year data window.
 - It runs as the `momentum-trial` service (`deploy/docker-compose.prod.yml`) with its own volume.
 

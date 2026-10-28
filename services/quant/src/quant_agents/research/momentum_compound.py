@@ -29,8 +29,10 @@ START = date(2016, 2, 1)
 OUT = er.ROOT / "services/quant/docs/results"
 
 
-def simulate(m: wm.Market, *, rebalance_holdings: bool = True, start: date = START, end: date | None = None) -> dict[str, object]:
-    """rebalance_holdings=False: holdings that stay in the top 10 are left alone; only new buys get an equal share."""
+def simulate(m: wm.Market, *, rebalance_holdings: bool = True, start: date = START, end: date | None = None, fill_leftover: bool = False) -> dict[str, object]:
+    """rebalance_holdings=False: holdings that stay in the top 10 are left alone; only new buys get an equal share.
+    fill_leftover=True: after the split, the cash left by whole-share rounding buys one more share at a time of the
+    most underweight holding that still fits, until no share fits."""
     p = m.p
     lo = int(np.searchsorted(p.days, start.toordinal()))
     hi = len(m.d) - 1 if end is None else int(np.searchsorted(p.days, end.toordinal(), side="right")) - 1
@@ -131,6 +133,24 @@ def simulate(m: wm.Market, *, rebalance_holdings: bool = True, start: date = STA
                     at_open[j] = at_open.get(j, 0.0) + qty * o
                     cost[j] = cost.get(j, 0.0) + amount + fee
                     trades.append({"day": m.d[t].isoformat(), "side": "BUY", "symbol": str(p.symbols[j]), "qty": qty, "price": price, "charges": fee})
+            if fill_leftover and plan:
+                extra: dict[int, int] = {}
+                while True:
+                    fits = [j for j in plan if j in at_open and not math.isnan(p.open[t, j]) and float(p.open[t, j]) * (1 + wm.SLIP) * 1.0013 <= cash - 50]
+                    if not fits:
+                        break
+                    j = min(fits, key=lambda k: at_open[k])
+                    price = float(p.open[t, j]) * (1 + wm.SLIP)
+                    cash -= price
+                    at_open[j] += float(p.open[t, j])
+                    extra[j] = extra.get(j, 0) + 1
+                for j, qty in extra.items():
+                    price = float(p.open[t, j]) * (1 + wm.SLIP)
+                    fee = delivery_charges(qty * price, 0.0)
+                    cash -= fee
+                    charges += fee
+                    cost[j] = cost.get(j, 0.0) + qty * price + fee
+                    trades.append({"day": m.d[t].isoformat(), "side": "BUY", "symbol": str(p.symbols[j]), "qty": qty, "price": price, "charges": fee, "note": "leftover"})
             # From the open to the close for everything held after the trades.
             held = {j: v * (float(p.close[t, j]) / float(p.open[t, j])) if not math.isnan(p.open[t, j]) else v for j, v in at_open.items()}
             plan = None

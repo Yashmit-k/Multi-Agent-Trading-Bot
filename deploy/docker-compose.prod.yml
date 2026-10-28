@@ -58,6 +58,7 @@ services:
       MOMENTUM_TRIAL_START: "2026-10-30"
       MOMENTUM_TRIAL_HOLD: "10"  # ₹1,00,000 invested once, split equally across 10 every month
       MOMENTUM_TRIAL_CAPITAL: "100000"
+      MOMENTUM_TRIAL_FILL: "true"  # leftover cash from whole-share rounding buys extra shares (momentum-compound.md)
     volumes:
       - momentum-trial-data:/data
     restart: unless-stopped

@@ -2,7 +2,8 @@
 
 The rule is the one that passed services/quant/docs/whole-market-result.md: the top HOLD (10) by 12-1 momentum at
 each month-end close. The book is ₹CAPITAL (₹1,00,000) invested once and never topped up; at every rebalance the whole
-book is split equally across the HOLD stocks (services/quant/docs/momentum-rebalance-result.md), traded at the next
+book is split equally across the HOLD stocks (services/quant/docs/momentum-rebalance-result.md), and the cash left by
+whole-share rounding buys one more share at a time of the most underweight holding (FILL), traded at the next
 open with Zerodha delivery charges and 10 bp slippage, by the backtest engine research.momentum_compound.simulate.
 Paper only: no order is ever sent to a broker.
 
@@ -39,8 +40,10 @@ RULE = "mom_12_1"
 RANKING_SHOWN = 40
 HOLD = int(os.environ.get("MOMENTUM_TRIAL_HOLD", "10"))
 CAPITAL = float(os.environ.get("MOMENTUM_TRIAL_CAPITAL", "100000"))
-# The same book in the backtest, ₹1 lakh once, equal split every month, 2016-02 to 2026-10 (momentum-compound.md).
-BACKTEST = {"period": "2016-02 to 2026-10", "cagr": 0.267, "max_drawdown": 0.39, "benchmark_cagr": 0.140, "niftybees_cagr": 0.123}
+FILL = os.environ.get("MOMENTUM_TRIAL_FILL", "true").strip().lower() not in {"0", "false", "no"}
+# The same book in the backtest, ₹1 lakh once, equal split every month with the leftover filled, 2016-02 to 2026-10
+# (momentum-compound.md).
+BACKTEST = {"period": "2016-02 to 2026-10", "cagr": 0.268, "max_drawdown": 0.39, "benchmark_cagr": 0.140, "niftybees_cagr": 0.123}
 
 
 def trading_day(day: date) -> bool:
@@ -137,7 +140,7 @@ def record_decisions(m, wm, now: datetime) -> list[str]:
 def report(m, wm, now: datetime, notes: list[str]) -> dict[str, object]:
     start_t = int(np.searchsorted(m.p.days, START.toordinal(), side="right"))  # first session after the decision
     hi = len(m.d) - 1
-    base = {"rule": f"12-1 momentum, top {HOLD} of the NSE Liquid-500, monthly", "method": "equal_split_compounding", "capital": CAPITAL, "hold": HOLD,
+    base = {"rule": f"12-1 momentum, top {HOLD} of the NSE Liquid-500, monthly", "method": "equal_split_compounding", "fill_leftover": FILL, "capital": CAPITAL, "hold": HOLD,
             "start_decision": START.isoformat(), "as_of_session": m.d[hi].isoformat(), "generated_at": now.isoformat(), "notes": notes, "paper_only": True,
             "next_decision": next_decision(m.d[hi]).isoformat(), "backtest": BACKTEST}
     if start_t > hi:
@@ -146,7 +149,7 @@ def report(m, wm, now: datetime, notes: list[str]) -> dict[str, object]:
     from quant_agents.research import momentum_compound as mc
 
     mc.HOLD, mc.CAPITAL = HOLD, CAPITAL
-    sim = mc.simulate(m, start=m.d[start_t])
+    sim = mc.simulate(m, start=m.d[start_t], fill_leftover=FILL)
     marks = sim["marks"]
     ends = [t for t in m.month_ends if start_t <= t <= hi] + ([hi] if hi not in m.month_ends else [])
     values = [CAPITAL] + [marks[t] for t in ends]

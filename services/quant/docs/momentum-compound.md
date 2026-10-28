@@ -48,3 +48,29 @@ Run 2026-10-29. Code: `quant_agents/research/momentum_compound.py`. Numbers: [re
 - **Charges grow with the book.** At ₹10 lakh, monthly trims and top-ups of 10 stocks cost about ₹1,000 a month (1.3% of the book a year). Most of that is STT (0.1% on each buy and sell) and the ₹15.34 DP charge per stock sold.
 - **"New buys only"** left holdings to run and did slightly better here (28.1%, with 40% fewer trades), but it was not part of a pre-registered test. The difference is within what chance alone could produce.
 - **Tax is not included.** Gains on stocks held under a year are taxed at 20% (short-term capital gains), and most positions here are held for months.
+
+## Filling the cash left by whole-share rounding (2026-10-29)
+
+**The option:** after the equal split, the leftover cash buys one more share at a time of the most underweight holding that still fits, until no share fits (`simulate(fill_leftover=True)`). Numbers: [results/momentum-fill-result.json](results/momentum-fill-result.json). All figures are after charges.
+
+| ₹1,00,000 once, 2016-02 to 2026-10 | Without fill | With fill |
+|---|---|---|
+| Final value | ₹12,70,774 | ₹12,78,473 |
+| CAGR | 26.70% | 26.77% |
+| Worst fall | 39.4% | 39.2% |
+| Charges | ₹68,404 | ₹68,828 |
+| Trades | 1,690 | 1,826 |
+| Idle cash, mean / worst | 0.27% / 2.9% | 0.04% / 0.2% |
+
+| Fresh ₹1,00,000 per period | Without fill | With fill |
+|---|---|---|
+| 2016-02–20 | ₹3,05,243 (25.4%), idle 0.5% | ₹3,06,084 (25.5%) |
+| 2021–23 | ₹2,44,700 (34.9%), idle 2.3% | ₹2,53,071 (36.4%) |
+| 2024–26 | ₹1,45,696 (14.2%), idle 6.8% | ₹1,52,147 (16.0%) |
+
+What this shows:
+- **The fill is not a better rule.** The monthly difference averages +0.005% (t = 0.43).
+- **It keeps the book fully invested.** That matters while the book is small, and today's leaders are expensive shares: up to 13–20% could otherwise sit idle.
+- Extra charges are small (about ₹400 over ten years). Top-up buys pay no DP charge.
+- It adds market exposure. A run started in January 2025 did 3 points a year worse with the fill.
+- **Adopted for the paper trial before its first decision**, to match how the book would be run by hand.
