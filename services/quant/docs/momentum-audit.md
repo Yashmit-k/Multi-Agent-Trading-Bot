@@ -1,5 +1,7 @@
 # 12-1 momentum backtest: audit for leaks and bias
 
+> **Correction 2026-10-29:** the CAGRs and drawdowns here compound returns measured on a *fixed* capital, with a fixed ₹ amount per new position and profits not reinvested. That is fine for comparing rules, so the verdicts stand, but it **overstates what a one-time investment would grow to**. For ₹1 lakh invested once and split equally across the 10 every month, see [momentum-compound.md](momentum-compound.md): 26.7% a year, worst fall 39%.
+
 Run 2026-10-28. Code: `quant_agents/research/momentum_audit.py`. Numbers: [results/momentum-audit-result.json](results/momentum-audit-result.json).
 
 The full backtest, as one continuous book from 2016-02-01 to 2026-10-27:

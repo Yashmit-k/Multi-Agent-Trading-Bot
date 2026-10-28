@@ -17,6 +17,9 @@ export type TrialReport = {
   capital?: number;
   hold?: number;
   position?: number;
+  method?: string;
+  equity?: number;
+  cash?: number;
   return?: number;
   benchmark_return?: number;
   niftybees_return?: number;
@@ -49,7 +52,11 @@ export default async function MomentumTrialPage() {
   return (
     <PageFrame
       title="Momentum trial"
-      description={`Top ${hold} of NSE's 500 most liquid stocks by 12-month momentum, rebalanced monthly. ${report.capital ? `${formatInr(report.capital)} of paper money` : "Paper money"}${report.position ? ` (${formatInr(report.position)} a stock)` : ""}: no real orders are placed.`}
+      description={
+        report.method === "equal_split_compounding"
+          ? `Top ${hold} of NSE's 500 most liquid stocks by 12-month momentum. ${formatInr(report.capital ?? 100000)} invested once; every month the whole amount is split equally across the ${hold}. Paper money: no real orders are placed.`
+          : `Top ${hold} of NSE's 500 most liquid stocks by 12-month momentum, rebalanced monthly. Paper money: no real orders are placed.`
+      }
     >
       <Card title="Status" right={<Badge tone="info">PAPER ONLY</Badge>}>
         <p data-testid="trial-status" className="text-sm text-[#E6EDF3]">
@@ -57,6 +64,12 @@ export default async function MomentumTrialPage() {
           {report.as_of_session ? <span className="text-[#94A3B8]"> · data to {day(report.as_of_session)}</span> : null}
         </p>
         {report.next_decision ? <p className="text-xs text-[#94A3B8]">Next decision: close of {day(report.next_decision)}</p> : null}
+        {running && report.equity !== undefined ? (
+          <p data-testid="trial-value" className="mt-1 text-sm text-[#E6EDF3]">
+            Value {formatInr(report.equity)}
+            {report.cash !== undefined ? <span className="text-[#94A3B8]"> · cash {formatInr(report.cash)}</span> : null}
+          </p>
+        ) : null}
       </Card>
 
       <div className="grid gap-3 sm:grid-cols-3">

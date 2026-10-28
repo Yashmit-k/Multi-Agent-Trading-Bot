@@ -1,5 +1,7 @@
 # Published anomalies across the whole Indian market and across asset classes: result
 
+> **Correction 2026-10-29:** the CAGRs and drawdowns here compound returns measured on a *fixed* capital, with a fixed ₹ amount per new position and profits not reinvested. That is fine for comparing rules, so the verdicts stand, but it **overstates what a one-time investment would grow to**. For ₹1 lakh invested once and split equally across the 10 every month, see [momentum-compound.md](momentum-compound.md): 26.7% a year, worst fall 39%.
+
 Protocol: [whole-market-protocol.md](whole-market-protocol.md), pre-registered 2026-10-28, with Amendment A (corporate actions) made before scoring. Scored once. Numbers: [results/whole-market-result.json](results/whole-market-result.json). Code: `quant_agents/research/bhavcopy.py` (data) and `quant_agents/research/whole_market.py` (study).
 
 Data:

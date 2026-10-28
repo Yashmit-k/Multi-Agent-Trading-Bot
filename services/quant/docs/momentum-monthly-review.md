@@ -1,5 +1,7 @@
 # 12-1 momentum backtest: month by month
 
+> **Correction 2026-10-29:** the CAGRs and drawdowns here compound returns measured on a *fixed* capital, with a fixed ₹ amount per new position and profits not reinvested. That is fine for comparing rules, so the verdicts stand, but it **overstates what a one-time investment would grow to**. For ₹1 lakh invested once and split equally across the 10 every month, see [momentum-compound.md](momentum-compound.md): 26.7% a year, worst fall 39%.
+
 One continuous book, ₹4,00,000, top 20 of the NSE Liquid-500. Net of charges and slippage. Code: `quant_agents/research/momentum_months.py`. Monthly figures are return on the ₹4,00,000 capital; the year column compounds them. The "why" labels come from a fixed rule (below), not from hindsight judgement. **Everything here is descriptive: no pattern below is a tested trading rule.**
 
 ## Momentum, net
