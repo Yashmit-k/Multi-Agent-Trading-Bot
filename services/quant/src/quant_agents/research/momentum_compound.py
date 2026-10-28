@@ -29,10 +29,12 @@ START = date(2016, 2, 1)
 OUT = er.ROOT / "services/quant/docs/results"
 
 
-def simulate(m: wm.Market, *, rebalance_holdings: bool = True, start: date = START, end: date | None = None, fill_leftover: bool = False) -> dict[str, object]:
+def simulate(m: wm.Market, *, rebalance_holdings: bool = True, start: date = START, end: date | None = None, fill_leftover: bool = False, park=None) -> dict[str, object]:
     """rebalance_holdings=False: holdings that stay in the top 10 are left alone; only new buys get an equal share.
     fill_leftover=True: after the split, the cash left by whole-share rounding buys one more share at a time of the
-    most underweight holding that still fits, until no share fits."""
+    most underweight holding that still fits, until no share fits.
+    park: optional callable (t) -> chain or None; when it returns a chain, the whole book is held in that one security
+    for the month (used to hold NIFTYBEES instead of the stocks)."""
     p = m.p
     lo = int(np.searchsorted(p.days, start.toordinal()))
     hi = len(m.d) - 1 if end is None else int(np.searchsorted(p.days, end.toordinal(), side="right")) - 1
@@ -56,6 +58,9 @@ def simulate(m: wm.Market, *, rebalance_holdings: bool = True, start: date = STA
     def choose(t: int) -> list[int]:
         """At the close of t: the top 10 that can be bought at the open of t + 1 (holdings count as they are)."""
         value = cash + sum(held.values())
+        parked = park(t) if park is not None else None
+        if parked is not None:
+            return [parked]
         target: list[int] = []
         for j in ranked(t):
             if len(target) == HOLD:
