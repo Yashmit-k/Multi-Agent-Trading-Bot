@@ -54,6 +54,25 @@ docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml exec mome
   - a loss far outside the backtest's range: worse than −40% in a single month (the 10-stock backtests' worst was −31%; set before the first decision).
 - Any real-money use is a separate decision. It would need its own review of tax, which the trial does not model: short-term capital gains are taxed at 20%.
 
+## Second book: momentum + delivery filter (added 2026-10-29, before the first decision)
+
+**Rule:** the same as above, except that each month the **top 30** by 12-1 are re-ordered by their mean delivery % over the last 63 sessions, and the **10 highest** are taken. The other 20 follow in 12-1 order as fallbacks.
+- Delivery data comes from NSE `sec_bhavdata_full`, downloaded each evening from 2026-06-01 into `delivery/`.
+- A month-end decision is recorded only once that day's delivery file is in, so a partial ranking can never be locked in.
+
+**Why:** variant V5 of [momentum-variants-protocol.md](momentum-variants-protocol.md).
+- It beat the plain rule in all three of its 2020–2026 periods, but **failed the multiple-testing bound** (t = 1.59): [momentum-variants-result.md](momentum-variants-result.md) and [momentum-delivery-detail.md](momentum-delivery-detail.md).
+- This book is the independent forward evidence that the backtest cannot give.
+
+**Separate files:** its decisions go to `decisions-delivery.jsonl`, and its report to `report.json["delivery_book"]`. The plain book is unchanged.
+- On 2026-09 to 2026-10 data it reproduces the research engine's 21 trades and final value exactly.
+
+**How it will be judged (fixed now):**
+- At 12 and at 24 completed months (closes of 2027-10-29 and 2028-10-31), compare its net return with the plain book's and the benchmark's.
+- It **supports the delivery filter** only if it beats **both** over 24 months.
+- A 12-month lead alone is not enough: the backtest's lead came in a few strong years.
+- The early-review triggers are those of the plain book.
+
 ## Known limits
 
 - **Holidays:** the NSE holiday list (`calendar/static_nse.py`) covers 2026. **It must be extended with the 2027 holidays before January 2027.** Without them a holiday is taken as a trading day, so a month-end that falls on one would be found a day late.

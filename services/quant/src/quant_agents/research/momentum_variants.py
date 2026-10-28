@@ -68,7 +68,7 @@ def low_volume_ratio(m, t, cols):
         return -(np.nanmean(qty[-63:], axis=0) / np.nanmean(qty, axis=0))
 
 
-def load_delivery(m) -> np.ndarray:
+def load_delivery(m, folder: Path | None = None) -> np.ndarray:
     """Delivery % on the panel grid (NaN where missing), matched by symbol and checked against that day's close."""
     p = m.p
     grid = np.full(p.close.shape, np.nan, dtype=np.float32)
@@ -77,7 +77,7 @@ def load_delivery(m) -> np.ndarray:
         by_symbol.setdefault(str(s), []).append(j)
     day_index = {int(d): k for k, d in enumerate(p.days)}
     matched = unmatched = 0
-    for path in sorted(Path(DELIVERY).glob("*.csv")):
+    for path in sorted(Path(folder or DELIVERY).glob("*.csv")):
         k = day_index.get(date.fromisoformat(path.stem).toordinal())
         if k is None:
             continue

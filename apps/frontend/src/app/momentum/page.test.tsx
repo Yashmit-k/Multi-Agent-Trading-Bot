@@ -30,4 +30,15 @@ describe("momentum trial page", () => {
     expect(screen.getByText(/invested once; every month the whole amount is split equally across the 10/)).toBeTruthy();
     expect(screen.getByText(/worst fall −39.0%/)).toBeTruthy();
   });
+
+  it("shows the delivery book as a second section when present", async () => {
+    fetchApi.mockResolvedValueOnce({
+      status: "waiting for the first open", hold: 10, pending_ranking: [{ rank: 1, symbol: "CUPID" }],
+      delivery_book: { status: "waiting for the first open", hold: 10, pending_ranking: [{ rank: 1, symbol: "LAURUSLABS" }] },
+    });
+    render(await MomentumTrialPage());
+    expect(screen.getByText("Second book: momentum + delivery filter")).toBeTruthy();
+    expect(screen.getByTestId("delivery-status").textContent).toContain("Waiting");
+    expect(screen.getByText("LAURUSLABS")).toBeTruthy();
+  });
 });

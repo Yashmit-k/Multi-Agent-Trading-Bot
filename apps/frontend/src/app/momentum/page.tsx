@@ -27,6 +27,7 @@ export type TrialReport = {
   months?: Month[];
   pending_ranking?: Array<{ rank: number; symbol: string }>;
   backtest?: Backtest;
+  delivery_book?: TrialReport;
 };
 
 const pct = (value: number | null | undefined) =>
@@ -46,8 +47,6 @@ export default async function MomentumTrialPage() {
       </PageFrame>
     );
   }
-  const running = report.status === "running";
-  const holdings = report.holdings ?? [];
   const hold = report.hold ?? 10;
   return (
     <PageFrame
@@ -58,14 +57,36 @@ export default async function MomentumTrialPage() {
           : `Top ${hold} of NSE's 500 most liquid stocks by 12-month momentum, rebalanced monthly. Paper money: no real orders are placed.`
       }
     >
+      <Book report={report} id="trial" />
+
+      {report.delivery_book ? (
+        <>
+          <h2 className="pt-4 text-lg font-semibold text-[#E6EDF3]">Second book: momentum + delivery filter</h2>
+          <p className="text-sm text-[#94A3B8]">
+            Same ₹1,00,000 and rules, but from the top 30 by momentum it buys the {hold} with the highest 3-month delivery % (the share bought for keeping, not traded the same
+            day). Tested in the backtest but not proven, so it runs on paper alongside the plain book.
+          </p>
+          <Book report={report.delivery_book} id="delivery" />
+        </>
+      ) : null}
+    </PageFrame>
+  );
+}
+
+function Book({ report, id }: { report: TrialReport; id: string }) {
+  const running = report.status === "running";
+  const holdings = report.holdings ?? [];
+  const hold = report.hold ?? 10;
+  return (
+    <>
       <Card title="Status" right={<Badge tone="info">PAPER ONLY</Badge>}>
-        <p data-testid="trial-status" className="text-sm text-[#E6EDF3]">
+        <p data-testid={`${id}-status`} className="text-sm text-[#E6EDF3]">
           {report.status === "not started" ? "Not started yet." : running ? "Running" : "Waiting for the first trade"}
           {report.as_of_session ? <span className="text-[#94A3B8]"> · data to {day(report.as_of_session)}</span> : null}
         </p>
         {report.next_decision ? <p className="text-xs text-[#94A3B8]">Next decision: close of {day(report.next_decision)}</p> : null}
         {running && report.equity !== undefined ? (
-          <p data-testid="trial-value" className="mt-1 text-sm text-[#E6EDF3]">
+          <p data-testid={`${id}-value`} className="mt-1 text-sm text-[#E6EDF3]">
             Value {formatInr(report.equity)}
             {report.cash !== undefined ? <span className="text-[#94A3B8]"> · cash {formatInr(report.cash)}</span> : null}
           </p>
@@ -128,6 +149,6 @@ export default async function MomentumTrialPage() {
           {pct(-report.backtest.max_drawdown)}. Judged after 12 months (Oct 2027).
         </p>
       ) : null}
-    </PageFrame>
+    </>
   );
 }
