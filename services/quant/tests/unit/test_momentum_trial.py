@@ -33,3 +33,9 @@ def test_decisions_are_recorded_once_and_changes_flagged(tmp_path, monkeypatch) 
     monkeypatch.setattr(mt, "ranking", lambda m, wm, t: [{"rank": 1, "symbol": "BBB", "score": 2.0, "close": 5.0}])
     assert mt.record_decisions(m, None, now)[0].startswith("WARNING")
     assert len((tmp_path / "decisions.jsonl").read_text().splitlines()) == 1
+
+
+def test_next_decision_is_the_month_end_session() -> None:
+    assert mt.next_decision(date(2026, 10, 28)) == date(2026, 10, 30)
+    assert mt.next_decision(date(2026, 10, 30)) == date(2026, 11, 30)
+    assert mt.month_end_session(date(2026, 3, 5)) == date(2026, 3, 30)  # 31 Mar 2026 is an NSE holiday

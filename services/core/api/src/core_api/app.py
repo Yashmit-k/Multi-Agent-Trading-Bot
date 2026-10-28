@@ -1,6 +1,7 @@
 """Core HTTP API. Unfinished product routes return 501."""
 
 import asyncio
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -204,6 +205,17 @@ def create_app(
     @app.get("/api/v1/signals/latest")
     def latest_signals(_: Annotated[None, Depends(require_user)]) -> list[dict]:
         return repository.latest_signal_per_agent()
+
+    @app.get("/api/v1/momentum-trial")
+    def momentum_trial(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        """The momentum paper trial's latest report (quant_agents.momentum_trial), read from its shared volume."""
+        path = Path(os.environ.get("MOMENTUM_TRIAL_REPORT", "/momentum-trial/momentum-trial/report.json"))
+        try:
+            return json.loads(path.read_text())
+        except FileNotFoundError:
+            return {"status": "not started"}
+        except (OSError, ValueError) as exc:
+            raise HTTPException(status_code=503, detail="momentum_trial_unreadable") from exc
 
     @app.get("/api/v1/signals/{symbol}")
     def signals_for_symbol(symbol: str, _: Annotated[None, Depends(require_user)]) -> list[dict[str, object]]:

@@ -11,7 +11,7 @@ const GROUPS: ReadonlyArray<readonly [string, ReadonlyArray<NavLink>]> = [
   ["Trading", [["/dashboard", "Overview"], ["/portfolio", "Portfolio"], ["/positions", "Positions"], ["/orders", "Orders"], ["/journal", "Journal"], ["/risk", "Risk"]]],
   ["Agents", [["/agents", "Agents"], ["/manager", "Portfolio manager"], ["/trace", "Agent trace"], ["/signals", "Signals"], ["/news", "News"]]],
   ["Market", [["/market", "Market"], ["/stocks", "Stocks"], ["/watchlist", "Watchlist"]]],
-  ["Strategies", [["/strategies", "Strategy lab"]]],
+  ["Strategies", [["/strategies", "Strategy lab"], ["/momentum", "Momentum trial"]]],
   ["System", [["/system", "Health"], ["/settings", "Settings"]]],
 ];
 

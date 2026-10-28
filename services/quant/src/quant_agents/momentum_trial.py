@@ -50,6 +50,22 @@ def next_session(day: date) -> date:
     return nxt
 
 
+def month_end_session(day: date) -> date:
+    """The last NSE session of day's month."""
+    last = (day.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    while not trading_day(last):
+        last -= timedelta(days=1)
+    return last
+
+
+def next_decision(as_of: date) -> date:
+    """The next month-end close at which a ranking will be recorded (this month's, or next month's once made)."""
+    this = month_end_session(as_of)
+    if as_of < this:
+        return this
+    return month_end_session(this + timedelta(days=7))
+
+
 def sync(raw: Path, today: date) -> int:
     """Fetch missing files. A 404 on a past non-trading day is recorded; on a trading day it is retried later."""
     from quant_agents.research.bhavcopy import fetch_day
@@ -116,7 +132,9 @@ def report(m, wm, now: datetime, notes: list[str]) -> dict[str, object]:
     start_t = int(np.searchsorted(m.p.days, START.toordinal(), side="right"))  # first session after the decision
     hi = len(m.d) - 1
     base = {"rule": "12-1 momentum, top 20 of the NSE Liquid-500, monthly", "capital": wm.NOTIONAL * wm.HOLD, "start_decision": START.isoformat(),
-            "as_of_session": m.d[hi].isoformat(), "generated_at": now.isoformat(), "notes": notes, "paper_only": True}
+            "as_of_session": m.d[hi].isoformat(), "generated_at": now.isoformat(), "notes": notes, "paper_only": True,
+            "next_decision": next_decision(m.d[hi]).isoformat(),
+            "backtest": {"period": "2016-02 to 2026-10", "cagr": 0.348, "benchmark_cagr": 0.139, "niftybees_cagr": 0.123, "max_drawdown": 0.58}}
     if start_t > hi:
         decision = next((json.loads(line) for line in (DIR / "decisions.jsonl").read_text().splitlines()[::-1]), None) if (DIR / "decisions.jsonl").exists() else None
         return {**base, "status": "waiting for the first open", "pending_ranking": (decision or {}).get("ranking", [])[:25]}
