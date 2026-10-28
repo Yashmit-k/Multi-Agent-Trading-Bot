@@ -190,6 +190,7 @@ services:
       QUANT_SYMBOLS: *nifty50
       QUANT_HORIZON: INTRADAY
       QUANT_TIMEFRAME: 5m
+      QUANT_GLOBAL_MARKETS: "false"  # the global-markets agent runs once, in the quant service
       QUANT_EVAL_INTERVAL_SECONDS: "300"
       CORE_API_URL: http://core-api:8000
     depends_on:

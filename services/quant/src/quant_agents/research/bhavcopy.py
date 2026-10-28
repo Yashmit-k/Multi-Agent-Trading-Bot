@@ -66,8 +66,8 @@ class Panel:
             return self.close / self.prev - 1
 
 
-def build() -> Panel:
-    files = sorted(RAW.glob("*.zip"))
+def build(folder: Path | None = None) -> Panel:
+    files = sorted((folder or RAW).glob("*.zip"))
     by_isin: dict[str, int] = {}
     by_symbol: dict[str, int] = {}
     symbols: list[str] = []
@@ -111,13 +111,43 @@ def build() -> Panel:
     return Panel(np.array([d for d, _ in daily]), np.array(symbols), np.array(etf), series, **fields)
 
 
-def save(panel: Panel) -> None:
-    np.savez_compressed(PANEL, **{k: getattr(panel, k) for k in ("days", "symbols", "etf", "series", "open", "high", "low", "close", "prev", "value")})
+def save(panel: Panel, path: Path | None = None) -> None:
+    np.savez_compressed(path or PANEL, **{k: getattr(panel, k) for k in ("days", "symbols", "etf", "series", "open", "high", "low", "close", "prev", "value")})
 
 
-def load() -> Panel:
-    z = np.load(PANEL, allow_pickle=False)
+def load(path: Path | None = None) -> Panel:
+    z = np.load(path or PANEL, allow_pickle=False)
     return Panel(**{k: z[k] for k in z.files})
+
+
+UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+UDIFF_FROM = date(2024, 7, 8)
+
+
+def url_for(day: date) -> str:
+    if day < UDIFF_FROM:
+        return f"https://nsearchives.nseindia.com/content/historical/EQUITIES/{day.year}/{day.strftime('%b').upper()}/cm{day.strftime('%d%b%Y').upper()}bhav.csv.zip"
+    return f"https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{day.strftime('%Y%m%d')}_F_0000.csv.zip"
+
+
+def fetch_day(day: date, folder: Path, *, timeout: float = 30.0) -> bool | None:
+    """Download one day's bhavcopy into folder/<date>.zip. True: saved; False: NSE has no file (404); None: other failure."""
+    import urllib.error
+    import urllib.request
+
+    folder.mkdir(parents=True, exist_ok=True)
+    target = folder / f"{day.isoformat()}.zip"
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url_for(day), headers={"User-Agent": UA}), timeout=timeout) as response:
+            body = response.read()
+    except urllib.error.HTTPError as exc:
+        return False if exc.code == 404 else None
+    except Exception:  # noqa: BLE001 - network trouble: retried by the caller
+        return None
+    if not body.startswith(b"PK"):
+        return None
+    target.write_bytes(body)
+    return True
 
 
 if __name__ == "__main__":

@@ -44,6 +44,20 @@ services:
     ports: !reset []
     restart: unless-stopped
 
+  # Forward paper trial of 12-1 momentum across the NSE Liquid-500 (services/quant/docs/momentum-trial.md).
+  # Paper only: it reads NSE's public bhavcopies and never talks to a broker.
+  momentum-trial:
+    build:
+      context: .
+      dockerfile: services/quant/Dockerfile
+    command: ["python", "-m", "quant_agents.momentum_trial"]
+    environment:
+      MOMENTUM_TRIAL_DIR: /data/momentum-trial
+      MOMENTUM_TRIAL_START: "2026-10-30"
+    volumes:
+      - momentum-trial-data:/data
+    restart: unless-stopped
+
   frontend:
     ports: !reset []
     restart: unless-stopped
@@ -66,3 +80,4 @@ services:
 volumes:
   caddy-data:
   caddy-config:
+  momentum-trial-data:

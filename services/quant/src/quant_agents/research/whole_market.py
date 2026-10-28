@@ -162,9 +162,18 @@ def _locked(m: Market, t: int, j: int, up: bool) -> bool:
 
 
 def simulate_stocks(m: Market, rule: str, label: str) -> dict[str, object]:
-    """Fixed-capital P&L: each day, sells at the open, then buys at the open, then holdings roll to the close."""
     lo, hi = m.period(label, rule)
+    return simulate_range(m, rule, lo, hi)
+
+
+def simulate_range(m: Market, rule: str, lo: int, hi: int) -> dict[str, object]:
+    """Fixed-capital P&L: each day, sells at the open, then buys at the open, then holdings roll to the close.
+
+    Plans at lo - 1 when that is a month-end, so a book that starts the day after a month-end is invested at once.
+    """
     p = m.p
+    paid: dict[int, float] = {}  # chain -> rupees paid, including charges
+    trades: list[dict[str, object]] = []
     held: dict[int, float] = {}  # chain -> value at the last close
     stale: dict[int, int] = {}
     pnl = charges = 0.0
@@ -203,9 +212,11 @@ def simulate_stocks(m: Market, rule: str, label: str) -> dict[str, object]:
                 stale[j] = stale.get(j, 0) + 1
                 if stale[j] >= 21:  # stopped trading: sold at the last close
                     fee = delivery_charges(0.0, held[j])
-                    pnl += held.pop(j) - fee
+                    value = held.pop(j)
+                    pnl += value - fee
                     charges += fee
                     want_sell.discard(j)
+                    trades.append({"day": m.d[t].isoformat(), "side": "SELL", "symbol": str(p.symbols[j]), "value": value, "charges": fee, "pnl": value - fee - paid.pop(j, 0.0), "note": "stopped trading"})
                 continue
             if _locked(m, t, j, up=False):
                 continue  # locked at the lower circuit: try again tomorrow
@@ -214,6 +225,7 @@ def simulate_stocks(m: Market, rule: str, label: str) -> dict[str, object]:
             pnl += value - fee
             charges += fee
             want_sell.discard(j)
+            trades.append({"day": m.d[t].isoformat(), "side": "SELL", "symbol": str(p.symbols[j]), "value": value, "charges": fee, "pnl": value - fee - paid.pop(j, 0.0)})
         for j in held:
             r = m.r[t, j]
             if j in start and not math.isnan(r):
@@ -226,15 +238,21 @@ def simulate_stocks(m: Market, rule: str, label: str) -> dict[str, object]:
             pnl -= cost + fee
             charges += fee
             held[j] = qty * float(p.close[t, j])
+            paid[j] = cost + fee
             buys += 1
+            trades.append({"day": m.d[t].isoformat(), "side": "BUY", "symbol": str(p.symbols[j]), "qty": qty, "price": price, "value": cost, "charges": fee})
         to_buy = []
         marks[t] = pnl + sum(held.values())
         if t in m.members and t < hi:
             want_sell, to_buy = plan(t, want_sell)
     final = sum(held.values())
     fee = sum(delivery_charges(0.0, v) for v in held.values())
-    marks[hi] = pnl + final - fee
-    return {"marks": marks, "capital": NOTIONAL * HOLD, "charges": charges + fee, "buys": buys, "lo": lo, "hi": hi}
+    open_marks = dict(marks)
+    if hi in marks:
+        marks[hi] = pnl + final - fee  # liquidated at the end, for the backtest's totals
+    holdings = [{"symbol": str(p.symbols[j]), "value": v, "cost": paid.get(j, 0.0), "pending_sell": j in want_sell} for j, v in held.items()]
+    return {"marks": marks, "open_marks": open_marks, "capital": NOTIONAL * HOLD, "charges": charges + fee, "buys": buys, "lo": lo, "hi": hi,
+            "holdings": holdings, "trades": trades, "pending_buys": [str(p.symbols[j]) for j in to_buy], "pending_sells": [str(p.symbols[j]) for j in want_sell]}
 
 
 def monthly(m: Market, marks: dict[int, float], capital: float, lo: int, hi: int) -> list[tuple[int, float]]:
