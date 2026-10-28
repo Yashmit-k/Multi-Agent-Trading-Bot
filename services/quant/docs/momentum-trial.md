@@ -2,6 +2,8 @@
 
 Status: **set up 2026-10-28. The first decision is at the close of 2026-10-30, and the first fills at the open of 2026-11-02.** Paper only: no order is ever sent to a broker.
 
+**Size: 10 stocks × ₹10,000 = ₹1,00,000** (changed 2026-10-29 from 20 × ₹20,000, before the first decision, to match the owner's planned capital). In the backtest this book returned 34.5% a year (2016-02 to 2026-10), with a worst fall of 50%, a worst month of −31% and charges of about 1.75% of capital a year. The 20 × ₹20,000 book returned 34.8% a year, with a worst fall of 58%.
+
 Why: 12-1 momentum was the only rule of 14 to pass [whole-market-result.md](whole-market-result.md). A backtest, however careful, can still be wrong in ways nobody has thought of. This trial runs the **same rule, unchanged**, on prices that did not exist when it was chosen.
 
 ## The rule (exactly the backtest's)
@@ -10,9 +12,9 @@ Why: 12-1 momentum was the only rule of 14 to pass [whole-market-result.md](whol
   - Liquidity is median daily traded value over 126 sessions.
   - Also required: close ≥ ₹20, not an ETF, and a return on at least 240 of the last 252 sessions.
 - **Score:** the return from 252 to 21 sessions ago, using corporate-action-adjusted prices.
-- **Portfolio:** the top 20, ₹20,000 each (₹4,00,000 capital), bought at the next session's open.
-  - A stock that cannot be bought at that open is skipped and the next one taken: an open locked at the upper circuit, a price above ₹20,000, or no EQ series.
-  - Holdings that leave the top 20 are sold at that open. A sell locked at the lower circuit waits a day.
+- **Portfolio:** the top 10, ₹10,000 each (₹1,00,000 capital), bought at the next session's open.
+  - A stock that cannot be bought at that open is skipped and the next one taken: an open locked at the upper circuit, a price above ₹10,000, or no EQ series.
+  - Holdings that leave the top 10 are sold at that open. A sell locked at the lower circuit waits a day.
 - **Costs:** Zerodha delivery charges, plus 10 bp of slippage each way.
 
 **Code:**
@@ -45,11 +47,12 @@ docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml exec mome
 - **Not a reason to stop or change the rule:** a losing month or a losing stretch. The backtest lost money in 5 of 11 years and fell 58% in 2018–20.
 - **Reasons to review early:**
   - a data or engine fault (a flagged ranking mismatch, missing files, or a broken corporate-action adjustment);
-  - a loss far outside the backtest's range: worse than −35% in a single month (the backtest's worst was −27%).
+  - a loss far outside the backtest's range: worse than −40% in a single month (the 10-stock backtest's worst was −31%; set before the first decision).
 - Any real-money use is a separate decision. It would need its own review of tax, which the trial does not model: short-term capital gains are taxed at 20%.
 
 ## Known limits
 
 - **Holidays:** the NSE holiday list (`calendar/static_nse.py`) covers 2026. **It must be extended with the 2027 holidays before January 2027.** Without them a holiday is taken as a trading day, so a month-end that falls on one would be found a day late.
 - **Dividends** are not included, for the strategy or the benchmark.
-- Fills are paper fills at the actual NSE open of the day, with slippage. Real fills of ₹20,000 in a 500th-ranked stock should be close, but are not guaranteed.
+- Fills are paper fills at the actual NSE open of the day, with slippage. Real fills of ₹10,000 in a 500th-ranked stock should be close, but are not guaranteed.
+- A 10-stock book is concentrated: each stock is 10% of it. In the backtest its worst single month was −31%.

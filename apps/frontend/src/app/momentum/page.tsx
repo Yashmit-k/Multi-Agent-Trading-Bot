@@ -15,6 +15,8 @@ export type TrialReport = {
   as_of_session?: string;
   next_decision?: string;
   capital?: number;
+  hold?: number;
+  position?: number;
   return?: number;
   benchmark_return?: number;
   niftybees_return?: number;
@@ -43,10 +45,11 @@ export default async function MomentumTrialPage() {
   }
   const running = report.status === "running";
   const holdings = report.holdings ?? [];
+  const hold = report.hold ?? 10;
   return (
     <PageFrame
       title="Momentum trial"
-      description="Top 20 of NSE's 500 most liquid stocks by 12-month momentum, rebalanced monthly. ₹4,00,000 of paper money: no real orders are placed."
+      description={`Top ${hold} of NSE's 500 most liquid stocks by 12-month momentum, rebalanced monthly. ${report.capital ? `${formatInr(report.capital)} of paper money` : "Paper money"}${report.position ? ` (${formatInr(report.position)} a stock)` : ""}: no real orders are placed.`}
     >
       <Card title="Status" right={<Badge tone="info">PAPER ONLY</Badge>}>
         <p data-testid="trial-status" className="text-sm text-[#E6EDF3]">
@@ -86,8 +89,8 @@ export default async function MomentumTrialPage() {
         </Card>
       ) : report.pending_ranking?.length ? (
         <Card title="To be bought at the next open">
-          <p className="text-sm text-[#CBD5E1]">{report.pending_ranking.slice(0, 20).map((r) => r.symbol).join(", ")}</p>
-          <p className="mt-1 text-xs text-[#94A3B8]">The first 20 that can be bought at that open, in this order.</p>
+          <p className="text-sm text-[#CBD5E1]">{report.pending_ranking.slice(0, hold).map((r) => r.symbol).join(", ")}</p>
+          <p className="mt-1 text-xs text-[#94A3B8]">{`The first ${hold} that can be bought at that open, in this order.`}</p>
         </Card>
       ) : null}
 
@@ -106,7 +109,7 @@ export default async function MomentumTrialPage() {
         </Card>
       ) : null}
 
-      {report.backtest ? (
+      {report.backtest?.cagr !== undefined ? (
         <p className="text-xs text-[#94A3B8]">
           Backtest {report.backtest.period}: {pct(report.backtest.cagr)} a year against {pct(report.backtest.benchmark_cagr)} for the benchmark, worst fall{" "}
           {pct(-report.backtest.max_drawdown)}. Judged after 12 months (Oct 2027).

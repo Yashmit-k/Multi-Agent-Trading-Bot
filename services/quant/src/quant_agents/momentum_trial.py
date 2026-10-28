@@ -1,13 +1,14 @@
 """Forward paper trial of 12-1 momentum across the NSE Liquid-500 (services/quant/docs/momentum-trial.md).
 
 The rule is the one that passed services/quant/docs/whole-market-result.md, run by the same engine
-(research.whole_market.simulate_range): top 20 by 12-1 momentum at each month-end close, ₹20,000 each, bought at the
-next open with Zerodha delivery charges and 10 bp slippage. Paper only: no order is ever sent to a broker.
+(research.whole_market.simulate_range): the top HOLD by 12-1 momentum at each month-end close, POSITION rupees each
+(default 10 x ₹10,000), bought at the next open with Zerodha delivery charges and 10 bp slippage. Paper only: no
+order is ever sent to a broker.
 
 Each evening (after NSE publishes the day's bhavcopy) it:
   1. downloads any missing bhavcopies into DIR/raw (a rolling window from FETCH_FROM);
   2. on the last session of a month, appends that close's full ranking to DIR/decisions.jsonl before the next open
-     (the pre-commitment; fills then take the first 20 that can be bought at that open, as in the backtest);
+     (the pre-commitment; fills then take the first HOLD that can be bought at that open, as in the backtest);
   3. re-runs the book from START on the data and writes DIR/report.json: equity, holdings, trades, and the
      equal-weight Liquid-500 (gross) and NIFTYBEES over the same months.
 
@@ -35,6 +36,14 @@ FETCH_FROM = date(2024, 7, 8)  # enough history for the 252-session look-back; o
 RUN_AFTER = time(19, 30)  # NSE publishes the bhavcopy in the early evening
 RULE = "mom_12_1"
 RANKING_SHOWN = 40
+HOLD = int(os.environ.get("MOMENTUM_TRIAL_HOLD", "10"))
+POSITION = float(os.environ.get("MOMENTUM_TRIAL_POSITION", "10000"))
+# The same book in the backtest (services/quant/docs/momentum-trial.md), 2016-02 to 2026-10, continuous.
+BACKTESTS = {
+    (20, 20000.0): {"cagr": 0.348, "max_drawdown": 0.58},
+    (20, 5000.0): {"cagr": 0.326, "max_drawdown": 0.57},
+    (10, 10000.0): {"cagr": 0.345, "max_drawdown": 0.50},
+}
 
 
 def trading_day(day: date) -> bool:
@@ -88,6 +97,7 @@ def _market(raw: Path):
     from quant_agents.research import bhavcopy
     from quant_agents.research import whole_market as wm
 
+    wm.HOLD, wm.BUFFER, wm.NOTIONAL = HOLD, HOLD, POSITION
     m = wm.Market(bhavcopy.build(raw))
     last = len(m.d) - 1
     # The newest session is a month-end if the next NSE session falls in a new month (Market can't see tomorrow).
@@ -123,7 +133,7 @@ def record_decisions(m, wm, now: datetime) -> list[str]:
             if key not in logged:
                 out.write(json.dumps({"decided_at_close": key, "recorded_at": now.isoformat(), "trade_at_open_of": next_session(day).isoformat(), "rule": RULE, "ranking": ranked}) + "\n")
                 notes.append(f"decision recorded for {key}")
-            elif [r["symbol"] for r in logged[key]["ranking"][:20]] != [r["symbol"] for r in ranked[:20]]:
+            elif [r["symbol"] for r in logged[key]["ranking"][:HOLD]] != [r["symbol"] for r in ranked[:HOLD]]:
                 notes.append(f"WARNING: ranking for {key} recomputes differently (data revised?)")
     return notes
 
@@ -131,10 +141,10 @@ def record_decisions(m, wm, now: datetime) -> list[str]:
 def report(m, wm, now: datetime, notes: list[str]) -> dict[str, object]:
     start_t = int(np.searchsorted(m.p.days, START.toordinal(), side="right"))  # first session after the decision
     hi = len(m.d) - 1
-    base = {"rule": "12-1 momentum, top 20 of the NSE Liquid-500, monthly", "capital": wm.NOTIONAL * wm.HOLD, "start_decision": START.isoformat(),
+    base = {"rule": f"12-1 momentum, top {HOLD} of the NSE Liquid-500, monthly", "capital": wm.NOTIONAL * wm.HOLD, "hold": HOLD, "position": POSITION, "start_decision": START.isoformat(),
             "as_of_session": m.d[hi].isoformat(), "generated_at": now.isoformat(), "notes": notes, "paper_only": True,
             "next_decision": next_decision(m.d[hi]).isoformat(),
-            "backtest": {"period": "2016-02 to 2026-10", "cagr": 0.348, "benchmark_cagr": 0.139, "niftybees_cagr": 0.123, "max_drawdown": 0.58}}
+            "backtest": {"period": "2016-02 to 2026-10", "benchmark_cagr": 0.139, "niftybees_cagr": 0.123, **BACKTESTS.get((HOLD, POSITION), {})}}
     if start_t > hi:
         decision = next((json.loads(line) for line in (DIR / "decisions.jsonl").read_text().splitlines()[::-1]), None) if (DIR / "decisions.jsonl").exists() else None
         return {**base, "status": "waiting for the first open", "pending_ranking": (decision or {}).get("ranking", [])[:25]}
