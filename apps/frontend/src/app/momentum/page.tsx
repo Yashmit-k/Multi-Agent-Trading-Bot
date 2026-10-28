@@ -146,7 +146,7 @@ function Book({ report, id }: { report: TrialReport; id: string }) {
       {report.backtest?.cagr !== undefined ? (
         <p className="text-xs text-[#94A3B8]">
           Backtest {report.backtest.period}: {pct(report.backtest.cagr)} a year against {pct(report.backtest.benchmark_cagr)} for the benchmark, worst fall{" "}
-          {pct(-report.backtest.max_drawdown)}. Judged after 12 months (Oct 2027).
+          {pct(-report.backtest.max_drawdown)}. {id === "delivery" ? "Judged against the plain book at 24 months (Oct 2028)." : "Judged after 12 months (Oct 2027)."}
         </p>
       ) : null}
     </>
