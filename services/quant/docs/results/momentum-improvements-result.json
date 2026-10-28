@@ -1,0 +1,214 @@
+{
+ "protocol": "services/quant/docs/momentum-improvements-protocol.md",
+ "baseline": {
+  "periods": {
+   "train": {
+    "annual": 0.30921730553532745,
+    "benchmark_annual": 0.11507340986931831,
+    "charges": 22200.256440600453,
+    "buys": 366
+   },
+   "validate": {
+    "annual": 0.42532711953128577,
+    "benchmark_annual": 0.2872938086548022,
+    "charges": 17993.02208954892,
+    "buys": 296
+   },
+   "test": {
+    "annual": 0.35021701600528626,
+    "benchmark_annual": 0.09831301762654834,
+    "charges": 15508.67125989584,
+    "buys": 261
+   }
+  },
+  "continuous": {
+   "cagr": 0.3482049666214828,
+   "benchmark_cagr": 0.13938832266730827,
+   "max_drawdown": 0.5801397190171937
+  },
+  "continuous_charges": 54150.74020770484,
+  "continuous_buys": 895
+ },
+ "buffer40": {
+  "periods": {
+   "train": {
+    "annual": 0.3049911789154704,
+    "benchmark_annual": 0.11507340986931831,
+    "charges": 13560.795099111074,
+    "buys": 220
+   },
+   "validate": {
+    "annual": 0.4564603737834927,
+    "benchmark_annual": 0.2872938086548022,
+    "charges": 10724.633940575397,
+    "buys": 172
+   },
+   "test": {
+    "annual": 0.292074728139459,
+    "benchmark_annual": 0.09831301762654834,
+    "charges": 9545.252337005297,
+    "buys": 159
+   }
+  },
+  "continuous": {
+   "cagr": 0.3331992331960205,
+   "benchmark_cagr": 0.13938832266730827,
+   "max_drawdown": 0.6114066939025566
+  },
+  "continuous_charges": 31971.91710164225,
+  "continuous_buys": 518
+ },
+ "hold30": {
+  "periods": {
+   "train": {
+    "annual": 0.25121374061813806,
+    "benchmark_annual": 0.11507340986931831,
+    "charges": 33495.723424159674,
+    "buys": 555
+   },
+   "validate": {
+    "annual": 0.46120837470458187,
+    "benchmark_annual": 0.2872938086548022,
+    "charges": 23810.716416545954,
+    "buys": 389
+   },
+   "test": {
+    "annual": 0.2777728204461266,
+    "benchmark_annual": 0.09831301762654834,
+    "charges": 20822.307932616975,
+    "buys": 351
+   }
+  },
+  "continuous": {
+   "cagr": 0.3092013764664028,
+   "benchmark_cagr": 0.13938832266730827,
+   "max_drawdown": 0.5599988065927104
+  },
+  "continuous_charges": 75587.17932769096,
+  "continuous_buys": 1250
+ },
+ "skip_top5pct": {
+  "periods": {
+   "train": {
+    "annual": 0.08814559851930467,
+    "benchmark_annual": 0.11507340986931831,
+    "charges": 44647.834618108434,
+    "buys": 757
+   },
+   "validate": {
+    "annual": 0.47294520258550804,
+    "benchmark_annual": 0.2872938086548022,
+    "charges": 29691.12986955408,
+    "buys": 494
+   },
+   "test": {
+    "annual": 0.13052400683464943,
+    "benchmark_annual": 0.09831301762654834,
+    "charges": 27463.32876452613,
+    "buys": 473
+   }
+  },
+  "continuous": {
+   "cagr": 0.18898529117401108,
+   "benchmark_cagr": 0.13938832266730827,
+   "max_drawdown": 0.4927992291279605
+  },
+  "continuous_charges": 100751.55734015004,
+  "continuous_buys": 1706
+ },
+ "buffer40_hold30": {
+  "periods": {
+   "train": {
+    "annual": 0.23850201349461284,
+    "benchmark_annual": 0.11507340986931831,
+    "charges": 24284.947664994364,
+    "buys": 400
+   },
+   "validate": {
+    "annual": 0.4786193868344083,
+    "benchmark_annual": 0.2872938086548022,
+    "charges": 18532.055198104063,
+    "buys": 299
+   },
+   "test": {
+    "annual": 0.30710165677515755,
+    "benchmark_annual": 0.09831301762654834,
+    "charges": 17247.54163192182,
+    "buys": 288
+   }
+  },
+  "continuous": {
+   "cagr": 0.32653376044959814,
+   "benchmark_cagr": 0.13938832266730827,
+   "max_drawdown": 0.568459407804919
+  },
+  "continuous_charges": 57519.952809590446,
+  "continuous_buys": 941
+ },
+ "gate": {
+  "buffer40": {
+   "beats_baseline": {
+    "train": false,
+    "validate": true,
+    "test": false
+   },
+   "beats_benchmark": {
+    "train": true,
+    "validate": true,
+    "test": true
+   },
+   "mean_monthly_vs_baseline": -0.0007140711272159186,
+   "t_stat": -0.326150034571892,
+   "bonferroni_low": -0.005189062808487303,
+   "improves": false
+  },
+  "hold30": {
+   "beats_baseline": {
+    "train": false,
+    "validate": true,
+    "test": false
+   },
+   "beats_benchmark": {
+    "train": true,
+    "validate": true,
+    "test": true
+   },
+   "mean_monthly_vs_baseline": -0.0029674339747331672,
+   "t_stat": -1.5417680290139475,
+   "bonferroni_low": -0.0069345597479143675,
+   "improves": false
+  },
+  "skip_top5pct": {
+   "beats_baseline": {
+    "train": false,
+    "validate": true,
+    "test": false
+   },
+   "beats_benchmark": {
+    "train": false,
+    "validate": true,
+    "test": true
+   },
+   "mean_monthly_vs_baseline": -0.012143761005035527,
+   "t_stat": -2.04544661246016,
+   "bonferroni_low": -0.024654922632807674,
+   "improves": false
+  },
+  "buffer40_hold30": {
+   "beats_baseline": {
+    "train": false,
+    "validate": true,
+    "test": false
+   },
+   "beats_benchmark": {
+    "train": true,
+    "validate": true,
+    "test": true
+   },
+   "mean_monthly_vs_baseline": -0.00240284419981533,
+   "t_stat": -1.288273827231915,
+   "bonferroni_low": -0.0062180788577478165,
+   "improves": false
+  }
+ }
+}

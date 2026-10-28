@@ -22,6 +22,7 @@ PERIODS = {"train": (date(2016, 1, 1), date(2020, 12, 31)), "validate": (date(20
 K = 14
 Q = 0.10 / K
 LOOK, SKIP, UNIVERSE, HOLD = 252, 21, 500, 20
+BUFFER = HOLD  # a holding is kept while it ranks within BUFFER (BUFFER = HOLD: the plain top-HOLD rule)
 NOTIONAL = 20_000.0
 SLIP = 0.0010
 ETF_SLIP = 0.0005
@@ -187,10 +188,18 @@ def simulate_range(m: Market, rule: str, lo: int, hi: int) -> dict[str, object]:
         s = scores(m, rule, t, cols)
         order = [int(cols[k]) for k in np.argsort(-np.nan_to_num(s, nan=-np.inf)) if np.isfinite(s[k])]
         target: list[int] = []
+        if BUFFER > HOLD:
+            # Keep a holding while it ranks within BUFFER; fill the free slots with the best-ranked stocks not held.
+            rank = {j: k for k, j in enumerate(order)}
+            target = [j for j in held if j not in selling and rank.get(j, BUFFER) < BUFFER][:HOLD]
         for j in order:
+            if j in target:
+                continue
             if len(target) == HOLD:
                 break
             if j in held and j not in selling:
+                if BUFFER > HOLD:
+                    continue  # ranked below the buffer: sold
                 target.append(j)
                 continue
             o = p.open[t + 1, j]
