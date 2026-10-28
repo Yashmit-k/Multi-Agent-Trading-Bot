@@ -1,0 +1,670 @@
+{
+ "protocol": "services/quant/docs/whole-market-protocol.md",
+ "sessions": 2917,
+ "first": "2015-01-01",
+ "last": "2026-10-27",
+ "stocks": {
+  "mom_12_1": {
+   "train": {
+    "annual": 0.30921730553532745,
+    "benchmark_annual": 0.11507340986931831,
+    "niftybees_annual": 0.15727406340400923,
+    "charges": 22200.256440600453,
+    "buys": 366,
+    "months": 59,
+    "decile_spread_monthly_pct": 1.4740918499387035,
+    "worst_month": -0.2657614562094102
+   },
+   "validate": {
+    "annual": 0.42532711953128577,
+    "benchmark_annual": 0.2872938086548022,
+    "niftybees_annual": 0.1661254077476998,
+    "charges": 17993.02208954892,
+    "buys": 296,
+    "months": 36,
+    "decile_spread_monthly_pct": 2.5847816486695194,
+    "worst_month": -0.13247241512829197
+   },
+   "test": {
+    "annual": 0.35021701600528626,
+    "benchmark_annual": 0.09831301762654834,
+    "niftybees_annual": 0.04251597575317073,
+    "charges": 15508.67125989584,
+    "buys": 261,
+    "months": 34,
+    "decile_spread_monthly_pct": 2.0861081273676945,
+    "worst_month": -0.1590867353540373
+   }
+  },
+  "resid_mom": {
+   "train": {
+    "annual": 0.07075362448803452,
+    "benchmark_annual": 0.11507340986931831,
+    "niftybees_annual": 0.15727406340400923,
+    "charges": 65077.29002705211,
+    "buys": 1097,
+    "months": 59,
+    "decile_spread_monthly_pct": 0.7674524783785297,
+    "worst_month": -0.2986609117001942
+   },
+   "validate": {
+    "annual": 0.23395712785294004,
+    "benchmark_annual": 0.2872938086548022,
+    "niftybees_annual": 0.1661254077476998,
+    "charges": 40739.87212473874,
+    "buys": 691,
+    "months": 36,
+    "decile_spread_monthly_pct": 0.4243460179521211,
+    "worst_month": -0.18384066581337924
+   },
+   "test": {
+    "annual": -0.033612433498405106,
+    "benchmark_annual": 0.09831301762654834,
+    "niftybees_annual": 0.04251597575317073,
+    "charges": 37718.357650405596,
+    "buys": 651,
+    "months": 34,
+    "decile_spread_monthly_pct": -0.09325558827835032,
+    "worst_month": -0.137988911317256
+   }
+  },
+  "high_52w": {
+   "train": {
+    "annual": 0.1662127152545066,
+    "benchmark_annual": 0.11507340986931831,
+    "niftybees_annual": 0.15727406340400923,
+    "charges": 52142.34344155954,
+    "buys": 887,
+    "months": 59,
+    "decile_spread_monthly_pct": 1.7980635704406698,
+    "worst_month": -0.17690775098470468
+   },
+   "validate": {
+    "annual": 0.17361346146992307,
+    "benchmark_annual": 0.2872938086548022,
+    "niftybees_annual": 0.1661254077476998,
+    "charges": 35939.709100941174,
+    "buys": 613,
+    "months": 36,
+    "decile_spread_monthly_pct": 0.5679500558183679,
+    "worst_month": -0.07471149435906031
+   },
+   "test": {
+    "annual": 0.049064838177960465,
+    "benchmark_annual": 0.09831301762654834,
+    "niftybees_annual": 0.04251597575317073,
+    "charges": 32159.4725162343,
+    "buys": 558,
+    "months": 34,
+    "decile_spread_monthly_pct": 0.4450800205654213,
+    "worst_month": -0.1685712087756039
+   }
+  },
+  "frog_pan": {
+   "train": {
+    "annual": 0.21501901638237852,
+    "benchmark_annual": 0.11507340986931831,
+    "niftybees_annual": 0.15727406340400923,
+    "charges": 31072.27432195154,
+    "buys": 520,
+    "months": 59,
+    "decile_spread_monthly_pct": 1.4605588363806523,
+    "worst_month": -0.24167340223568098
+   },
+   "validate": {
+    "annual": 0.3087956030780614,
+    "benchmark_annual": 0.2872938086548022,
+    "niftybees_annual": 0.1661254077476998,
+    "charges": 16877.111173872687,
+    "buys": 283,
+    "months": 36,
+    "decile_spread_monthly_pct": -0.8450161256576562,
+    "worst_month": -0.0845953497488179
+   },
+   "test": {
+    "annual": 0.18611765574075956,
+    "benchmark_annual": 0.09831301762654834,
+    "niftybees_annual": 0.04251597575317073,
+    "charges": 14446.47634477758,
+    "buys": 247,
+    "months": 34,
+    "decile_spread_monthly_pct": -0.0028243470450617287,
+    "worst_month": -0.1277331538602743
+   }
+  },
+  "low_vol": {
+   "train": {
+    "annual": 0.1482570906419083,
+    "benchmark_annual": 0.11507340986931831,
+    "niftybees_annual": 0.15727406340400923,
+    "charges": 10143.009217400273,
+    "buys": 170,
+    "months": 59,
+    "decile_spread_monthly_pct": 1.251138059876484,
+    "worst_month": -0.11654800169541354
+   },
+   "validate": {
+    "annual": 0.13063763625767677,
+    "benchmark_annual": 0.2872938086548022,
+    "niftybees_annual": 0.1661254077476998,
+    "charges": 7327.272050723465,
+    "buys": 124,
+    "months": 36,
+    "decile_spread_monthly_pct": -1.0365411024541293,
+    "worst_month": -0.058649434278998235
+   },
+   "test": {
+    "annual": -0.010718236338234743,
+    "benchmark_annual": 0.09831301762654834,
+    "niftybees_annual": 0.04251597575317073,
+    "charges": 5811.338358556284,
+    "buys": 103,
+    "months": 34,
+    "decile_spread_monthly_pct": -0.5893198175440779,
+    "worst_month": -0.1092722962640172
+   }
+  },
+  "low_max": {
+   "train": {
+    "annual": 0.1537779730669459,
+    "benchmark_annual": 0.11507340986931831,
+    "niftybees_annual": 0.15727406340400923,
+    "charges": 57910.5193108787,
+    "buys": 985,
+    "months": 59,
+    "decile_spread_monthly_pct": 1.5236588811136371,
+    "worst_month": -0.31561318108644687
+   },
+   "validate": {
+    "annual": 0.16914386384264865,
+    "benchmark_annual": 0.2872938086548022,
+    "niftybees_annual": 0.1661254077476998,
+    "charges": 36001.948716011226,
+    "buys": 618,
+    "months": 36,
+    "decile_spread_monthly_pct": -1.1184154055473599,
+    "worst_month": -0.0673449865096307
+   },
+   "test": {
+    "annual": 0.028877586959258118,
+    "benchmark_annual": 0.09831301762654834,
+    "niftybees_annual": 0.04251597575317073,
+    "charges": 33411.12121440074,
+    "buys": 577,
+    "months": 34,
+    "decile_spread_monthly_pct": -0.41365739361899356,
+    "worst_month": -0.10698253720938927
+   }
+  },
+  "rev_1m": {
+   "train": {
+    "annual": 0.028450427656923377,
+    "benchmark_annual": 0.11507340986931831,
+    "niftybees_annual": 0.15727406340400923,
+    "charges": 62840.43560634049,
+    "buys": 1055,
+    "months": 59,
+    "decile_spread_monthly_pct": 0.3928086400743912,
+    "worst_month": -0.2921992708249811
+   },
+   "validate": {
+    "annual": 0.12242727487201444,
+    "benchmark_annual": 0.2872938086548022,
+    "niftybees_annual": 0.1661254077476998,
+    "charges": 39662.835441069205,
+    "buys": 669,
+    "months": 36,
+    "decile_spread_monthly_pct": -0.5862860996474125,
+    "worst_month": -0.2035841629831835
+   },
+   "test": {
+    "annual": -0.01301222132733702,
+    "benchmark_annual": 0.09831301762654834,
+    "niftybees_annual": 0.04251597575317073,
+    "charges": 38005.42663284831,
+    "buys": 650,
+    "months": 34,
+    "decile_spread_monthly_pct": -0.4914902526052806,
+    "worst_month": -0.1522939927732332
+   }
+  },
+  "seasonal": {
+   "train": {
+    "annual": 0.0068110764470205865,
+    "benchmark_annual": 0.005761039941553993,
+    "niftybees_annual": 0.1332222783671839,
+    "charges": 37823.096662741315,
+    "buys": 637,
+    "months": 36,
+    "decile_spread_monthly_pct": 1.461455683178164,
+    "worst_month": -0.3605792422686162
+   },
+   "validate": {
+    "annual": 0.24523426949583405,
+    "benchmark_annual": 0.2872938086548022,
+    "niftybees_annual": 0.1661254077476998,
+    "charges": 39680.38844090681,
+    "buys": 668,
+    "months": 36,
+    "decile_spread_monthly_pct": -0.1627605279955735,
+    "worst_month": -0.11473132851993127
+   },
+   "test": {
+    "annual": 0.15034989893076034,
+    "benchmark_annual": 0.09831301762654834,
+    "niftybees_annual": 0.04251597575317073,
+    "charges": 35907.69696605614,
+    "buys": 613,
+    "months": 34,
+    "decile_spread_monthly_pct": 1.289891505572605,
+    "worst_month": -0.1118298850809352
+   }
+  },
+  "amihud": {
+   "train": {
+    "annual": -0.019543661466650857,
+    "benchmark_annual": 0.11507340986931831,
+    "niftybees_annual": 0.15727406340400923,
+    "charges": 20428.428160560445,
+    "buys": 344,
+    "months": 59,
+    "decile_spread_monthly_pct": -0.11821831703577883,
+    "worst_month": -0.3646435812558037
+   },
+   "validate": {
+    "annual": 0.32028164775505436,
+    "benchmark_annual": 0.2872938086548022,
+    "niftybees_annual": 0.1661254077476998,
+    "charges": 14697.372886796597,
+    "buys": 241,
+    "months": 36,
+    "decile_spread_monthly_pct": 1.4378759441802198,
+    "worst_month": -0.11815109289465661
+   },
+   "test": {
+    "annual": 0.1529325522504821,
+    "benchmark_annual": 0.09831301762654834,
+    "niftybees_annual": 0.04251597575317073,
+    "charges": 12863.390008860766,
+    "buys": 215,
+    "months": 34,
+    "decile_spread_monthly_pct": 0.6654856832426453,
+    "worst_month": -0.1731413146486289
+   }
+  },
+  "conservative": {
+   "train": {
+    "annual": 0.1544436302377321,
+    "benchmark_annual": 0.11507340986931831,
+    "niftybees_annual": 0.15727406340400923,
+    "charges": 20958.81179290329,
+    "buys": 357,
+    "months": 59,
+    "decile_spread_monthly_pct": 1.6885193113532964,
+    "worst_month": -0.22011843754751956
+   },
+   "validate": {
+    "annual": 0.2456261492916969,
+    "benchmark_annual": 0.2872938086548022,
+    "niftybees_annual": 0.1661254077476998,
+    "charges": 16457.652318778524,
+    "buys": 280,
+    "months": 36,
+    "decile_spread_monthly_pct": 0.8225547481521588,
+    "worst_month": -0.06365253294889728
+   },
+   "test": {
+    "annual": 0.07687919091697007,
+    "benchmark_annual": 0.09831301762654834,
+    "niftybees_annual": 0.04251597575317073,
+    "charges": 12679.657415701047,
+    "buys": 221,
+    "months": 34,
+    "decile_spread_monthly_pct": 0.9294897613462981,
+    "worst_month": -0.1614850380537416
+   }
+  },
+  "gate": {
+   "mom_12_1": {
+    "beats_benchmark": {
+     "train": true,
+     "validate": true,
+     "test": true
+    },
+    "beats_niftybees": {
+     "train": true,
+     "validate": true,
+     "test": true
+    },
+    "pooled_monthly_excess": 0.016142393398401185,
+    "t_stat": 2.9636064850680506,
+    "bonferroni_low": 0.003653773576526036,
+    "works": true
+   },
+   "resid_mom": {
+    "beats_benchmark": {
+     "train": false,
+     "validate": false,
+     "test": false
+    },
+    "beats_niftybees": {
+     "train": false,
+     "validate": true,
+     "test": false
+    },
+    "pooled_monthly_excess": -0.005827166139929711,
+    "t_stat": -1.9031726632832613,
+    "bonferroni_low": -0.013175982081440956,
+    "works": false
+   },
+   "high_52w": {
+    "beats_benchmark": {
+     "train": true,
+     "validate": false,
+     "test": false
+    },
+    "beats_niftybees": {
+     "train": true,
+     "validate": true,
+     "test": true
+    },
+    "pooled_monthly_excess": -0.0017762994716934908,
+    "t_stat": -0.5348489146990124,
+    "bonferroni_low": -0.010142609794922356,
+    "works": false
+   },
+   "frog_pan": {
+    "beats_benchmark": {
+     "train": true,
+     "validate": true,
+     "test": true
+    },
+    "beats_niftybees": {
+     "train": true,
+     "validate": true,
+     "test": true
+    },
+    "pooled_monthly_excess": 0.00623786374637666,
+    "t_stat": 1.9898935611173072,
+    "bonferroni_low": -0.001296402013535796,
+    "works": false
+   },
+   "low_vol": {
+    "beats_benchmark": {
+     "train": true,
+     "validate": false,
+     "test": false
+    },
+    "beats_niftybees": {
+     "train": false,
+     "validate": false,
+     "test": false
+    },
+    "pooled_monthly_excess": -0.004773157413124243,
+    "t_stat": -1.2138236889757774,
+    "bonferroni_low": -0.014208614165857347,
+    "works": false
+   },
+   "low_max": {
+    "beats_benchmark": {
+     "train": true,
+     "validate": false,
+     "test": false
+    },
+    "beats_niftybees": {
+     "train": false,
+     "validate": true,
+     "test": false
+    },
+    "pooled_monthly_excess": -0.002797566813478917,
+    "t_stat": -0.9592244323995555,
+    "bonferroni_low": -0.010235629704312896,
+    "works": false
+   },
+   "rev_1m": {
+    "beats_benchmark": {
+     "train": false,
+     "validate": false,
+     "test": false
+    },
+    "beats_niftybees": {
+     "train": false,
+     "validate": false,
+     "test": false
+    },
+    "pooled_monthly_excess": -0.009580755356036018,
+    "t_stat": -2.5120183277323256,
+    "bonferroni_low": -0.01867919149766067,
+    "works": false
+   },
+   "seasonal": {
+    "beats_benchmark": {
+     "train": true,
+     "validate": false,
+     "test": true
+    },
+    "beats_niftybees": {
+     "train": false,
+     "validate": true,
+     "test": true
+    },
+    "pooled_monthly_excess": 0.00023027662642858415,
+    "t_stat": 0.06636162394761037,
+    "bonferroni_low": -0.008890761653829519,
+    "works": false
+   },
+   "amihud": {
+    "beats_benchmark": {
+     "train": false,
+     "validate": true,
+     "test": true
+    },
+    "beats_niftybees": {
+     "train": false,
+     "validate": true,
+     "test": true
+    },
+    "pooled_monthly_excess": -0.0031639411007747774,
+    "t_stat": -0.73184086009559,
+    "bonferroni_low": -0.013430356307319258,
+    "works": false
+   },
+   "conservative": {
+    "beats_benchmark": {
+     "train": true,
+     "validate": false,
+     "test": false
+    },
+    "beats_niftybees": {
+     "train": false,
+     "validate": true,
+     "test": true
+    },
+    "pooled_monthly_excess": 6.076043704067651e-05,
+    "t_stat": 0.01685346379283442,
+    "bonferroni_low": -0.00838182934623527,
+    "works": false
+   }
+  }
+ },
+ "assets": {
+  "one_over_n": {
+   "train": {
+    "cagr": 0.1847630127151596,
+    "sharpe": 1.4170010469189493,
+    "max_drawdown": 0.2503490927235771,
+    "costs": 4686.720018473286
+   },
+   "validate": {
+    "cagr": 0.13363207833857693,
+    "sharpe": 1.133328347390308,
+    "max_drawdown": 0.12734838477475474,
+    "costs": 2877.9096764111123
+   },
+   "test": {
+    "cagr": 0.1924453127468322,
+    "sharpe": 1.3831312069787822,
+    "max_drawdown": 0.11222378509738473,
+    "costs": 2773.7965526660337
+   }
+  },
+  "buy_hold_nifty": {
+   "train": {
+    "cagr": 0.14734262778314555,
+    "sharpe": 0.8357420339476386,
+    "max_drawdown": 0.3540837785945994,
+    "costs": 1180.6634452784645
+   },
+   "validate": {
+    "cagr": 0.14294294488494597,
+    "sharpe": 1.0090475852941092,
+    "max_drawdown": 0.1613029684874201,
+    "costs": 827.6492227563263
+   },
+   "test": {
+    "cagr": 0.0320488019528371,
+    "sharpe": 0.30668971456861144,
+    "max_drawdown": 0.14971254076112694,
+    "costs": 796.9523689149247
+   }
+  },
+  "asset_mom": {
+   "train": {
+    "cagr": 0.1156778763550661,
+    "sharpe": 0.7871577633023122,
+    "max_drawdown": 0.25660675280893175,
+    "costs": 6481.328072659334
+   },
+   "validate": {
+    "cagr": 0.07597931739444652,
+    "sharpe": 0.6937667224250997,
+    "max_drawdown": 0.1590815141289883,
+    "costs": 4291.16691737593
+   },
+   "test": {
+    "cagr": 0.25516847342151183,
+    "sharpe": 1.2833201353864305,
+    "max_drawdown": 0.15383638279278034,
+    "costs": 4072.086776376551
+   }
+  },
+  "dual_mom": {
+   "train": {
+    "cagr": 0.10161164257129673,
+    "sharpe": 0.5452637585716691,
+    "max_drawdown": 0.4248580682016083,
+    "costs": 6741.983899738414
+   },
+   "validate": {
+    "cagr": 0.13985900898979686,
+    "sharpe": 0.9149510316628332,
+    "max_drawdown": 0.1929408685332602,
+    "costs": 3845.8025398251903
+   },
+   "test": {
+    "cagr": 0.21237027255001784,
+    "sharpe": 0.7811441397476828,
+    "max_drawdown": 0.26107304739664927,
+    "costs": 3436.288128390412
+   }
+  },
+  "risk_parity": {
+   "train": {
+    "cagr": 0.16615392588181632,
+    "sharpe": 1.2917939155831093,
+    "max_drawdown": 0.28302420501518066,
+    "costs": 5626.887933029708
+   },
+   "validate": {
+    "cagr": 0.13883574628943607,
+    "sharpe": 1.264121458086594,
+    "max_drawdown": 0.11379195071495929,
+    "costs": 3340.271676775107
+   },
+   "test": {
+    "cagr": 0.17629959651440008,
+    "sharpe": 1.2854186146552828,
+    "max_drawdown": 0.11437774486120167,
+    "costs": 3424.8086784096968
+   }
+  },
+  "gtaa_trend": {
+   "train": {
+    "cagr": 0.12903796878004425,
+    "sharpe": 1.3625484593717434,
+    "max_drawdown": 0.14139616898836505,
+    "costs": 6949.3553859869535
+   },
+   "validate": {
+    "cagr": 0.13174732886181872,
+    "sharpe": 1.4093887079113845,
+    "max_drawdown": 0.07529752051728711,
+    "costs": 4105.645133035359
+   },
+   "test": {
+    "cagr": 0.16803164492237732,
+    "sharpe": 1.5084930369345249,
+    "max_drawdown": 0.11222558263872906,
+    "costs": 3176.1783001952126
+   }
+  },
+  "gate": {
+   "asset_mom": {
+    "cagr_beats_1n": {
+     "train": false,
+     "validate": false,
+     "test": true
+    },
+    "sharpe_beats_1n": {
+     "train": false,
+     "validate": false,
+     "test": false
+    },
+    "bonferroni_low": -0.007601462760645932,
+    "works": false
+   },
+   "dual_mom": {
+    "cagr_beats_1n": {
+     "train": false,
+     "validate": true,
+     "test": true
+    },
+    "sharpe_beats_1n": {
+     "train": false,
+     "validate": false,
+     "test": false
+    },
+    "bonferroni_low": -0.011774735435787366,
+    "works": false
+   },
+   "risk_parity": {
+    "cagr_beats_1n": {
+     "train": false,
+     "validate": true,
+     "test": false
+    },
+    "sharpe_beats_1n": {
+     "train": false,
+     "validate": true,
+     "test": false
+    },
+    "bonferroni_low": -0.002459112272460429,
+    "works": false
+   },
+   "gtaa_trend": {
+    "cagr_beats_1n": {
+     "train": false,
+     "validate": false,
+     "test": false
+    },
+    "sharpe_beats_1n": {
+     "train": false,
+     "validate": true,
+     "test": true
+    },
+    "bonferroni_low": -0.0073745206551182165,
+    "works": false
+   }
+  }
+ }
+}
