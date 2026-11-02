@@ -30,8 +30,13 @@ export type TrialReport = {
   delivery_book?: TrialReport;
 };
 
-const pct = (value: number | null | undefined) =>
-  value === null || value === undefined || !Number.isFinite(value) ? "—" : `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value * 100).toFixed(1)}%`;
+// Two decimals below 1% (so a small loss reads −0.03%, not −0.0%), one decimal otherwise.
+const pct = (value: number | null | undefined) => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  const size = Math.abs(value * 100);
+  const text = size.toFixed(size < 1 ? 2 : 1);
+  return `${Number(text) === 0 ? "" : value > 0 ? "+" : "−"}${text}%`;
+};
 const tone = (value: number | null | undefined) => (value === null || value === undefined ? "" : value > 0 ? "text-[#22C55E]" : value < 0 ? "text-[#EF4444]" : "");
 const day = (iso?: string) => (iso ? new Date(`${iso}T00:00:00+05:30`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }) : "—");
 const monthName = (iso: string) => new Date(`${iso}T00:00:00+05:30`).toLocaleDateString("en-IN", { month: "short", year: "numeric", timeZone: "Asia/Kolkata" });

@@ -30,6 +30,7 @@ describe("momentum trial page", () => {
     expect(screen.getByTestId("trial-value").textContent).toContain("1,01,800");
     expect(screen.getByText(/invested once; every month the whole amount is split equally across the 10/)).toBeTruthy();
     expect(screen.getByText(/worst fall −39.0%/)).toBeTruthy();
+    expect(screen.getAllByText("+0.60%").length).toBeGreaterThan(0);  // benchmark 0.006: two decimals below 1%
   });
 
   it("shows the delivery book as a second section when present", async () => {
