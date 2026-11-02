@@ -69,6 +69,19 @@ export default async function MomentumTrialPage() {
           <Book report={report.delivery_book} id="delivery" />
         </>
       ) : null}
+
+      <Card title="How to copy this">
+        <ul data-testid="how-to-copy" className="list-disc space-y-1 pl-5 text-sm text-[#CBD5E1]">
+          <li>The list is fixed at the close of the last trading day of each month and traded at the next morning&apos;s open.</li>
+          <li>
+            Place market orders before 9:08 AM (NSE&apos;s pre-open auction), or as an after-market order the evening before, so they fill at the opening price.
+          </li>
+          <li>Split the money equally across the {hold} stocks in whole shares; use what is left over for extra shares of the smallest holding.</li>
+          <li>If a stock opens locked at its upper price limit and your order does not fill, buy the next stock in line instead.</li>
+          <li>This page updates after the close on every trading day (about 19:30 IST).</li>
+        </ul>
+        <p className="mt-2 text-xs text-[#94A3B8]">A paper trial for research, not investment advice. Tax on short-term gains is not included in any figure.</p>
+      </Card>
     </PageFrame>
   );
 }
@@ -81,8 +94,19 @@ function Book({ report, id }: { report: TrialReport; id: string }) {
     <>
       <Card title="Status" right={<Badge tone="info">PAPER ONLY</Badge>}>
         <p data-testid={`${id}-status`} className="text-sm text-[#E6EDF3]">
-          {report.status === "not started" ? "Not started yet." : running ? "Running" : "Waiting for the first trade"}
-          {report.as_of_session ? <span className="text-[#94A3B8]"> · data to {day(report.as_of_session)}</span> : null}
+          {report.status === "not started" ? (
+            "Not started yet."
+          ) : running ? (
+            <>
+              Running
+              {report.as_of_session ? <span className="text-[#94A3B8]"> · data to {day(report.as_of_session)}</span> : null}
+            </>
+          ) : (
+            <>
+              Picks fixed at the close of {day(report.as_of_session)}; bought at the next open.
+              <span className="text-[#94A3B8]"> Results appear after that day&apos;s close (about 19:30 IST).</span>
+            </>
+          )}
         </p>
         {report.next_decision ? <p className="text-xs text-[#94A3B8]">Next decision: close of {day(report.next_decision)}</p> : null}
         {running && report.equity !== undefined ? (

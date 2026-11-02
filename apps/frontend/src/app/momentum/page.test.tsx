@@ -10,7 +10,8 @@ describe("momentum trial page", () => {
   it("shows the pending picks while waiting for the first open", async () => {
     fetchApi.mockResolvedValueOnce({ status: "waiting for the first open", as_of_session: "2026-10-30", next_decision: "2026-11-30", pending_ranking: [{ rank: 1, symbol: "CUPID" }] });
     render(await MomentumTrialPage());
-    expect(screen.getByTestId("trial-status").textContent).toContain("Waiting");
+    expect(screen.getByTestId("trial-status").textContent).toContain("bought at the next open");
+    expect(screen.getByTestId("how-to-copy").textContent).toContain("before 9:08 AM");
     expect(screen.getByText("CUPID")).toBeTruthy();
     expect(screen.getByText("PAPER ONLY")).toBeTruthy();
   });
@@ -38,7 +39,7 @@ describe("momentum trial page", () => {
     });
     render(await MomentumTrialPage());
     expect(screen.getByText("Second book: momentum + delivery filter")).toBeTruthy();
-    expect(screen.getByTestId("delivery-status").textContent).toContain("Waiting");
+    expect(screen.getByTestId("delivery-status").textContent).toContain("bought at the next open");
     expect(screen.getByText("LAURUSLABS")).toBeTruthy();
   });
 });
