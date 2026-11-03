@@ -7,13 +7,34 @@ import type { TradingMode } from "@/contracts/generated/vocab";
 import { ModeBanner } from "@/components/ModeBanner";
 
 type NavLink = readonly [string, string];
+const ARCHIVED: ReadonlyArray<NavLink> = [
+  ["/dashboard", "Overview"],
+  ["/portfolio", "Portfolio"],
+  ["/positions", "Positions"],
+  ["/orders", "Orders"],
+  ["/journal", "Journal"],
+  ["/risk", "Risk"],
+  ["/agents", "Agents"],
+  ["/manager", "Portfolio manager"],
+  ["/trace", "Agent trace"],
+  ["/signals", "Signals"],
+  ["/news", "News"],
+  ["/market", "Market"],
+  ["/stocks", "Stocks"],
+  ["/watchlist", "Watchlist"],
+  ["/strategies", "Strategy lab"],
+];
 const GROUPS: ReadonlyArray<readonly [string, ReadonlyArray<NavLink>]> = [
-  ["Trading", [["/dashboard", "Overview"], ["/portfolio", "Portfolio"], ["/positions", "Positions"], ["/orders", "Orders"], ["/journal", "Journal"], ["/risk", "Risk"]]],
-  ["Agents", [["/agents", "Agents"], ["/manager", "Portfolio manager"], ["/trace", "Agent trace"], ["/signals", "Signals"], ["/news", "News"]]],
-  ["Market", [["/market", "Market"], ["/stocks", "Stocks"], ["/watchlist", "Watchlist"]]],
-  ["Strategies", [["/strategies", "Strategy lab"], ["/momentum", "Momentum trial"]]],
+  ["Momentum", [["/momentum", "Momentum trial"]]],
+  ["NIFTY 50 system (archived)", ARCHIVED],
   ["System", [["/system", "Health"], ["/settings", "Settings"]]],
 ];
+// The NIFTY 50 paper system stopped when its Zerodha market data ended.
+export const ARCHIVED_NOTE = "Archived: Zerodha market data ended on 3 Nov 2026. This page shows the NIFTY 50 paper system as it stood then.";
+
+export function isArchived(pathname: string): boolean {
+  return ARCHIVED.some(([href]) => pathname === href || pathname.startsWith(`${href}/`));
+}
 
 const LINKS: NavLink[] = GROUPS.flatMap(([, links]) => [...links]);
 
@@ -86,7 +107,14 @@ export function AppShell({
             {/* Fade on the right edge hints that the tabs scroll; it never blocks taps. */}
             <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#0B0F14] to-transparent" />
           </div>
-          <main className="w-full max-w-none p-4">{children}</main>
+          <main className="w-full max-w-none p-4">
+            {isArchived(pathname) ? (
+              <div data-testid="archived-note" className="mb-3 rounded-md border border-[#78350F] bg-[#1C1305] px-3 py-1.5 text-xs text-[#F59E0B]">
+                {ARCHIVED_NOTE}
+              </div>
+            ) : null}
+            {children}
+          </main>
         </div>
       </div>
     </div>

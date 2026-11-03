@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Uptime/health alert, run from cron every 5 minutes in market hours (EC2 clock is UTC):
 #   */5 3-10 * * 1-5  ~/Multi-Agent-Trading-Bot/deploy/healthcheck.sh >> ~/backups/health.log 2>&1
-# Alerts on any "down" component, an unreachable site, or live_enabled=true. Sends to Telegram
+# Alerts on an unreachable site, live_enabled=true, a momentum-trial report more than 3 weekdays old, or a full
+# disk. Since 2026-11-04 the NIFTY 50 system is archived (its Zerodha data ended), so its components being down is
+# expected and no longer alerted. Sends to Telegram
 # (TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID) and/or ALERT_WEBHOOK_URL, read from the repo's .env.
 # The same problem is re-sent at most every 30 minutes, and a "recovered" message follows once it clears.
 set -uo pipefail
@@ -36,10 +38,30 @@ import json, sys
 data = json.load(sys.stdin)
 if data.get("live_enabled"):
     print("StockX: live_enabled is TRUE"); sys.exit()
-bad = [c["component"] + ": " + c["detail"] for c in data.get("checks", []) if c.get("status") == "down"]
-if bad:
-    print("StockX down: " + "; ".join(bad))
 ')"
+fi
+
+# The momentum paper trial: its report should move to the latest session every trading evening.
+TRIAL_URL="${TRIAL_URL:-https://$(read_env DOMAIN)/api/v1/momentum-trial}"
+trial="$(curl -fsS --max-time 20 "$TRIAL_URL")"
+if [ $? -ne 0 ] || [ -z "$trial" ]; then
+  message="${message:+$message; }StockX: momentum trial report unreachable"
+else
+  stale="$(printf '%s' "$trial" | python3 -c '
+import json, sys
+from datetime import date, timedelta
+data = json.load(sys.stdin)
+as_of = data.get("as_of_session")
+if not as_of:
+    print("momentum trial has no session date"); sys.exit()
+day, today, weekdays = date.fromisoformat(as_of), date.today(), 0
+while day < today:
+    day += timedelta(days=1)
+    weekdays += day.weekday() < 5
+if weekdays > 3:
+    print(f"momentum trial data is {weekdays} weekdays old (last session {as_of})")
+')"
+  [ -n "$stale" ] && message="${message:+$message; }StockX: $stale"
 fi
 
 # Disk: alert at DISK_ALERT_PCT (default 85%) used on the root filesystem.
