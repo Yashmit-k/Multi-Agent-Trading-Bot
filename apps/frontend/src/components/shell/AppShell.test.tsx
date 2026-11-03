@@ -6,8 +6,28 @@ vi.mock("next/navigation", () => ({ usePathname: () => path }));
 
 import { AppShell, isArchived } from "@/components/shell/AppShell";
 
+describe("StockX branding", () => {
+  it("shows StockX in the header and does not show FLEXI", () => {
+    path = "/dashboard";
+    render(
+      <AppShell mode="PAPER" killSwitch="disarmed">
+        <p>child</p>
+      </AppShell>,
+    );
+    const brand = screen.getByTestId("brand-mark");
+    expect(brand.textContent).toBe("StockX");
+    const logo = screen.getByTestId("brand-logo");
+    expect(logo.getAttribute("src")).toBe("/logo.svg");
+    expect(logo.getAttribute("alt")).toBe("");
+    expect(screen.getByTestId("mode-banner").textContent).toContain("PAPER TRADING");
+    expect(screen.getByTestId("kill-chip").textContent).toContain("disarmed");
+    expect(screen.queryByText(/flexi/i)).toBeNull();
+  });
+});
+
 describe("app shell after the NIFTY 50 system was archived", () => {
   it("puts Momentum first and groups the old pages as archived", () => {
+    path = "/momentum";
     render(<AppShell mode="PAPER">x</AppShell>);
     const groups = screen.getAllByText(/^(Momentum|NIFTY 50 system \(archived\)|System)$/).map((el) => el.textContent);
     expect(groups.slice(0, 3)).toEqual(["Momentum", "NIFTY 50 system (archived)", "System"]);
