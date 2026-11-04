@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LivePanel } from "@/components/live/LivePanel";
 
-function mockFetch(operator: boolean) {
+function mockFetch(operator: boolean, planChanges: Record<string, unknown> = {}) {
   const calls: string[] = [];
   vi.stubGlobal(
     "fetch",
@@ -15,9 +15,12 @@ function mockFetch(operator: boolean) {
         "/api/v1/live/plan": {
           mode: "dry_run", decided_at_close: "2026-11-30", trade_at_open_of: "2026-12-01", assumed_account: true, book: 100000, per_stock: 10000,
           orders: [{ side: "BUY", symbol: "AAA", quantity: 99, close: 100, limit: 103, value: 10197, blocked: null }], warnings: [], totals: { buy: 10197, sell: 0, charges: 12 },
+          digest: "d1", run_phase: null, live_switch: false,
         },
+        "/api/v1/live/run": { run: null, live_switch: false },
       };
-      return new Response(JSON.stringify(body[url] ?? {}), { status: 200, headers: { "Content-Type": "application/json" } });
+      const reply = url === "/api/v1/live/plan" ? { ...(body[url] as object), ...planChanges } : body[url];
+      return new Response(JSON.stringify(reply ?? {}), { status: 200, headers: { "Content-Type": "application/json" } });
     }),
   );
   return calls;
@@ -49,5 +52,20 @@ describe("settings for momentum live", () => {
     expect(await screen.findByText("AAA")).toBeTruthy();
     expect(screen.getByText(/Dry run: nothing is sent to Zerodha/)).toBeTruthy();
     expect(screen.getByText(/assumes an empty account/)).toBeTruthy();
+  });
+
+  it("offers Approve only in live mode with the server switch on", async () => {
+    mockFetch(true);
+    render(<LivePanel />);
+    expect(await screen.findByText("AAA")).toBeTruthy();
+    expect(screen.queryByText("Approve and send")).toBeNull(); // dry run in this mock
+  });
+
+  it("shows Approve and Skip in live mode once logged in to Zerodha", async () => {
+    mockFetch(true, { mode: "live", live_switch: true, assumed_account: false });
+    render(<LivePanel />);
+    expect(await screen.findByText("Approve and send")).toBeTruthy();
+    expect(screen.getByText("Skip this month")).toBeTruthy();
+    expect(screen.getByText(/sent to Zerodha only when you press Approve/)).toBeTruthy();
   });
 });

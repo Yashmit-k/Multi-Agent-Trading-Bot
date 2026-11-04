@@ -1,9 +1,16 @@
 # Momentum live: approve-then-place with Zerodha (plan)
 
-Status (2026-11-05): **phases 1 and 2 built; no order code exists.** Written 2026-11-04. Nothing here places an order until the owner switches it on.
+Status (2026-11-05): **phases 1–3 built. Order placement exists but is switched off:** the server switch `MOMENTUM_LIVE_ENABLED` is not set, so Mode cannot be set to Live and Approve is refused. Written 2026-11-04.
 
-- Phase 1: operator-only Settings page, Zerodha login through the site, read-only account view.
-- Phase 2: the trial writes `live/proposal-<close>.json` once per month-end. Core's planner (`core_api/live_plan.py`) turns it into the dry-run orders shown on the Settings page; each dry run on the real account is logged once. Telegram sends one notice when the ranking is fixed and one at 08:45 IST on rebalance morning (Mode not Off).
+- **Phase 1:** operator-only Settings page, Zerodha login through the site, read-only account view.
+- **Phase 2:** the trial writes `live/proposal-<close>.json` once per month-end. Core's planner (`core_api/live_plan.py`) turns it into the orders shown on the Settings page; each dry run on the real account is logged once. Telegram sends one notice when the ranking is fixed and one at 08:45 IST on rebalance morning (Mode not Off).
+- **Phase 3:** `core_api/live_exec.py` places an approved rebalance, tested only against a fake Zerodha (`tests/test_momentum_live_exec.py`).
+  - **Approve** sends exactly the orders shown. The site sends a fingerprint of them, and a changed plan is refused with "reload".
+  - Sells go first. Buys follow once the sells are done or 15 minutes have passed, sized to the cash Zerodha shows. Then one leftover round with the cash the fills freed.
+  - Anything still open at 10:30 IST, or 60 minutes after Approve if that is later (never after 15:15), is cancelled.
+  - The ledger is updated from the actual fills only.
+  - **Skip** marks the month done with no orders. **Stop** cancels the strategy's open orders and sets Mode to Off.
+  - A background step runs every 15 seconds. The run is saved after every order, so a restart continues it, and an order placed just before a crash is adopted rather than placed again.
 
 ## What it does
 

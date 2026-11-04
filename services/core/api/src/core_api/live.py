@@ -1,13 +1,16 @@
-"""Momentum live, phase 1 (services/quant/docs/momentum-live-plan.md): the owner's Zerodha account, read-only, and the
-settings the later phases will use. Nothing in this module places, changes or cancels an order.
+"""Momentum live (services/quant/docs/momentum-live-plan.md): the owner's Zerodha account (read-only), the settings,
+the month's planned orders, and the owner's Approve / Skip / Stop of a rebalance.
 
-Every route needs the Core token. The public proxy forwards them only for a signed-in operator, because the account
-and the amount invested are private.
+Orders are placed only by core_api.live_exec, after Approve and only when every gate there passes (the server switch
+MOMENTUM_LIVE_ENABLED is off by default). Every route needs the Core token; the public proxy forwards them only for a
+signed-in operator, because the account and the amount invested are private.
 """
 
 import hashlib
 import json
 import os
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Any, Callable
@@ -16,6 +19,7 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 
+from core_api.live_exec import FINAL_PHASES, RUN_EVENT, RUN_KEY, Executor, LiveRefused, check_approval, enabled, new_run, order_digest
 from core_db.repository import CoreRepository
 
 SETTING_KEY = "momentum_live"
@@ -23,8 +27,13 @@ LEDGER_KEY = "momentum_live_ledger"  # shares the strategy bought itself; writte
 CHANGE_EVENT = "momentum_live.settings_changed"
 DRY_RUN_EVENT = "momentum_live.dry_run"
 DEFAULTS: dict[str, object] = {"amount": 0, "stocks": 10, "mode": "off", "max_order": 25000}
-# "live" is accepted only once order placement is built (phase 3 of the plan).
-MODES = ("off", "dry_run")
+MODES = ("off", "dry_run")  # plus "live" while the server switch MOMENTUM_LIVE_ENABLED is on
+
+
+def modes() -> tuple[str, ...]:
+    from core_api.live_exec import enabled
+
+    return (*MODES, "live") if enabled() else MODES
 LIMITS = {"amount": (0, 10_000_000), "stocks": (5, 50), "max_order": (1_000, 1_000_000)}
 
 
@@ -64,10 +73,8 @@ def parse_settings(values: dict[str, Any]) -> tuple[dict[str, object], dict[str,
             continue
         clean[key] = number
     mode = str(values.get("mode", "")).strip()
-    if mode == "live":
-        errors["mode"] = "live mode is not built yet; use off or dry_run"
-    elif mode not in MODES:
-        errors["mode"] = "must be off or dry_run"
+    if mode not in modes():
+        errors["mode"] = "live needs the server switch MOMENTUM_LIVE_ENABLED=true" if mode == "live" else f"must be one of {', '.join(modes())}"
     else:
         clean["mode"] = mode
     return clean, errors
@@ -139,7 +146,7 @@ def register(app: FastAPI, repository: CoreRepository, require_user: Callable[..
         changes = repository.list_system_events(event_type=CHANGE_EVENT, limit=10)
         return {
             "settings": load_settings(repository),
-            "modes": list(MODES),
+            "modes": list(modes()),
             "limits": {key: {"min": low, "max": high} for key, (low, high) in LIMITS.items()},
             "updated_at": stored["updated_at"] if stored else None,
             "changes": [{"at": row["recorded_at"].isoformat(), **row["envelope"]} for row in changes],
@@ -186,12 +193,15 @@ def register(app: FastAPI, repository: CoreRepository, require_user: Callable[..
             return {"mode": settings["mode"], "sent": False, "detail": "no_proposal_yet"}
         account = read_account() if app.state.kite_client is not None and logged_in() else None
         body = plan(proposal, settings, account, load_ledger(repository))
+        run = load_run()
+        body["digest"] = order_digest(body["orders"])
+        body["run_phase"] = run["phase"] if run and run.get("decided") == body["decided_at_close"] else None
         if account is not None and body["orders"]:
             # Each distinct dry run is kept once in the append-only log.
             digest = hashlib.sha256(json.dumps([body["orders"], settings], sort_keys=True).encode()).hexdigest()[:16]
             repository.insert_system_event(str(uuid5(NAMESPACE_URL, f"{DRY_RUN_EVENT}:{body['decided_at_close']}:{digest}")), DRY_RUN_EVENT,
                                            datetime.now(timezone.utc), {"settings": settings, "plan": body})
-        return {**body, "mode": settings["mode"], "sent": False, "live_enabled": False}
+        return {**body, "mode": settings["mode"], "sent": False, "live_switch": enabled()}
 
     @app.get("/api/v1/live/account")
     def live_account(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
@@ -202,6 +212,148 @@ def register(app: FastAPI, repository: CoreRepository, require_user: Callable[..
             raise HTTPException(status_code=409, detail="zerodha_login_required")
         body = read_account()
         return {**body, "read_at": datetime.now(timezone.utc).isoformat(), "live_enabled": False}
+
+    # ---- Approve / Skip / Stop and the run (core_api.live_exec) ------------------------------------------------
+
+    lock = threading.Lock()  # one step of a run at a time: the background runner and the routes never overlap
+    # Swappable in tests: the clock and the pause between orders.
+    app.state.momentum_live_clock = lambda: datetime.now(timezone.utc)
+    app.state.momentum_live_sleep = time.sleep
+
+    def clock() -> datetime:
+        return app.state.momentum_live_clock()
+
+    def load_run() -> dict | None:
+        stored = repository.get_setting(RUN_KEY)
+        return dict(stored["payload"]) if stored else None
+
+    def executor() -> Executor:
+        def save(run: dict) -> None:
+            repository.save_setting(RUN_KEY, run, updated_by="momentum_live", now=datetime.now(timezone.utc))
+
+        def log(kind: str, payload: dict) -> None:
+            repository.insert_system_event(str(uuid4()), kind, datetime.now(timezone.utc), json.loads(json.dumps(payload, default=str)))
+
+        def update_ledger(ledger: dict[str, int]) -> None:
+            repository.save_setting(LEDGER_KEY, ledger, updated_by="momentum_live", now=datetime.now(timezone.utc))
+
+        notify = send_telegram if os.environ.get("TELEGRAM_BOT_TOKEN") else None
+        return Executor(app.state.kite_client, save, log, update_ledger, sleep=app.state.momentum_live_sleep, notify=notify)
+
+    def run_view() -> dict[str, object]:
+        return {"run": load_run(), "live_switch": enabled()}
+
+    def set_mode_off(operator: str) -> None:
+        before = load_settings(repository)
+        if before["mode"] != "off":
+            now = datetime.now(timezone.utc)
+            repository.save_setting(SETTING_KEY, {**before, "mode": "off"}, updated_by=operator, now=now)
+            repository.insert_system_event(str(uuid4()), CHANGE_EVENT, now, {"by": operator, "changed": {"mode": {"from": before["mode"], "to": "off"}}})
+
+    class ApproveBody(BaseModel):
+        digest: str
+        operator: str = "operator"
+
+    class OperatorBody(BaseModel):
+        operator: str = "operator"
+
+    @app.get("/api/v1/live/run")
+    def live_run(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        return run_view()
+
+    @app.post("/api/v1/live/approve")
+    def live_approve(body: ApproveBody, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        """The owner approves exactly the orders shown (body.digest); the sells go out at once."""
+        from core_api.live_plan import plan
+
+        if app.state.kite_client is None:
+            raise HTTPException(status_code=503, detail="zerodha_not_configured")
+        proposal = latest_proposal()
+        if proposal is None:
+            raise HTTPException(status_code=409, detail="no_proposal_yet")
+        with lock:
+            settings = load_settings(repository)
+            account = read_account() if logged_in() else None
+            current = plan(proposal, settings, account, load_ledger(repository))
+            now = clock()
+            try:
+                check_approval(settings=settings, plan=current, digest=body.digest, run=load_run(), now=now, logged_in=account is not None,
+                               trading_day=nse_trading_day(now))
+            except LiveRefused as exc:
+                raise HTTPException(status_code=409, detail=exc.code) from exc
+            run = new_run(current, settings, load_ledger(repository), now)
+            run["approved_by"] = body.operator[:64] or "operator"
+            repository.insert_system_event(str(uuid4()), "momentum_live.approved", now, {"by": run["approved_by"], "decided": run["decided"], "digest": body.digest})
+            executor().tick(run, now)
+        return run_view()
+
+    @app.post("/api/v1/live/skip")
+    def live_skip(body: OperatorBody, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        """No orders this month; the month counts as done."""
+        from core_api.live_plan import plan
+
+        proposal = latest_proposal()
+        if proposal is None:
+            raise HTTPException(status_code=409, detail="no_proposal_yet")
+        with lock:
+            run = load_run()
+            if run is not None and run.get("decided") == proposal["decided_at_close"]:
+                raise HTTPException(status_code=409, detail="already_done_this_month")
+            settings = load_settings(repository)
+            skipped = new_run(plan(proposal, settings, None, load_ledger(repository)), settings, load_ledger(repository), clock(), skipped=True)
+            skipped["notes"].append(f"skipped by {body.operator[:64] or 'operator'}")
+            repository.save_setting(RUN_KEY, skipped, updated_by="momentum_live", now=clock())
+            repository.insert_system_event(str(uuid4()), RUN_EVENT, clock(), json.loads(json.dumps(skipped, default=str)))
+        return run_view()
+
+    @app.post("/api/v1/live/stop")
+    def live_stop(body: OperatorBody, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
+        """Cancel the strategy's open orders and set Mode to Off. Works even with no run in progress."""
+        with lock:
+            run = load_run()
+            if run is not None and run["phase"] not in FINAL_PHASES and app.state.kite_client is not None:
+                executor().stop(run)
+            set_mode_off(body.operator[:64] or "operator")
+        return run_view()
+
+    def advance() -> None:
+        """One step of a run in progress; called by the background runner every few seconds."""
+        with lock:
+            run = load_run()
+            if run is None or run["phase"] in FINAL_PHASES or app.state.kite_client is None:
+                return
+            if not logged_in():
+                note = "Zerodha session ended: log in again on the site to finish the rebalance"
+                if note not in run["notes"]:
+                    run["notes"].append(note)
+                    repository.save_setting(RUN_KEY, run, updated_by="momentum_live", now=clock())
+                return
+            executor().tick(run, clock())
+
+    app.state.momentum_live_advance = advance
+
+
+def nse_trading_day(now: datetime) -> bool:
+    """False outside the calendar's coverage, so nothing is placed on a day it cannot vouch for."""
+    try:
+        from core_paper.trading_calendar import session_for
+
+        return session_for((now.astimezone(timezone.utc) + timedelta(hours=5, minutes=30)).date()) is not None
+    except Exception:  # noqa: BLE001
+        return False
+
+
+async def run_loop(app: FastAPI, every_seconds: int = 15) -> None:
+    import asyncio
+    import logging
+
+    log = logging.getLogger("uvicorn.error")
+    while True:
+        try:
+            await asyncio.to_thread(app.state.momentum_live_advance)
+        except Exception as exc:  # noqa: BLE001 - logged; the next tick retries from the saved state
+            log.warning("momentum_live run step failed: %s: %s", type(exc).__name__, str(exc)[:200])
+        await asyncio.sleep(every_seconds)
 
 
 # ---- Telegram notices: the ranking is fixed (evening) and rebalance morning (08:45 IST) -------------------------

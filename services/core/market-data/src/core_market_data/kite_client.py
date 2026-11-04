@@ -83,6 +83,20 @@ class KiteConnectMarketClient:
     def orders(self) -> list[dict[str, Any]]:
         return list(self._kite.orders())
 
+    # Order calls, used only by momentum live (core_api.live_exec) behind its gates: NSE delivery (CNC) limit orders.
+    def place_limit_order(self, *, symbol: str, side: str, quantity: int, price: float, tag: str) -> str:
+        if side not in ("BUY", "SELL") or quantity <= 0 or price <= 0:
+            raise ValueError("bad order")
+        return str(
+            self._kite.place_order(
+                variety="regular", exchange="NSE", tradingsymbol=symbol, transaction_type=side, quantity=int(quantity),
+                product="CNC", order_type="LIMIT", price=round(float(price), 2), validity="DAY", tag=tag,
+            )
+        )
+
+    def cancel_order(self, order_id: str) -> None:
+        self._kite.cancel_order(variety="regular", order_id=order_id)
+
     def historical_data(
         self,
         instrument_token: int,

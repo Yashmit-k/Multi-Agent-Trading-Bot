@@ -28,9 +28,19 @@ type Plan = {
   orders?: Array<{ side: string; symbol: string; quantity: number; close: number; limit: number; value: number; blocked: string | null }>;
   warnings?: string[];
   totals?: { buy?: number; sell?: number; charges?: number };
+  digest?: string;
+  run_phase?: string | null;
+  live_switch?: boolean;
+};
+type RunOrder = { side: string; symbol: string; quantity: number; filled: number; limit: number; average_price: number | null; status: string; round: string };
+type Run = { decided: string; phase: string; deadline: string; orders: RunOrder[]; notes: string[]; summary?: { bought: number; sold: number; unfilled: string[] } };
+
+const PHASE: Record<string, string> = {
+  selling: "Selling", buying: "Buying", buying_wait: "Waiting for buys to fill", leftover_wait: "Buying with the leftover cash",
+  closing: "Cancelling what is still open", done: "Done", stopped: "Stopped", skipped: "Skipped this month",
 };
 
-const MODE_LABEL: Record<string, string> = { off: "Off", dry_run: "Dry run (orders shown, never sent)" };
+const MODE_LABEL: Record<string, string> = { off: "Off", dry_run: "Dry run (orders shown, never sent)", live: "Live (orders sent after you approve)" };
 const LABEL: Record<string, string> = { amount: "Amount for the strategy", stocks: "Number of stocks", mode: "Mode", max_order: "Largest single order" };
 const HINT: Record<string, string> = {
   amount: "The most of your account the strategy may use, in rupees. It never spends beyond this.",
@@ -76,7 +86,9 @@ function SettingsForm({ view, onSaved }: { view: SettingsView; onSaved: (next: S
               <option key={mode} value={mode}>{MODE_LABEL[mode] ?? mode}</option>
             ))}
           </select>
-          <span className="mt-0.5 block text-xs text-[#64748B]">Live mode arrives once order placement is built and tested.</span>
+          <span className="mt-0.5 block text-xs text-[#64748B]">
+            {view.modes.includes("live") ? "Live: nothing is sent until you press Approve on the month's orders." : "Live is off on the server (switch MOMENTUM_LIVE_ENABLED)."}
+          </span>
         </span>
       </label>
       <div className="flex items-center gap-3">
@@ -136,13 +148,29 @@ function AccountView() {
   );
 }
 
-function PlanCard({ mode }: { mode: string }) {
+function PlanCard({ mode, onRun }: { mode: string; onRun: () => void }) {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
+  const [pending, setPending] = useState(false);
+  const load = useCallback(() => {
     setPlan(null);
+    setError(null);
     fetchApi<Plan>("/api/v1/live/plan").then(setPlan).catch((e) => setError(errorText(e)));
-  }, [mode]);
+  }, []);
+  useEffect(load, [load, mode]);
+  async function act(path: string, body: object, question: string) {
+    if (!window.confirm(question)) return;
+    setPending(true);
+    try {
+      await postApi(path, { ...body, operator: "web-operator" });
+      onRun();
+      load();
+    } catch (e) {
+      setError(`${errorText(e)}. Reload the orders and try again.`);
+    } finally {
+      setPending(false);
+    }
+  }
   if (error) return <p className="text-sm text-[#EF4444]">{error}</p>;
   if (!plan) return <p className="text-sm text-[#94A3B8]">Working out the orders…</p>;
   if (plan.mode === "off") return <p className="text-sm text-[#94A3B8]">Mode is Off. Set it to Dry run to see the orders each rebalance would place.</p>;
@@ -152,8 +180,13 @@ function PlanCard({ mode }: { mode: string }) {
     <div className="space-y-3 text-sm">
       <p className="text-[#94A3B8]">
         Ranking fixed at the close of {plan.decided_at_close}; orders for the open of {plan.trade_at_open_of}. Book {inr(plan.book)}, about {inr(plan.per_stock)} per stock.{" "}
-        <span className="font-semibold text-[#F59E0B]">Dry run: nothing is sent to Zerodha.</span>
+        {plan.mode === "live" ? (
+          <span className="font-semibold text-[#EF4444]">Live: these are sent to Zerodha only when you press Approve.</span>
+        ) : (
+          <span className="font-semibold text-[#F59E0B]">Dry run: nothing is sent to Zerodha.</span>
+        )}
       </p>
+      {plan.run_phase ? <p className="text-xs text-[#94A3B8]">This month: {PHASE[plan.run_phase] ?? plan.run_phase}.</p> : null}
       {plan.assumed_account ? <p className="text-xs text-[#F59E0B]">Not logged in to Zerodha, so this assumes an empty account holding the amount in cash.</p> : null}
       {orders.length ? (
         <Table head={["Order", "Stock", "Shares", "Close", "Limit", "Value"]} minWidth={520}>
@@ -177,6 +210,82 @@ function PlanCard({ mode }: { mode: string }) {
       {(plan.warnings ?? []).map((w) => (
         <p key={w} className="text-xs text-[#F59E0B]">{w}</p>
       ))}
+      {plan.mode === "live" && plan.live_switch && !plan.run_phase ? (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={pending || plan.assumed_account || !orders.some((o) => !o.blocked)}
+            onClick={() => void act("/api/v1/live/approve", { digest: plan.digest }, `Send these ${orders.filter((o) => !o.blocked).length} orders to Zerodha now? Buys up to ${inr(plan.totals?.buy)}.`)}
+            className="rounded bg-[#DC2626] px-3 py-1 font-medium text-white disabled:opacity-50"
+          >
+            Approve and send
+          </button>
+          <button type="button" disabled={pending} onClick={() => void act("/api/v1/live/skip", {}, "Skip this month? No orders will be placed until next month-end.")} className="rounded border border-[#26303C] px-3 py-1 text-[#94A3B8]">
+            Skip this month
+          </button>
+          {plan.assumed_account ? <span className="text-xs text-[#F59E0B]">Log in to Zerodha first.</span> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function RunCard({ refreshKey }: { refreshKey: number }) {
+  const [run, setRun] = useState<Run | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const load = useCallback(() => {
+    fetchApi<{ run: Run | null }>("/api/v1/live/run").then((body) => setRun(body.run)).catch(() => setRun(null));
+  }, []);
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, 10000);
+    return () => clearInterval(timer);
+  }, [load, refreshKey]);
+  async function stop() {
+    if (!window.confirm("Cancel the strategy's open orders and switch Mode to Off?")) return;
+    try {
+      await postApi("/api/v1/live/stop", { operator: "web-operator" });
+      setMessage("Stopped. Mode is Off.");
+      load();
+    } catch (e) {
+      setMessage(errorText(e));
+    }
+  }
+  const active = run && !["done", "stopped", "skipped"].includes(run.phase);
+  return (
+    <div className="space-y-3 text-sm">
+      {run ? (
+        <>
+          <p>
+            Rebalance of {run.decided}: <span className="font-semibold">{PHASE[run.phase] ?? run.phase}</span>
+            {active ? ` (open orders are cancelled at ${new Date(run.deadline).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })} IST)` : ""}
+          </p>
+          {run.orders.length ? (
+            <Table head={["Order", "Stock", "Shares", "Filled", "Limit", "Avg price", "Status"]} minWidth={560}>
+              {run.orders.map((o, k) => (
+                <tr key={`${o.round}-${o.side}-${o.symbol}-${k}`}>
+                  <Td>{o.side === "BUY" ? "Buy" : "Sell"}{o.round === "leftover" ? " (leftover)" : ""}</Td>
+                  <Td>{o.symbol}</Td>
+                  <Td className="tabular-nums">{o.quantity}</Td>
+                  <Td className="tabular-nums">{o.filled}</Td>
+                  <Td className="tabular-nums">{price(o.limit)}</Td>
+                  <Td className="tabular-nums">{price(o.average_price)}</Td>
+                  <Td>{o.status.toLowerCase()}</Td>
+                </tr>
+              ))}
+            </Table>
+          ) : null}
+          {run.notes.map((n) => (
+            <p key={n} className="text-xs text-[#94A3B8]">{n}</p>
+          ))}
+        </>
+      ) : (
+        <p className="text-[#94A3B8]">No rebalance has been sent yet.</p>
+      )}
+      <button type="button" onClick={() => void stop()} className="rounded border border-[#DC2626] px-3 py-1 text-[#FCA5A5]">
+        Stop: cancel open orders and switch off
+      </button>
+      {message ? <p className="text-xs text-[#94A3B8]">{message}</p> : null}
     </div>
   );
 }
@@ -215,6 +324,7 @@ export function LivePanel() {
   const { status } = useOperator();
   const [view, setView] = useState<SettingsView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [runKey, setRunKey] = useState(0);
   const operator = Boolean(status?.operator);
   useEffect(() => {
     if (!operator) return;
@@ -239,7 +349,12 @@ export function LivePanel() {
       </Card>
       {view ? (
         <Card title="This month's orders">
-          <PlanCard mode={`${view.settings.mode}-${view.updated_at ?? ""}`} />
+          <PlanCard mode={`${view.settings.mode}-${view.updated_at ?? ""}`} onRun={() => setRunKey((k) => k + 1)} />
+        </Card>
+      ) : null}
+      {view && view.settings.mode !== "off" ? (
+        <Card title="Rebalance status">
+          <RunCard refreshKey={runKey} />
         </Card>
       ) : null}
       <OperatorLogin />

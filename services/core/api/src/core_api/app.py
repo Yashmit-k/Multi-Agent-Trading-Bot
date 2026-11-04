@@ -79,11 +79,12 @@ def create_app(
         task = None
         if resolved.market_data_collector:
             task = asyncio.create_task(_collector_loop(_app, repository, resolved.market_data_poll_seconds))
-        from core_api.live import notice_loop
+        from core_api.live import notice_loop, run_loop
 
         notices = asyncio.create_task(notice_loop(repository)) if os.environ.get("TELEGRAM_BOT_TOKEN") else None
+        runner = asyncio.create_task(run_loop(_app))  # advances an approved momentum-live rebalance; idle otherwise
         yield
-        for running in (task, notices):
+        for running in (task, notices, runner):
             if running is not None:
                 running.cancel()
 

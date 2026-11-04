@@ -29,5 +29,8 @@ describe("public proxy policy", () => {
     expect(operatorOnlyRead("/api/v1/momentum-trial")).toBe(false);
     expect(allowOperatorWrite("/api/v1/live/settings")).toBe(true);
     expect(allowOperatorWrite("/api/v1/live/account")).toBe(false);
+    expect(allowOperatorWrite("/api/v1/live/approve")).toBe(true);
+    expect(allowOperatorWrite("/api/v1/live/stop")).toBe(true);
+    expect(allowOperatorWrite("/api/v1/live/approve/x")).toBe(false);
   });
 });

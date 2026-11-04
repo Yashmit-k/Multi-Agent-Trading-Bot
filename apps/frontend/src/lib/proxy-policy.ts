@@ -30,6 +30,7 @@ export function allowWrite(path: string, allowed: string | undefined): boolean {
 const OPERATOR_WRITES: RegExp[] = [
   /^\/api\/v1\/settings\/risk$/,
   /^\/api\/v1\/live\/settings$/,
+  /^\/api\/v1\/live\/(approve|skip|stop)$/,
   /^\/api\/v1\/paper\/orders\/manual$/,
   /^\/api\/v1\/paper\/orders\/[\w:.-]+\/cancel$/,
   /^\/api\/v1\/paper\/positions\/[\w&.-]+\/close$/,
