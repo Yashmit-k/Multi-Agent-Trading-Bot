@@ -158,7 +158,7 @@ def ranking(m, wm, t: int, scorer=None, limit: int = RANKING_SHOWN) -> list[dict
     cols = m.members[t]
     s = (scorer or wm.scores)(m, RULE, t, cols)
     order = [k for k in np.argsort(-np.nan_to_num(s, nan=-np.inf)) if np.isfinite(s[k])][:limit]
-    return [{"rank": n + 1, "symbol": str(m.p.symbols[cols[k]]), "score": round(float(s[k]), 4), "close": float(m.p.close[t, cols[k]])} for n, k in enumerate(order)]
+    return [{"rank": n + 1, "symbol": str(m.p.symbols[cols[k]]), "score": round(float(s[k]), 4), "close": round(float(m.p.close[t, cols[k]]), 2)} for n, k in enumerate(order)]
 
 
 def record_decisions(m, wm, now: datetime, book: str = "plain", scorer=None) -> list[str]:
@@ -205,7 +205,7 @@ def write_proposal(m, wm, now: datetime) -> str | None:
     for j, symbol in enumerate(m.p.symbols):
         close = m.p.close[t, j]
         if m.p.series[t, j] == 1 and np.isfinite(close) and close > 0:
-            closes[str(symbol)] = float(close)
+            closes[str(symbol)] = round(float(close), 2)
     body = {"decided_at_close": key, "trade_at_open_of": next_session(m.d[t]).isoformat(), "rule": RULE, "written_at": now.isoformat(),
             "ranking": ranking(m, wm, t, limit=PROPOSAL_DEPTH), "closes": closes}
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -109,3 +109,21 @@ def test_the_login_code_never_reaches_the_access_log() -> None:
     for f in logging.getLogger("uvicorn.access").filters:
         f.filter(record)
     assert "SECRET123" not in record.getMessage() and "request_token=[redacted]&x=1" in record.getMessage()
+
+
+def test_a_new_book_invests_nearly_all_of_the_amount() -> None:
+    # Ten stocks priced like the 30 Oct 2026 decision, ₹1,00,000, empty account.
+    prices = [536.40, 324.55, 767.45, 1796.10, 3094.80, 6838.00, 4111.60, 955.60, 843.30, 2341.60]
+    proposal = {"decided_at_close": "2026-10-30", "trade_at_open_of": "2026-11-02",
+                "ranking": [{"symbol": f"S{k}", "close": c} for k, c in enumerate(prices)], "closes": {f"S{k}": c for k, c in enumerate(prices)}}
+    body = plan(proposal, {"amount": 100000, "stocks": 10, "mode": "dry_run", "max_order": 25000}, None, {})
+    at_limit = sum(o["quantity"] * o["limit"] for o in body["orders"])
+    assert 0.97 * 100000 <= at_limit and at_limit + body["totals"]["charges"] <= 100000
+    assert len(body["orders"]) == 10
+
+
+def test_an_empty_account_is_explained() -> None:
+    body = plan(PROPOSAL, SETTINGS, _account(0), {})
+    assert body["orders"] == []
+    assert any("no cash available" in w for w in body["warnings"])
+    assert any("Not enough cash" in w for w in plan(PROPOSAL, SETTINGS, _account(20), {})["warnings"])

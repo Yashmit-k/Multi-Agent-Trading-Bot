@@ -45,7 +45,7 @@ def plan(proposal: dict, settings: dict, account: dict | None, ledger: dict[str,
     for row in account.get("positions", []):
         if row.get("product") == "CNC":  # bought today, not yet in holdings
             in_account[row["symbol"]] = in_account.get(row["symbol"], 0) + int(row["quantity"])
-    closes = {**last_close, **{str(k): float(v) for k, v in proposal["closes"].items()}}
+    closes = {s: round(c, 2) for s, c in {**last_close, **{str(k): float(v) for k, v in proposal["closes"].items()}}.items()}
 
     held: dict[str, int] = {}
     for symbol, qty in ledger.items():
@@ -73,15 +73,19 @@ def plan(proposal: dict, settings: dict, account: dict | None, ledger: dict[str,
     if len(targets) < stocks:
         warnings.append(f"Only {len(targets)} ranked stocks have a price; holding {len(targets)}.")
     per = book / max(len(targets), 1)
-    want = {s: int(per // closes[s]) for s in targets}
-    left = book - sum(want[s] * closes[s] for s in targets)
+    # Shares to buy are sized at their limit price, so the worst case already fits and little cash is left idle;
+    # shares already held are valued at the close. A reserve covers the buy charges.
+    size = {s: closes[s] if s in held else buy_limit(closes[s]) for s in targets}
+    budget = book - delivery_charges(max(book - held_value, 0.0), 0.0)
+    want = {s: int(per // size[s]) for s in targets}
+    left = budget - sum(want[s] * size[s] for s in targets)
     while True:  # leftover fill, as in the paper trial
-        room = [s for s in targets if closes[s] <= left]
+        room = [s for s in targets if size[s] <= left]
         if not room:
             break
-        pick = min(room, key=lambda s: want[s] * closes[s] / per)
+        pick = min(room, key=lambda s: want[s] * size[s] / per)
         want[pick] += 1
-        left -= closes[pick]
+        left -= size[pick]
 
     sells = {s: q for s, q in held.items() if s not in want and s not in untradable}
     sells.update({s: held[s] - want[s] for s in targets if held.get(s, 0) > want[s]})
@@ -101,6 +105,12 @@ def plan(proposal: dict, settings: dict, account: dict | None, ledger: dict[str,
         buys[heavy] -= 1
         if buys[heavy] == 0:
             del buys[heavy]
+
+    if not buys and any(s not in held for s in targets):
+        if not assumed and cash <= 0 and not sells:
+            warnings.append("Your Zerodha account has no cash available, so nothing can be bought. Add funds to see this month's real orders.")
+        else:
+            warnings.append("Not enough cash for even one share of the stocks to buy.")
 
     orders = []
     for side, book_side in (("SELL", sells), ("BUY", buys)):
