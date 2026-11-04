@@ -45,6 +45,7 @@ DELIVERY_FROM = date(2026, 6, 1)  # 63 sessions of delivery % are needed before 
 DELIVERY_BACKTEST = {"period": "2020-02 to 2026-10", "cagr": 0.554, "max_drawdown": 0.31, "benchmark_cagr": 0.200, "niftybees_cagr": 0.116}
 RULE = "mom_12_1"
 RANKING_SHOWN = 40
+PROPOSAL_DEPTH = 80  # momentum live: up to 50 stocks, with fallbacks for names that cannot be bought
 HOLD = int(os.environ.get("MOMENTUM_TRIAL_HOLD", "10"))
 CAPITAL = float(os.environ.get("MOMENTUM_TRIAL_CAPITAL", "100000"))
 FILL = os.environ.get("MOMENTUM_TRIAL_FILL", "true").strip().lower() not in {"0", "false", "no"}
@@ -153,10 +154,10 @@ def _market(raw: Path):
     return m, wm
 
 
-def ranking(m, wm, t: int, scorer=None) -> list[dict[str, object]]:
+def ranking(m, wm, t: int, scorer=None, limit: int = RANKING_SHOWN) -> list[dict[str, object]]:
     cols = m.members[t]
     s = (scorer or wm.scores)(m, RULE, t, cols)
-    order = [k for k in np.argsort(-np.nan_to_num(s, nan=-np.inf)) if np.isfinite(s[k])][:RANKING_SHOWN]
+    order = [k for k in np.argsort(-np.nan_to_num(s, nan=-np.inf)) if np.isfinite(s[k])][:limit]
     return [{"rank": n + 1, "symbol": str(m.p.symbols[cols[k]]), "score": round(float(s[k]), 4), "close": float(m.p.close[t, cols[k]])} for n, k in enumerate(order)]
 
 
@@ -186,6 +187,32 @@ def record_decisions(m, wm, now: datetime, book: str = "plain", scorer=None) -> 
             elif [r["symbol"] for r in logged[key]["ranking"][:HOLD]] != [r["symbol"] for r in ranked[:HOLD]]:
                 notes.append(f"WARNING: {book} ranking for {key} recomputes differently (data revised?)")
     return notes
+
+
+def write_proposal(m, wm, now: datetime) -> str | None:
+    """Momentum live (services/quant/docs/momentum-live-plan.md): for the latest month-end decision, write once the
+    ranking deep enough for up to 50 stocks plus fallbacks, and that close for every EQ share (to price the sells of
+    holdings that left the ranking). Core sizes the orders from it; this service never talks to a broker."""
+    ends = [t for t in sorted(m.members) if m.d[t] >= START]
+    if not ends:
+        return None
+    t = ends[-1]
+    key = m.d[t].isoformat()
+    path = DIR / "live" / f"proposal-{key}.json"
+    if path.exists():
+        return None
+    closes = {}
+    for j, symbol in enumerate(m.p.symbols):
+        close = m.p.close[t, j]
+        if m.p.series[t, j] == 1 and np.isfinite(close) and close > 0:
+            closes[str(symbol)] = float(close)
+    body = {"decided_at_close": key, "trade_at_open_of": next_session(m.d[t]).isoformat(), "rule": RULE, "written_at": now.isoformat(),
+            "ranking": ranking(m, wm, t, limit=PROPOSAL_DEPTH), "closes": closes}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(body, default=_plain))
+    tmp.replace(path)
+    return f"live: proposal written for {key}"
 
 
 def report(m, wm, now: datetime, notes: list[str], book: str = "plain", scorer=None) -> dict[str, object]:
@@ -253,6 +280,8 @@ def run_once(now: datetime | None = None) -> dict[str, object]:
     got_delivery = sync_delivery(DIR / "delivery", today)
     m, wm = _market(raw)
     notes = record_decisions(m, wm, now)
+    proposal = write_proposal(m, wm, now)
+    notes += [proposal] if proposal else []
     body = report(m, wm, now, notes)
     scorer = _scorer("delivery", m)
     delivery_notes = record_decisions(m, wm, now, "delivery", scorer)

@@ -42,7 +42,23 @@ packages = ["src/quant_agents"]
 "src/quant_agents" = "quant_agents"
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+# Some research modules reuse Core's backtest and cost code, so the Core packages are on the path too (as in the root
+# pytest.ini).
+pythonpath = [
+    "src",
+    "../../packages/contracts/src",
+    "../core/db/src",
+    "../core/candle-engine/src",
+    "../core/feature-engine/src",
+    "../core/signal-ingestion/src",
+    "../core/market-data/src",
+    "../core/worker/src",
+    "../core/api/src",
+    "../core/signal-fusion/src",
+    "../core/decision-engine/src",
+    "../core/risk-engine/src",
+    "../core/paper-execution/src",
+]
 testpaths = ["tests"]
 markers = [
     "integration: requires core_features; excluded by default",

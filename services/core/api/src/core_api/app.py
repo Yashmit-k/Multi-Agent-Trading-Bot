@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -44,6 +45,18 @@ class ErrorBody(BaseModel):
     detail: str
 
 
+class _RedactRequestToken(logging.Filter):
+    """Zerodha's one-time login code arrives in the callback's query string; keep it out of the access log."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.args, tuple) and any("request_token=" in str(arg) for arg in record.args):
+            record.args = tuple(re.sub(r"request_token=[^&\s]+", "request_token=[redacted]", str(arg)) if isinstance(arg, str) else arg for arg in record.args)
+        return True
+
+
+logging.getLogger("uvicorn.access").addFilter(_RedactRequestToken())
+
+
 def create_app(
     settings: Settings | None = None,
     repository: CoreRepository | None = None,
@@ -66,9 +79,13 @@ def create_app(
         task = None
         if resolved.market_data_collector:
             task = asyncio.create_task(_collector_loop(_app, repository, resolved.market_data_poll_seconds))
+        from core_api.live import notice_loop
+
+        notices = asyncio.create_task(notice_loop(repository)) if os.environ.get("TELEGRAM_BOT_TOKEN") else None
         yield
-        if task is not None:
-            task.cancel()
+        for running in (task, notices):
+            if running is not None:
+                running.cancel()
 
     app = FastAPI(title="Core trading API", version="1.0.0", lifespan=lifespan)
     app.add_middleware(

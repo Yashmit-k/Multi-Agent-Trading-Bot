@@ -1,6 +1,9 @@
 # Momentum live: approve-then-place with Zerodha (plan)
 
-Status: **PLAN, not built.** Written 2026-11-04. Nothing here places an order until the owner switches it on.
+Status (2026-11-05): **phases 1 and 2 built; no order code exists.** Written 2026-11-04. Nothing here places an order until the owner switches it on.
+
+- Phase 1: operator-only Settings page, Zerodha login through the site, read-only account view.
+- Phase 2: the trial writes `live/proposal-<close>.json` once per month-end. Core's planner (`core_api/live_plan.py`) turns it into the dry-run orders shown on the Settings page; each dry run on the real account is logged once. Telegram sends one notice when the ranking is fixed and one at 08:45 IST on rebalance morning (Mode not Off).
 
 ## What it does
 

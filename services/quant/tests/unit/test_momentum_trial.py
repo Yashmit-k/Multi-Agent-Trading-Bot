@@ -53,3 +53,31 @@ def test_delivery_book_waits_for_that_days_delivery_file(tmp_path, monkeypatch) 
     (tmp_path / "delivery" / "2026-10-30.csv").write_text("SYMBOL\n")
     assert mt.record_decisions(m, None, now, "delivery") == ["delivery: decision recorded for 2026-10-30"]
     assert json.loads((tmp_path / "decisions-delivery.jsonl").read_text())["book"] == "delivery"
+
+
+def test_live_proposal_is_written_once_for_the_latest_decision(tmp_path, monkeypatch) -> None:
+    import numpy as np
+
+    class _P:
+        symbols = np.array(["AAA", "BBB", "CCC"])
+        close = np.array([[10.0, 20.0, 30.0], [11.0, np.nan, 33.0]])
+        series = np.array([[1, 1, 1], [1, 1, 2]])  # CCC trades as BE on the decision day: no EQ close
+
+    m = _M([date(2026, 10, 29), date(2026, 10, 30)])
+    m.members = {1: []}
+    m.p = _P()
+    monkeypatch.setattr(mt, "DIR", tmp_path)
+    monkeypatch.setattr(mt, "START", date(2026, 10, 30))
+    seen = {}
+
+    def fake_ranking(m, wm, t, scorer=None, limit=mt.RANKING_SHOWN):
+        seen["limit"] = limit
+        return [{"rank": 1, "symbol": "AAA", "score": 1.0, "close": 11.0}]
+
+    monkeypatch.setattr(mt, "ranking", fake_ranking)
+    now = datetime(2026, 10, 30, 14, tzinfo=timezone.utc)
+    assert mt.write_proposal(m, None, now) == "live: proposal written for 2026-10-30"
+    body = json.loads((tmp_path / "live" / "proposal-2026-10-30.json").read_text())
+    assert body["trade_at_open_of"] == "2026-11-02" and seen["limit"] == mt.PROPOSAL_DEPTH
+    assert body["closes"] == {"AAA": 11.0}
+    assert mt.write_proposal(m, None, now) is None  # fixed once written

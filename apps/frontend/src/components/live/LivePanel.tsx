@@ -17,6 +17,19 @@ type Account = {
   read_at: string;
 };
 
+type Plan = {
+  mode: string;
+  detail?: string;
+  decided_at_close?: string;
+  trade_at_open_of?: string;
+  assumed_account?: boolean;
+  book?: number;
+  per_stock?: number;
+  orders?: Array<{ side: string; symbol: string; quantity: number; close: number; limit: number; value: number; blocked: string | null }>;
+  warnings?: string[];
+  totals?: { buy?: number; sell?: number; charges?: number };
+};
+
 const MODE_LABEL: Record<string, string> = { off: "Off", dry_run: "Dry run (orders shown, never sent)" };
 const LABEL: Record<string, string> = { amount: "Amount for the strategy", stocks: "Number of stocks", mode: "Mode", max_order: "Largest single order" };
 const HINT: Record<string, string> = {
@@ -123,6 +136,51 @@ function AccountView() {
   );
 }
 
+function PlanCard({ mode }: { mode: string }) {
+  const [plan, setPlan] = useState<Plan | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    setPlan(null);
+    fetchApi<Plan>("/api/v1/live/plan").then(setPlan).catch((e) => setError(errorText(e)));
+  }, [mode]);
+  if (error) return <p className="text-sm text-[#EF4444]">{error}</p>;
+  if (!plan) return <p className="text-sm text-[#94A3B8]">Working out the orders…</p>;
+  if (plan.mode === "off") return <p className="text-sm text-[#94A3B8]">Mode is Off. Set it to Dry run to see the orders each rebalance would place.</p>;
+  if (plan.detail === "no_proposal_yet") return <p className="text-sm text-[#94A3B8]">No month-end ranking yet.</p>;
+  const orders = plan.orders ?? [];
+  return (
+    <div className="space-y-3 text-sm">
+      <p className="text-[#94A3B8]">
+        Ranking fixed at the close of {plan.decided_at_close}; orders for the open of {plan.trade_at_open_of}. Book {inr(plan.book)}, about {inr(plan.per_stock)} per stock.{" "}
+        <span className="font-semibold text-[#F59E0B]">Dry run: nothing is sent to Zerodha.</span>
+      </p>
+      {plan.assumed_account ? <p className="text-xs text-[#F59E0B]">Not logged in to Zerodha, so this assumes an empty account holding the amount in cash.</p> : null}
+      {orders.length ? (
+        <Table head={["Order", "Stock", "Shares", "Close", "Limit", "Value"]} minWidth={520}>
+          {orders.map((o) => (
+            <tr key={`${o.side}-${o.symbol}`} className={o.blocked ? "opacity-50" : ""}>
+              <Td className={o.side === "BUY" ? "text-[#22C55E]" : "text-[#EF4444]"}>{o.side === "BUY" ? "Buy" : "Sell"}</Td>
+              <Td>{o.symbol}</Td>
+              <Td className="tabular-nums">{o.quantity}</Td>
+              <Td className="tabular-nums">{price(o.close)}</Td>
+              <Td className="tabular-nums">{price(o.limit)}</Td>
+              <Td className="tabular-nums">{inr(o.value)}{o.blocked ? ` (${o.blocked})` : ""}</Td>
+            </tr>
+          ))}
+        </Table>
+      ) : (
+        <p className="text-[#94A3B8]">No orders.</p>
+      )}
+      {plan.totals && orders.length ? (
+        <p className="text-xs text-[#94A3B8]">Buys up to {inr(plan.totals.buy)}, sells at least {inr(plan.totals.sell)}, charges about {inr(plan.totals.charges)}. Limits are the worst price accepted; fills are usually at the market price.</p>
+      ) : null}
+      {(plan.warnings ?? []).map((w) => (
+        <p key={w} className="text-xs text-[#F59E0B]">{w}</p>
+      ))}
+    </div>
+  );
+}
+
 function ZerodhaCard() {
   const [status, setStatus] = useState<ZerodhaStatus | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -179,6 +237,11 @@ export function LivePanel() {
       <Card title="Zerodha account">
         <ZerodhaCard />
       </Card>
+      {view ? (
+        <Card title="This month's orders">
+          <PlanCard mode={`${view.settings.mode}-${view.updated_at ?? ""}`} />
+        </Card>
+      ) : null}
       <OperatorLogin />
     </>
   );
