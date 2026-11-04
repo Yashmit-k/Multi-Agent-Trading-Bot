@@ -26,6 +26,8 @@ services:
     restart: unless-stopped
     environment:
       CORE_API_CORS_ORIGINS: https://${DOMAIN}
+      # The NIFTY 50 collector is retired; momentum live uses the free Kite Personal plan, which has no quotes.
+      MARKET_DATA_COLLECTOR: "false"
     volumes:
       - momentum-trial-data:/momentum-trial:ro  # the paper trial's report, for GET /api/v1/momentum-trial
 

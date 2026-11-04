@@ -70,6 +70,19 @@ class KiteConnectMarketClient:
     def quote(self, key: str) -> dict[str, Any]:
         return dict(self._kite.quote(key))
 
+    # Read-only account calls (the free Personal plan includes them). Nothing here places or changes an order.
+    def holdings(self) -> list[dict[str, Any]]:
+        return list(self._kite.holdings())
+
+    def positions(self) -> dict[str, Any]:
+        return dict(self._kite.positions())
+
+    def equity_margins(self) -> dict[str, Any]:
+        return dict(self._kite.margins("equity"))
+
+    def orders(self) -> list[dict[str, Any]]:
+        return list(self._kite.orders())
+
     def historical_data(
         self,
         instrument_token: int,

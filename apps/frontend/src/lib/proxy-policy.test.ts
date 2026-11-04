@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allowRead, allowWrite } from "@/lib/proxy-policy";
+import { allowOperatorWrite, allowRead, allowWrite, operatorOnlyRead } from "@/lib/proxy-policy";
 
 describe("public proxy policy", () => {
   it("allows dashboard reads", () => {
@@ -21,5 +21,13 @@ describe("public proxy policy", () => {
     expect(allowWrite("/api/v1/risk/kill-switch", "/api/v1/risk/kill-switch")).toBe(true);
     expect(allowWrite("/api/v1/paper/start", "/api/v1/risk/kill-switch")).toBe(false);
     expect(allowWrite("/api/v1/internal/signals", "/api/v1/internal/signals")).toBe(false);
+  });
+
+  it("keeps the live account and settings to the signed-in operator", () => {
+    expect(operatorOnlyRead("/api/v1/live/account")).toBe(true);
+    expect(operatorOnlyRead("/api/v1/live/settings")).toBe(true);
+    expect(operatorOnlyRead("/api/v1/momentum-trial")).toBe(false);
+    expect(allowOperatorWrite("/api/v1/live/settings")).toBe(true);
+    expect(allowOperatorWrite("/api/v1/live/account")).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
-import { allowOperatorWrite, allowPublicWrite, allowRead, allowWrite } from "@/lib/proxy-policy";
+import { allowOperatorWrite, allowPublicWrite, allowRead, allowWrite, operatorOnlyRead } from "@/lib/proxy-policy";
 import { tokenFromCookieHeader, validToken } from "@/lib/operator-session";
+import { sameOrigin } from "@/lib/same-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -26,18 +27,6 @@ async function forward(response: Response): Promise<Response> {
 
 type Context = { params: Promise<{ path: string[] }> };
 
-// A signed-in operator's writes must come from this site's own pages.
-function sameOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  if (!origin) return true; // same-origin fetches from older browsers may omit it; the cookie is SameSite=Strict
-  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
-
 // Ten public backtest previews per address per ten minutes, so visitors cannot tie up the server.
 const previews = new Map<string, number[]>();
 function rateLimited(request: Request, now = Date.now()): boolean {
@@ -53,6 +42,9 @@ export async function GET(request: Request, context: Context): Promise<Response>
   const pathname = `/api/v1/${path.join("/")}`;
   if (!allowRead(pathname)) {
     return Response.json({ detail: "blocked_by_public_proxy" }, { status: 403 });
+  }
+  if (operatorOnlyRead(pathname) && !validToken(tokenFromCookieHeader(request.headers.get("cookie")))) {
+    return Response.json({ detail: "operator_login_required" }, { status: 403 });
   }
   const url = new URL(request.url);
   try {

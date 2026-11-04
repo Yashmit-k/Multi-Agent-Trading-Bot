@@ -8,6 +8,13 @@ export function allowRead(path: string): boolean {
   return path.startsWith("/api/v1/") && !READ_BLOCKED.some((prefix) => path.startsWith(prefix));
 }
 
+// Reads only a signed-in operator may make: the owner's Zerodha account and the amount invested are private.
+const OPERATOR_READS: RegExp[] = [/^\/api\/v1\/live\//];
+
+export function operatorOnlyRead(path: string): boolean {
+  return OPERATOR_READS.some((pattern) => pattern.test(path));
+}
+
 export function allowWrite(path: string, allowed: string | undefined): boolean {
   if (!path.startsWith("/api/v1/") || path.startsWith("/api/v1/internal/")) {
     return false;
@@ -22,6 +29,7 @@ export function allowWrite(path: string, allowed: string | undefined): boolean {
 // Writes an operator who has signed in may make from the browser.
 const OPERATOR_WRITES: RegExp[] = [
   /^\/api\/v1\/settings\/risk$/,
+  /^\/api\/v1\/live\/settings$/,
   /^\/api\/v1\/paper\/orders\/manual$/,
   /^\/api\/v1\/paper\/orders\/[\w:.-]+\/cancel$/,
   /^\/api\/v1\/paper\/positions\/[\w&.-]+\/close$/,

@@ -112,6 +112,15 @@ def create_app(
 
     register_reviews(app, repository, publisher, require_user, require_internal, starting_cash=resolved.paper_starting_cash)
 
+    from core_api.live import register as register_live
+
+    def zerodha_logged_in() -> bool:
+        times = _token_times(repository, datetime.now(timezone.utc))
+        expired = times.get("hours_left") is not None and times["hours_left"] <= 0
+        return bool(app.state.zerodha_access_token) and not expired
+
+    register_live(app, repository, require_user, zerodha_logged_in)
+
     @app.get("/api/v1/market/ingestion")
     def market_ingestion(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
         state = app.state.ingestion
@@ -962,6 +971,9 @@ def create_app(
         state.authenticated = True
         state.last_error = None
         gate = app.state.historical_gate
+        if not resolved.market_data_collector:
+            # Momentum live uses the free Personal plan, which has no chart history: nothing to seed.
+            return {"authenticated": True, "live_enabled": False}
         if gate.mark_queued():
             state.seed_status = "queued"
             logger.info("seed_queued")
