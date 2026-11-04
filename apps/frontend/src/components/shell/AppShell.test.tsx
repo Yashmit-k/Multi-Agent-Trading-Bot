@@ -4,11 +4,11 @@ import { describe, expect, it, vi } from "vitest";
 let path = "/momentum";
 vi.mock("next/navigation", () => ({ usePathname: () => path }));
 
-import { AppShell, isArchived } from "@/components/shell/AppShell";
+import { AppShell } from "@/components/shell/AppShell";
 
 describe("StockX branding", () => {
   it("shows StockX in the header and does not show FLEXI", () => {
-    path = "/dashboard";
+    path = "/momentum";
     render(
       <AppShell mode="PAPER" killSwitch="disarmed">
         <p>child</p>
@@ -25,21 +25,12 @@ describe("StockX branding", () => {
   });
 });
 
-describe("app shell after the NIFTY 50 system was archived", () => {
-  it("puts Momentum first and groups the old pages as archived", () => {
+describe("app shell after the NIFTY 50 system was removed", () => {
+  it("lists only the Momentum and System groups", () => {
     path = "/momentum";
     render(<AppShell mode="PAPER">x</AppShell>);
-    const groups = screen.getAllByText(/^(Momentum|NIFTY 50 system \(archived\)|System)$/).map((el) => el.textContent);
-    expect(groups.slice(0, 3)).toEqual(["Momentum", "NIFTY 50 system (archived)", "System"]);
-    expect(screen.queryByTestId("archived-note")).toBeNull();
-  });
-
-  it("shows the archived note on old pages only", () => {
-    path = "/positions";
-    render(<AppShell mode="PAPER">x</AppShell>);
-    expect(screen.getByTestId("archived-note").textContent).toContain("Zerodha market data ended on 3 Nov 2026");
-    expect(isArchived("/stocks/RELIANCE")).toBe(true);
-    expect(isArchived("/momentum")).toBe(false);
-    expect(isArchived("/system")).toBe(false);
+    expect(screen.queryByText("NIFTY 50 system (archived)")).toBeNull();
+    expect(screen.queryByText("Overview")).toBeNull();
+    expect(screen.getAllByText("Momentum trial").length).toBeGreaterThan(0);
   });
 });
