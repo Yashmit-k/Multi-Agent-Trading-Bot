@@ -9,3 +9,10 @@ export function sameOrigin(request: Request): boolean {
     return false;
   }
 }
+
+// Behind Caddy, request.url names the container (localhost:3000); the browser needs the public address.
+export function publicUrl(request: Request, path: string): URL {
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const proto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  return host ? new URL(path, `${proto ?? new URL(request.url).protocol.replace(":", "")}://${host}`) : new URL(path, request.url);
+}

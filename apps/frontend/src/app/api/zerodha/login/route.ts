@@ -1,11 +1,12 @@
 import { coreHeaders, coreUrl } from "@/lib/core-direct";
 import { tokenFromCookieHeader, validToken } from "@/lib/operator-session";
+import { publicUrl } from "@/lib/same-origin";
 
 export const dynamic = "force-dynamic";
 
 // Starts the Zerodha login: only the signed-in operator is sent on to Zerodha's own login page.
 export async function GET(request: Request): Promise<Response> {
-  const back = new URL("/settings", request.url);
+  const back = publicUrl(request, "/settings");
   if (!validToken(tokenFromCookieHeader(request.headers.get("cookie")))) {
     back.searchParams.set("zerodha", "operator_login_required");
     return Response.redirect(back, 303);
