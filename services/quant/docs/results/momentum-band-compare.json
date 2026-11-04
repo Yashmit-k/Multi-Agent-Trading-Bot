@@ -1,0 +1,210 @@
+{
+ "2016-02 to 2026-10": {
+  "backtest (every order at the open)": {
+   "final": 1278473.016151516,
+   "cagr": 0.2676868977071427,
+   "max_drawdown": 0.39225491013593183,
+   "charges": 68827.8134849974,
+   "buys": 902,
+   "sells": 791,
+   "missed_buys": 0,
+   "missed_sells": 0
+  },
+  "1.5%, at the open": {
+   "final": 1430205.6457408513,
+   "cagr": 0.28098986180714447,
+   "max_drawdown": 0.3665668130743599,
+   "charges": 76291.68964150937,
+   "buys": 705,
+   "sells": 790,
+   "missed_buys": 137,
+   "missed_sells": 54
+  },
+  "1.5%, during the day": {
+   "final": 1283181.3310461289,
+   "cagr": 0.2681207311099141,
+   "max_drawdown": 0.3703988810397262,
+   "charges": 74563.11296061173,
+   "buys": 848,
+   "sells": 801,
+   "missed_buys": 30,
+   "missed_sells": 14
+  },
+  "3%, at the open": {
+   "final": 1378490.842602217,
+   "cagr": 0.27660605023217655,
+   "max_drawdown": 0.36554862684529976,
+   "charges": 76979.44168960606,
+   "buys": 826,
+   "sells": 785,
+   "missed_buys": 46,
+   "missed_sells": 30
+  },
+  "3%, during the day": {
+   "final": 1375962.8180218535,
+   "cagr": 0.2763879495807273,
+   "max_drawdown": 0.3900936224604933,
+   "charges": 70714.20596057829,
+   "buys": 885,
+   "sells": 799,
+   "missed_buys": 12,
+   "missed_sells": 1
+  }
+ },
+ "2016-20": {
+  "backtest (every order at the open)": {
+   "final": 306083.9633989333,
+   "cagr": 0.2551476322951822,
+   "max_drawdown": 0.35136550527407184,
+   "charges": 11466.841006722321,
+   "buys": 380,
+   "sells": 331,
+   "missed_buys": 0,
+   "missed_sells": 0
+  },
+  "1.5%, at the open": {
+   "final": 294455.7639056226,
+   "cagr": 0.24531107784690764,
+   "max_drawdown": 0.3665668130743599,
+   "charges": 11362.032297646125,
+   "buys": 291,
+   "sells": 329,
+   "missed_buys": 67,
+   "missed_sells": 24
+  },
+  "1.5%, during the day": {
+   "final": 321069.2210023479,
+   "cagr": 0.2673940403669077,
+   "max_drawdown": 0.33463257107638933,
+   "charges": 11338.0366463941,
+   "buys": 368,
+   "sells": 323,
+   "missed_buys": 11,
+   "missed_sells": 9
+  },
+  "3%, at the open": {
+   "final": 356606.0751104971,
+   "cagr": 0.29471128843208216,
+   "max_drawdown": 0.3197843130137078,
+   "charges": 11407.376597044218,
+   "buys": 342,
+   "sells": 319,
+   "missed_buys": 24,
+   "missed_sells": 16
+  },
+  "3%, during the day": {
+   "final": 304896.88520501857,
+   "cagr": 0.2541572423528522,
+   "max_drawdown": 0.34180685389307286,
+   "charges": 11376.965421142599,
+   "buys": 370,
+   "sells": 330,
+   "missed_buys": 5,
+   "missed_sells": 1
+  }
+ },
+ "2021-23": {
+  "backtest (every order at the open)": {
+   "final": 253070.94232861235,
+   "cagr": 0.36380500967369667,
+   "max_drawdown": 0.3211441370502962,
+   "charges": 9484.206003912475,
+   "buys": 253,
+   "sells": 237,
+   "missed_buys": 0,
+   "missed_sells": 0
+  },
+  "1.5%, at the open": {
+   "final": 299445.78884546104,
+   "cagr": 0.4426873062327408,
+   "max_drawdown": 0.2893625563703527,
+   "charges": 10119.439335292282,
+   "buys": 201,
+   "sells": 238,
+   "missed_buys": 32,
+   "missed_sells": 6
+  },
+  "1.5%, during the day": {
+   "final": 270931.7627660474,
+   "cagr": 0.39524240675365974,
+   "max_drawdown": 0.31940977486304056,
+   "charges": 9739.172850661274,
+   "buys": 244,
+   "sells": 235,
+   "missed_buys": 7,
+   "missed_sells": 0
+  },
+  "3%, at the open": {
+   "final": 262524.2080596333,
+   "cagr": 0.3806216006951779,
+   "max_drawdown": 0.3195530484186967,
+   "charges": 9551.721302377578,
+   "buys": 239,
+   "sells": 237,
+   "missed_buys": 7,
+   "missed_sells": 0
+  },
+  "3%, during the day": {
+   "final": 262270.06585320435,
+   "cagr": 0.38017482227847554,
+   "max_drawdown": 0.32091487491864745,
+   "charges": 9547.985812889388,
+   "buys": 246,
+   "sells": 236,
+   "missed_buys": 3,
+   "missed_sells": 0
+  }
+ },
+ "2024-26": {
+  "backtest (every order at the open)": {
+   "final": 152146.78908404542,
+   "cagr": 0.15996478806179293,
+   "max_drawdown": 0.41072213966525417,
+   "charges": 7778.851345776058,
+   "buys": 214,
+   "sells": 230,
+   "missed_buys": 0,
+   "missed_sells": 0
+  },
+  "1.5%, at the open": {
+   "final": 149306.93692885325,
+   "cagr": 0.15226273005894808,
+   "max_drawdown": 0.3350359894131054,
+   "charges": 8067.479641434371,
+   "buys": 183,
+   "sells": 221,
+   "missed_buys": 31,
+   "missed_sells": 23
+  },
+  "1.5%, during the day": {
+   "final": 129883.62648826375,
+   "cagr": 0.09685891987603057,
+   "max_drawdown": 0.3876220489606975,
+   "charges": 7831.723086460096,
+   "buys": 198,
+   "sells": 238,
+   "missed_buys": 10,
+   "missed_sells": 6
+  },
+  "3%, at the open": {
+   "final": 131637.44806548135,
+   "cagr": 0.10207310108558754,
+   "max_drawdown": 0.38592911897398197,
+   "charges": 7563.234947562034,
+   "buys": 196,
+   "sells": 224,
+   "missed_buys": 12,
+   "missed_sells": 13
+  },
+  "3%, during the day": {
+   "final": 154068.65369284342,
+   "cagr": 0.16512455682485383,
+   "max_drawdown": 0.4104233869002596,
+   "charges": 7776.771370634961,
+   "buys": 209,
+   "sells": 229,
+   "missed_buys": 1,
+   "missed_sells": 1
+  }
+ }
+}

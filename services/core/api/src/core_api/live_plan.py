@@ -8,7 +8,7 @@ strategy's ledger are ever sold. Orders are limit orders at most BAND away from 
 
 import math
 
-BAND = 0.015  # limit price at most 1.5% above (buys) or below (sells) the decision close
+BAND = 0.03  # limit price at most 3% above (buys) or below (sells) the decision close (momentum-gap-check.md)
 TICK = 0.05  # a multiple of every NSE equity tick size
 
 # Zerodha equity delivery, as in research.mentor_strategies.delivery_charges.

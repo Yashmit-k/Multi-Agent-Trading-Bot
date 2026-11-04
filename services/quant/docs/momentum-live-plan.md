@@ -49,11 +49,14 @@ All changes are logged with the time. A change made after a proposal is ready ap
 - It reuses the paper trial's own code for this, so the two books follow exactly the same rule.
 
 **Prices**
-- The free Personal plan has no live prices, so orders are **limit orders priced from the last close** (NSE's free daily file): buys up to 1.5% above it, sells down to 1.5% below it.
-- A limit is the worst price accepted, not the price paid. A buy limited at ₹1,015 fills at ₹1,004 if that is the market price.
+- The free Personal plan has no live prices, so orders are **limit orders priced from the last close** (NSE's free daily file): buys up to **3%** above it, sells down to **3%** below it. 3% replaced the first draft's 1.5% on 2026-11-05, after [momentum-gap-check.md](momentum-gap-check.md):
+  - returns were about the same with either band;
+  - at 3% far fewer orders miss, so the live book follows the paper trial closely.
+- A limit is the worst price accepted, not the price paid. A buy limited at ₹1,030 fills at ₹1,004 if that is the market price.
 - **Pre-open:** where possible, orders go in during NSE's pre-open session (09:00–09:08), so they fill at the opening price if it is inside the band. That matches the paper trial's "bought at the open". The dry run checks which stocks take part in the pre-open auction.
-- **One retry:** an unfilled buy may be re-priced once from Yahoo Finance's price, which is unofficial and possibly delayed, so it is a hint only. The re-price is never above a hard cap of 3% over the close.
-- A stock beyond the cap is cancelled at 10:30 and reported, never chased.
+- No re-pricing: the global-markets agent and a Yahoo re-price were considered and dropped (momentum-gap-check.md).
+- An order still unfilled at 10:30 is cancelled and reported, never chased.
+- **Leftover round (phase 3):** Zerodha blocks cash at the limit price, so buys are sized to fit at 3% above the close and about 97% of the amount is invested at typical prices. Once the first buys fill below their limits, the freed cash buys more shares in a second round, so the book ends close to fully invested, as in the paper trial.
 - Market orders are not used.
 
 **Order of events**
@@ -126,10 +129,9 @@ Each phase is committed and deployed only with the owner's approval. Claude will
 
 ## Known limits
 
-- **Gaps beyond 1.5% go unfilled.**
-  - Momentum stocks often open sharply higher, so some months a buy will be missed. That money stays as cash until the next month.
-  - The result will differ from the paper trial, which buys at the open whatever the price.
-  - The band can be widened in Settings later.
+- **Gaps beyond 3% go unfilled.**
+  - In 2016–2026, about 1 new buy in 20 opened more than 3% above the close, and about 1 sell in 25 opened more than 3% below it.
+  - A missed buy's money stays as cash until the next month. A missed sell keeps the stock another month.
 - **No live prices.** The site can't show the value of holdings during the day, only at the last close.
 - **The account must not trade the same stocks by hand.** The ledger guard protects other holdings, but manual trades in the strategy's stocks make the reconciliation report differences.
 - **Server down on rebalance morning.** Nothing is placed, and the health check alerts. Approving later that day, or the next day, still works: the proposal stays valid until the next month-end.

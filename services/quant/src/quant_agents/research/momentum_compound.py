@@ -29,13 +29,31 @@ START = date(2016, 2, 1)
 OUT = er.ROOT / "services/quant/docs/results"
 
 
-def simulate(m: wm.Market, *, rebalance_holdings: bool = True, start: date = START, end: date | None = None, fill_leftover: bool = False, park=None) -> dict[str, object]:
+def simulate(m: wm.Market, *, rebalance_holdings: bool = True, start: date = START, end: date | None = None, fill_leftover: bool = False, park=None,
+             band: float | None = None, intraday: bool = False) -> dict[str, object]:
     """rebalance_holdings=False: holdings that stay in the top 10 are left alone; only new buys get an equal share.
     fill_leftover=True: after the split, the cash left by whole-share rounding buys one more share at a time of the
     most underweight holding that still fits, until no share fits.
     park: optional callable (t) -> chain or None; when it returns a chain, the whole book is held in that one security
-    for the month (used to hold NIFTYBEES instead of the stocks)."""
+    for the month (used to hold NIFTYBEES instead of the stocks).
+    band: limit orders as in momentum live, at most band above (buys) or below (sells) the decision close. An order the
+    open does not satisfy is missed (cash kept, or the stock held another month), unless intraday=True and the day's
+    range reached the limit, when it fills at the limit (an upper bound: live orders are cancelled at 10:30)."""
     p = m.p
+    missed = {"BUY": 0, "SELL": 0}
+
+    def fill(t: int, j: int, side: str) -> float | None:
+        """Price paid or received at the rebalance of t, or None when the limit order is missed."""
+        o = float(p.open[t, j])
+        price = o * (1 + wm.SLIP) if side == "BUY" else o * (1 - wm.SLIP)
+        if band is None:
+            return price
+        ref = float(p.close[t - 1, j])
+        limit = ref * (1 + band) if side == "BUY" else ref * (1 - band)
+        if (side == "BUY" and o <= limit) or (side == "SELL" and o >= limit):
+            return min(price, limit) if side == "BUY" else max(price, limit)
+        reached = float(p.low[t, j]) <= limit if side == "BUY" else float(p.high[t, j]) >= limit
+        return limit if intraday and reached else None
     lo = int(np.searchsorted(p.days, start.toordinal()))
     hi = len(m.d) - 1 if end is None else int(np.searchsorted(p.days, end.toordinal(), side="right")) - 1
     cash = CAPITAL
@@ -112,8 +130,12 @@ def simulate(m: wm.Market, *, rebalance_holdings: bool = True, start: date = STA
                     orders.append((j, math.floor(share / (p.open[t, j] * (1 + wm.SLIP)))))
             for j, delta in sorted(orders, key=lambda x: x[1]):  # sells (negative) before buys
                 o = float(p.open[t, j])
+                got = fill(t, j, "SELL" if delta < 0 else "BUY") if delta else None
+                if delta and got is None:
+                    missed["SELL" if delta < 0 else "BUY"] += 1
+                    continue
                 if delta < 0:
-                    amount = -delta * o * (1 - wm.SLIP)
+                    amount = -delta * got
                     fee = delivery_charges(0.0, amount)
                     cash += amount - fee
                     charges += fee
@@ -125,9 +147,9 @@ def simulate(m: wm.Market, *, rebalance_holdings: bool = True, start: date = STA
                     else:
                         cost[j] = cost.get(j, 0.0) * remaining / at_open[j]
                         at_open[j] = remaining
-                    trades.append({"day": m.d[t].isoformat(), "side": "SELL", "symbol": str(p.symbols[j]), "qty": -delta, "price": o * (1 - wm.SLIP), "charges": fee})
+                    trades.append({"day": m.d[t].isoformat(), "side": "SELL", "symbol": str(p.symbols[j]), "qty": -delta, "price": got, "charges": fee})
                 elif delta > 0:
-                    price = o * (1 + wm.SLIP)
+                    price = got
                     qty = min(delta, math.floor((cash - 50) / (price * 1.0013))) if cash > 50 else 0
                     if qty <= 0:
                         continue
@@ -141,16 +163,17 @@ def simulate(m: wm.Market, *, rebalance_holdings: bool = True, start: date = STA
             if fill_leftover and plan:
                 extra: dict[int, int] = {}
                 while True:
-                    fits = [j for j in plan if j in at_open and not math.isnan(p.open[t, j]) and float(p.open[t, j]) * (1 + wm.SLIP) * 1.0013 <= cash - 50]
+                    fits = [j for j in plan if j in at_open and not math.isnan(p.open[t, j]) and fill(t, j, "BUY") is not None
+                            and fill(t, j, "BUY") * 1.0013 <= cash - 50]
                     if not fits:
                         break
                     j = min(fits, key=lambda k: at_open[k])
-                    price = float(p.open[t, j]) * (1 + wm.SLIP)
+                    price = fill(t, j, "BUY")
                     cash -= price
                     at_open[j] += float(p.open[t, j])
                     extra[j] = extra.get(j, 0) + 1
                 for j, qty in extra.items():
-                    price = float(p.open[t, j]) * (1 + wm.SLIP)
+                    price = fill(t, j, "BUY")
                     fee = delivery_charges(qty * price, 0.0)
                     cash -= fee
                     charges += fee
@@ -169,7 +192,7 @@ def simulate(m: wm.Market, *, rebalance_holdings: bool = True, start: date = STA
             plan = choose(t)
     holdings = [{"symbol": str(p.symbols[j]), "value": v, "cost": cost.get(j, 0.0), "weight": v / marks[hi]} for j, v in held.items()]
     return {"marks": marks, "charges": charges, "trades": trades, "lo": lo, "hi": hi, "final": marks[hi], "cash_end": cash, "holdings": holdings,
-            "pending": [str(p.symbols[j]) for j in plan] if plan else []}
+            "pending": [str(p.symbols[j]) for j in plan] if plan else [], "missed": missed}
 
 
 def summary(m: wm.Market, sim: dict[str, object]) -> dict[str, object]:

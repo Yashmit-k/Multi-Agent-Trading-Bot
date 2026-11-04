@@ -27,9 +27,9 @@ def _account(cash: float, holdings: list[tuple[str, int]] = ()) -> dict:
 
 
 def test_limits_stay_inside_the_band_on_a_tick() -> None:
-    assert buy_limit(100.0) == 101.5 and sell_limit(100.0) == 98.5
-    assert buy_limit(123.47) <= 123.47 * 1.015 and round(buy_limit(123.47) / 0.05, 6) % 1 == 0
-    assert sell_limit(123.47) >= 123.47 * 0.985
+    assert buy_limit(100.0) == 103.0 and sell_limit(100.0) == 97.0
+    assert buy_limit(123.47) <= 123.47 * 1.03 and round(buy_limit(123.47) / 0.05, 6) % 1 == 0
+    assert sell_limit(123.47) >= 123.47 * 0.97
 
 
 def test_a_new_book_buys_the_top_n_within_the_amount() -> None:
