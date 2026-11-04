@@ -1,51 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import type { TradingMode } from "@/contracts/generated/vocab";
-import { OperatorChip } from "@/components/operator/OperatorGate";
 
-function useIstClock(): string {
-  const [now, setNow] = useState("");
-  useEffect(() => {
-    const format = () =>
-      new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
-    setNow(format());
-    const timer = setInterval(() => setNow(format()), 30000);
-    return () => clearInterval(timer);
-  }, []);
-  return now;
-}
-
-function marketState(): "open" | "closed" {
-  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
-    .formatToParts(new Date())
-    .reduce<Record<string, string>>((acc, part) => ({ ...acc, [part.type]: part.value }), {});
-  const minutes = Number(parts.hour) * 60 + Number(parts.minute);
-  const weekday = !["Sat", "Sun"].includes(parts.weekday ?? "");
-  return weekday && minutes >= 9 * 60 + 15 && minutes < 15 * 60 + 30 ? "open" : "closed";
-}
-
-export function ModeBanner({
-  mode,
-  killSwitch = "UNKNOWN",
-  market: serverMarket = null,
-}: {
-  mode: TradingMode | "UNKNOWN";
-  killSwitch?: string;
-  market?: { open: boolean; trading_day: boolean } | null;
-}) {
+// Since the NIFTY 50 system was removed (4 Nov 2026) the bar shows only the brand and that this is paper money.
+// The red LIVE warning stays as a safeguard, though nothing on this site trades live.
+export function ModeBanner({ mode }: { mode: TradingMode | "UNKNOWN" }) {
   const live = mode === "LIVE";
-  const clock = useIstClock();
-  const [market, setMarket] = useState<"open" | "closed" | null>(null);
-  useEffect(() => {
-    // The server's NSE calendar knows exchange holidays; the clock-only check is a fallback.
-    const read = () => setMarket(serverMarket ? (serverMarket.open ? "open" : "closed") : marketState());
-    read();
-    const timer = setInterval(read, 60000);
-    return () => clearInterval(timer);
-  }, [serverMarket]);
-  const armed = killSwitch === "armed";
   return (
     <header
       data-testid="mode-banner"
@@ -53,40 +14,17 @@ export function ModeBanner({
         live ? "border-red-700 bg-red-900/90 text-white" : "border-[#26303C] bg-[#0B0F14]/90 text-[#E6EDF3]"
       }`}
     >
-      <Link prefetch={false} href="/dashboard" className="flex min-w-0 items-center gap-2.5">
+      <Link prefetch={false} href="/momentum" className="flex min-w-0 items-center gap-2.5">
         {/* Decorative: the brand text beside it carries the name, so alt stays empty. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.svg" alt="" data-testid="brand-logo" width={28} height={28} className="h-7 w-7 shrink-0" />
         <span data-testid="brand-mark" className="shrink-0 whitespace-nowrap text-base font-semibold tracking-[0.14em]">
           StockX
         </span>
-        <span className="hidden truncate text-xs text-[#64748B] sm:inline">NIFTY 50 · multi-agent paper trading</span>
       </Link>
-      <div className="flex shrink-0 items-center gap-2 text-xs">
-        <span className={`whitespace-nowrap rounded px-2 py-0.5 font-semibold ${live ? "bg-white text-red-800" : "bg-[#1E3A8A]/40 text-[#93C5FD]"}`}>
-          {live ? "LIVE TRADING IS ACTIVE" : "PAPER TRADING"}
-        </span>
-        <span className="hidden rounded border border-[#26303C] px-2 py-0.5 text-[#94A3B8] md:inline">mode {mode}</span>
-        {market ? (
-          <span className="hidden items-center gap-1 rounded border border-[#26303C] px-2 py-0.5 text-[#94A3B8] md:flex">
-            <span className={`h-1.5 w-1.5 rounded-full ${market === "open" ? "bg-[#22C55E]" : "bg-[#64748B]"}`} />
-            NSE {market}
-          </span>
-        ) : null}
-        <span
-          data-testid="kill-chip"
-          className={`whitespace-nowrap rounded px-2 py-0.5 font-medium ${armed ? "bg-[#7F1D1D] text-[#FCA5A5]" : "bg-[#171F2A] text-[#94A3B8]"}`}
-        >
-          <span className="sm:hidden">Kill: </span>
-          <span className="hidden sm:inline">Kill switch: </span>
-          {killSwitch}
-        </span>
-        {/* Sign-in is also reachable at /login; the phone header keeps room for the PAPER/LIVE badge. */}
-        <span className="hidden sm:contents">
-          <OperatorChip />
-        </span>
-        {clock ? <span className="hidden tabular-nums text-[#64748B] sm:inline">{clock} IST</span> : null}
-      </div>
+      <span className={`whitespace-nowrap rounded px-2 py-0.5 text-xs font-semibold ${live ? "bg-white text-red-800" : "bg-[#1E3A8A]/40 text-[#93C5FD]"}`}>
+        {live ? "LIVE TRADING IS ACTIVE" : "Paper only"}
+      </span>
     </header>
   );
 }

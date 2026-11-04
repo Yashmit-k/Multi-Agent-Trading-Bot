@@ -5,18 +5,14 @@ import { HorizonSplit } from "@/components/HorizonSplit";
 import { NotAvailableState, EmptyState, ErrorState, LoadingState } from "@/components/States";
 
 describe("ModeBanner", () => {
-  it("shows UNKNOWN", () => {
-    render(<ModeBanner mode="UNKNOWN" />);
-    expect(screen.getByTestId("mode-banner").textContent).toContain("UNKNOWN");
-    expect(screen.getByTestId("kill-chip").textContent).toContain("UNKNOWN");
+  it("shows only the brand and Paper only", () => {
+    render(<ModeBanner mode="PAPER" />);
+    const text = screen.getByTestId("mode-banner").textContent;
+    expect(text).toBe("StockXPaper only");
   });
-  it("warns on LIVE", () => {
+  it("still warns on LIVE", () => {
     render(<ModeBanner mode="LIVE" />);
     expect(screen.getByTestId("mode-banner").textContent).toContain("LIVE TRADING");
-  });
-  it("shows kill switch chip when known", () => {
-    render(<ModeBanner mode="PAPER" killSwitch="disarmed" />);
-    expect(screen.getByTestId("kill-chip").textContent).toContain("disarmed");
   });
 });
 

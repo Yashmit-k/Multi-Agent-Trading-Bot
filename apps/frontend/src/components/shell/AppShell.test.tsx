@@ -10,7 +10,7 @@ describe("StockX branding", () => {
   it("shows StockX in the header and does not show FLEXI", () => {
     path = "/momentum";
     render(
-      <AppShell mode="PAPER" killSwitch="disarmed">
+      <AppShell mode="PAPER">
         <p>child</p>
       </AppShell>,
     );
@@ -19,8 +19,7 @@ describe("StockX branding", () => {
     const logo = screen.getByTestId("brand-logo");
     expect(logo.getAttribute("src")).toBe("/logo.svg");
     expect(logo.getAttribute("alt")).toBe("");
-    expect(screen.getByTestId("mode-banner").textContent).toContain("PAPER TRADING");
-    expect(screen.getByTestId("kill-chip").textContent).toContain("disarmed");
+    expect(screen.getByTestId("mode-banner").textContent).toContain("Paper only");
     expect(screen.queryByText(/flexi/i)).toBeNull();
   });
 });

@@ -17,13 +17,9 @@ const LINKS: NavLink[] = GROUPS.flatMap(([, links]) => [...links]);
 
 export function AppShell({
   mode,
-  killSwitch = "UNKNOWN",
-  market = null,
   children,
 }: {
   mode: TradingMode | "UNKNOWN";
-  killSwitch?: string;
-  market?: { open: boolean; trading_day: boolean } | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -34,7 +30,7 @@ export function AppShell({
   }, [pathname]);
   return (
     <div className="min-h-screen bg-[#0B0F14] text-[#E6EDF3]">
-      <ModeBanner mode={mode} killSwitch={killSwitch} market={market} />
+      <ModeBanner mode={mode} />
       <div className="flex min-h-[calc(100vh-48px)]">
         <aside className="sticky top-12 hidden h-[calc(100vh-48px)] w-[214px] shrink-0 overflow-y-auto border-r border-[#26303C] bg-[#0F141B] md:block">
           <nav className="flex flex-col gap-4 px-2 py-4 text-sm">
