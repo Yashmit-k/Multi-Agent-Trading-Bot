@@ -20,10 +20,10 @@ Once a month the system works out the orders for the owner's **real Zerodha acco
 |---|---|---|
 | Month-end evening (about 19:30 IST) | The ranking is fixed from NSE's closing file, as in the paper trial today | System |
 | Next morning, 08:45 IST | Telegram: "Rebalance ready. Log in to see the orders." | System |
-| Any time 09:00–10:30 | Log in to Zerodha through the site, on Zerodha's own page | **Owner** |
+| Any time from 09:15 | Log in to Zerodha through the site, on Zerodha's own page | **Owner** |
 | Straight after | The site reads the real holdings and cash and shows the exact orders: sell X, buy Y, quantities, limit prices, estimated charges | System |
 | | The owner presses **Approve** (or Skip) | **Owner** |
-| 09:00–09:08 (pre-open), or straight after Approve | Sells are placed first. Buys follow once the sale money shows in the account | System |
+| Straight after Approve (from 09:15) | Sells are placed first. Buys follow once the sale money shows in the account | System |
 | Until 10:30 | Fills are tracked. Unfilled orders are cancelled at 10:30 and reported | System |
 | 10:35 | Telegram and the site show the report: filled, unfilled, money spent, charges | System |
 
@@ -60,9 +60,16 @@ All changes are logged with the time. A change made after a proposal is ready ap
   - returns were about the same with either band;
   - at 3% far fewer orders miss, so the live book follows the paper trial closely.
 - A limit is the worst price accepted, not the price paid. A buy limited at ₹1,030 fills at ₹1,004 if that is the market price.
-- **Pre-open:** where possible, orders go in during NSE's pre-open session (09:00–09:08), so they fill at the opening price if it is inside the band. That matches the paper trial's "bought at the open". The dry run checks which stocks take part in the pre-open auction.
+- **No pre-open orders:** orders go in from 09:15, in the normal session. A stock outside NSE's 09:00–09:08 call auction can reject an order sent during it, and a rejected order is not retried. Approving soon after 09:15 keeps the prices close to the open the paper trial assumes.
 - No re-pricing: the global-markets agent and a Yahoo re-price were considered and dropped (momentum-gap-check.md).
 - An order still unfilled at 10:30 is cancelled and reported, never chased.
+- **Checks before trading (added 2026-11-05).** On the morning of the trade, the planner reads Zerodha's instrument list for the day:
+  - each limit is rounded to that stock's own price step (tick size);
+  - a stock not trading in the EQ series that day (moved to trade-to-trade, for instance) is replaced by the next-ranked one, and such a holding is kept for the month;
+  - a stock whose price is more than 30% from the decision close (a split or bonus) is left out the same way.
+
+  Approve is refused without the instrument list, and opens only at 09:15, after the pre-open.
+- **Before the first live run, the owner enables DDPI** in the Zerodha console. Without it, every automated sell from the demat account fails.
 - **Leftover round (phase 3):** Zerodha blocks cash at the limit price, so buys are sized to fit at 3% above the close and about 97% of the amount is invested at typical prices. Once the first buys fill below their limits, the freed cash buys more shares in a second round, so the book ends close to fully invested, as in the paper trial.
 - Market orders are not used.
 

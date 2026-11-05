@@ -14,7 +14,7 @@ from core_db.session import create_schema
 from test_momentum_live_api import HEADERS, _settings
 
 UTC = timezone.utc
-TRADE_MORNING = datetime(2026, 12, 1, 3, 35, tzinfo=UTC)  # 09:05 IST on the trade day
+TRADE_MORNING = datetime(2026, 12, 1, 3, 50, tzinfo=UTC)  # 09:20 IST on the trade day
 
 
 class FakeBroker:
@@ -78,6 +78,8 @@ PLAN = {
     "targets": ["AAA", "BBB", "CCC"],
     "closes": {"AAA": 100.0, "BBB": 250.0, "CCC": 40.0, "OLD": 500.0},
     "per_stock": 3300.0,
+    "instruments_checked": True,
+    "ticks": {"AAA": 0.05, "BBB": 0.05, "CCC": 0.01, "OLD": 0.05},
     "orders": [
         {"side": "SELL", "symbol": "OLD", "quantity": 4, "limit": 485.0, "blocked": None},
         {"side": "BUY", "symbol": "AAA", "quantity": 32, "limit": 103.0, "blocked": None},
@@ -131,7 +133,8 @@ def test_every_gate_refuses_on_its_own(switch_on, monkeypatch) -> None:
         "mode_not_live": {"settings": {**SETTINGS, "mode": "dry_run"}},
         "zerodha_login_required": {"logged_in": False},
         "already_done_this_month": {"run": {"decided": "2026-11-30"}},
-        "outside_trading_window": {"now": datetime(2026, 12, 1, 3, 25, tzinfo=UTC)},  # 08:55 IST
+        "outside_trading_window": {"now": datetime(2026, 12, 1, 3, 40, tzinfo=UTC)},  # 09:10 IST: pre-open, too early
+        "instrument_list_unavailable": {"plan": {**PLAN, "instruments_checked": False}},
         "plan_changed_reload": {"digest": "something-else"},
         "nothing_to_do": {"plan": {**PLAN, "orders": [{**PLAN["orders"][0], "blocked": "above"}]}},
     }
@@ -247,6 +250,9 @@ def test_stop_cancels_open_orders_and_keeps_the_fills(switch_on) -> None:
 
 
 class RouteBroker(FakeBroker):
+    def instruments(self, exchange: str) -> list[dict]:
+        return [{"tradingsymbol": s, "segment": "NSE", "instrument_type": "EQ", "tick_size": 0.05, "last_price": 0.0} for s in ("AAA", "BBB", "CCC", "DDD", "EEE")]
+
     def login_url(self) -> str:
         return "https://kite.zerodha.com/connect/login?api_key=test"
 

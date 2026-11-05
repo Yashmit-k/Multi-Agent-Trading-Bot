@@ -127,3 +127,37 @@ def test_an_empty_account_is_explained() -> None:
     assert body["orders"] == []
     assert any("no cash available" in w for w in body["warnings"])
     assert any("Not enough cash" in w for w in plan(PROPOSAL, SETTINGS, _account(20), {})["warnings"])
+
+
+INSTRUMENTS = {s: {"tick": 0.05, "last_price": 0.0} for s in ("AAA", "BBB", "CCC", "DDD", "EEE", "OLD")}
+
+
+def test_limits_follow_each_stocks_price_step() -> None:
+    body = plan(PROPOSAL, SETTINGS, _account(50000), {}, {**INSTRUMENTS, "AAA": {"tick": 0.10, "last_price": 0.0}, "CCC": {"tick": 0.01, "last_price": 0.0}})
+    limits = {o["symbol"]: o["limit"] for o in body["orders"]}
+    assert limits["AAA"] == 103.0 and round(limits["AAA"] / 0.10, 6) % 1 == 0
+    assert limits["CCC"] == 41.2 and body["ticks"]["CCC"] == 0.01 and body["instruments_checked"] is True
+    assert buy_limit(123.47, 0.10) == 127.1 and sell_limit(123.47, 0.10) == 119.8
+
+
+def test_a_stock_off_the_eq_series_is_replaced_and_a_holding_kept() -> None:
+    without_bbb = {k: v for k, v in INSTRUMENTS.items() if k not in ("BBB", "OLD")}
+    body = plan(PROPOSAL, SETTINGS, _account(10000, [("OLD", 4)]), {"OLD": 4}, without_bbb)
+    assert body["targets"] == ["AAA", "CCC", "DDD"]  # BBB skipped, DDD next in line
+    assert not any(o["symbol"] == "OLD" for o in body["orders"])  # cannot be sold today: kept
+    assert any("BBB: not trading in the EQ series today" in w for w in body["warnings"])
+    assert any("OLD: not trading in the EQ series today, so it is kept" in w for w in body["warnings"])
+
+
+def test_a_price_jump_like_a_split_is_left_out() -> None:
+    split = {**INSTRUMENTS, "AAA": {"tick": 0.05, "last_price": 20.0}}  # 1:5 split: ₹100 became ₹20
+    body = plan(PROPOSAL, SETTINGS, _account(10000), {}, split)
+    assert "AAA" not in body["targets"] and any("AAA: price ₹20.00 is more than 30%" in w for w in body["warnings"])
+    held = plan(PROPOSAL, SETTINGS, {"holdings": [{"symbol": "OLD", "quantity": 4, "t1_quantity": 0, "close_price": 100.0}], "positions": [], "cash": {"available": 1000}},
+                {"OLD": 4}, INSTRUMENTS)  # OLD's account price ₹100 against a ₹500 decision close
+    assert not any(o["symbol"] == "OLD" for o in held["orders"])
+
+
+def test_without_the_instrument_list_the_plan_says_so() -> None:
+    body = plan(PROPOSAL, SETTINGS, None, {})
+    assert body["instruments_checked"] is False and any("instrument list was not available" in w for w in body["warnings"])

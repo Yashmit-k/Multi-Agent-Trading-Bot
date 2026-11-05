@@ -4,8 +4,8 @@ A run goes: sells first; then buys sized to the cash Zerodha shows; then one lef
 freed; anything still open at the deadline is cancelled; the strategy's ledger is updated from the actual fills.
 
 Nothing is sent unless every gate passes: the server switch MOMENTUM_LIVE_ENABLED=true (off by default, set only by
-the owner), Mode = Live, a fresh Zerodha login, the owner pressing Approve on exactly the orders shown, inside NSE
-hours on or after the trade day, and at most one run per month-end decision. Each order is an NSE delivery (CNC)
+the owner), Mode = Live, a fresh Zerodha login, the owner pressing Approve on exactly the orders shown, 09:15-15:00 IST
+on an NSE trading day on or after the trade day, with Zerodha's instrument list for the day (price steps, EQ series), and at most one run per month-end decision. Each order is an NSE delivery (CNC)
 limit order, no larger than the "largest single order" setting, in a stock of that month's ranking (buys) or the
 ledger (sells); buys never exceed the approved budget. Orders go out at most one a second, and every run state is
 saved after each order, so a restart picks up the run (and adopts an order placed just before a crash) instead of
@@ -19,7 +19,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
-from core_api.live_plan import buy_limit, delivery_charges
+from core_api.live_plan import TICK, buy_limit, delivery_charges
 
 RUN_KEY = "momentum_live_run"
 RUN_EVENT = "momentum_live.run"
@@ -61,8 +61,11 @@ def check_approval(*, settings: dict, plan: dict, digest: str, run: dict | None,
     if run is not None and run.get("decided") == plan["decided_at_close"]:
         raise LiveRefused("already_done_this_month")
     local = ist(now)
-    if local.date().isoformat() < plan["trade_at_open_of"] or not trading_day or not ((9, 0) <= (local.hour, local.minute) < (15, 0)):
+    # From 09:15: an order sent in the 09:00-09:08 pre-open can be rejected for a stock outside the call auction.
+    if local.date().isoformat() < plan["trade_at_open_of"] or not trading_day or not ((9, 15) <= (local.hour, local.minute) < (15, 0)):
         raise LiveRefused("outside_trading_window")
+    if not plan.get("instruments_checked"):
+        raise LiveRefused("instrument_list_unavailable")
     if not [o for o in plan["orders"] if not o.get("blocked")]:
         raise LiveRefused("nothing_to_do")
     if order_digest(plan["orders"]) != digest:
@@ -84,7 +87,7 @@ def new_run(plan: dict, settings: dict, ledger: dict[str, int], now: datetime, *
         "approved_at": now.isoformat(), "deadline": (deadline_local - IST).replace(tzinfo=timezone.utc).isoformat(),
         "phase": "skipped" if skipped else "selling", "budget": float(plan["totals"].get("spendable", 0.0)) if not skipped else 0.0,
         "max_order": float(settings["max_order"]), "targets": list(plan.get("targets", [])), "per_stock": float(plan.get("per_stock", 0.0)),
-        "closes": closes, "ledger_before": dict(ledger), "orders": [] if skipped else orders, "notes": [], "ledger_applied": skipped,
+        "closes": closes, "ticks": {str(k): float(v) for k, v in plan.get("ticks", {}).items()}, "ledger_before": dict(ledger), "orders": [] if skipped else orders, "notes": [], "ledger_applied": skipped,
     }
 
 
@@ -246,15 +249,15 @@ class Executor:
         value = {s: held.get(s, 0) * run["closes"][s] for s in targets}
         extra: dict[str, int] = {}
         while True:
-            fits = [s for s in targets if buy_limit(run["closes"][s]) * 1.0013 <= left]
+            fits = [s for s in targets if buy_limit(run["closes"][s], run["ticks"].get(s, TICK)) * 1.0013 <= left]
             if not fits:
                 break
             s = min(fits, key=lambda k: value[k])
             extra[s] = extra.get(s, 0) + 1
             value[s] += run["closes"][s]
-            left -= buy_limit(run["closes"][s]) * 1.0013
+            left -= buy_limit(run["closes"][s], run["ticks"].get(s, TICK)) * 1.0013
         for s, qty in sorted(extra.items()):
-            o = {"key": f"leftover:BUY:{s}", "round": "leftover", "side": "BUY", "symbol": s, "quantity": qty, "limit": buy_limit(run["closes"][s]),
+            o = {"key": f"leftover:BUY:{s}", "round": "leftover", "side": "BUY", "symbol": s, "quantity": qty, "limit": buy_limit(run["closes"][s], run["ticks"].get(s, TICK)),
                  "order_id": None, "status": "PENDING", "filled": 0, "average_price": None}
             run["orders"].append(o)
             self.place(run, o)

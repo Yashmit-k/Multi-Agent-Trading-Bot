@@ -180,6 +180,23 @@ def register(app: FastAPI, repository: CoreRepository, require_user: Callable[..
                 raise HTTPException(status_code=409, detail="zerodha_login_required") from exc
             raise HTTPException(status_code=502, detail="zerodha_unreachable") from exc
 
+    def instruments_today() -> dict[str, dict] | None:
+        """Zerodha's NSE EQ instruments (price step, last price), fetched once a day; None if unavailable."""
+        if app.state.kite_client is None or not logged_in():
+            return None
+        day = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).date()
+        cached = getattr(app.state, "momentum_live_instruments", None)
+        if cached and cached[0] == day:
+            return cached[1]
+        try:
+            rows = app.state.kite_client.instruments("NSE")
+        except Exception:  # noqa: BLE001 - the plan says it is unchecked, and Approve refuses it
+            return None
+        table = {str(r["tradingsymbol"]): {"tick": float(r.get("tick_size") or 0.05), "last_price": float(r.get("last_price") or 0.0)}
+                 for r in rows if r.get("segment") == "NSE" and r.get("instrument_type") == "EQ"}
+        app.state.momentum_live_instruments = (day, table)
+        return table
+
     @app.get("/api/v1/live/plan")
     def live_plan(_: Annotated[None, Depends(require_user)]) -> dict[str, object]:
         """The orders this month's rebalance would place. Phase 2: shown only, never sent."""
@@ -192,7 +209,7 @@ def register(app: FastAPI, repository: CoreRepository, require_user: Callable[..
         if proposal is None:
             return {"mode": settings["mode"], "sent": False, "detail": "no_proposal_yet"}
         account = read_account() if app.state.kite_client is not None and logged_in() else None
-        body = plan(proposal, settings, account, load_ledger(repository))
+        body = plan(proposal, settings, account, load_ledger(repository), instruments_today() if account is not None else None)
         run = load_run()
         body["digest"] = order_digest(body["orders"])
         body["run_phase"] = run["phase"] if run and run.get("decided") == body["decided_at_close"] else None
@@ -274,7 +291,7 @@ def register(app: FastAPI, repository: CoreRepository, require_user: Callable[..
         with lock:
             settings = load_settings(repository)
             account = read_account() if logged_in() else None
-            current = plan(proposal, settings, account, load_ledger(repository))
+            current = plan(proposal, settings, account, load_ledger(repository), instruments_today() if account is not None else None)
             now = clock()
             try:
                 check_approval(settings=settings, plan=current, digest=body.digest, run=load_run(), now=now, logged_in=account is not None,
