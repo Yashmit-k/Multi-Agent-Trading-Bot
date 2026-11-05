@@ -75,9 +75,25 @@ def test_live_proposal_is_written_once_for_the_latest_decision(tmp_path, monkeyp
         return [{"rank": 1, "symbol": "AAA", "score": 1.0, "close": 11.0}]
 
     monkeypatch.setattr(mt, "ranking", fake_ranking)
+    monkeypatch.setattr(mt, "price_bands", lambda: {"AAA": 20.0, "BBB": None})
     now = datetime(2026, 10, 30, 14, tzinfo=timezone.utc)
     assert mt.write_proposal(m, None, now) == "live: proposal written for 2026-10-30"
     body = json.loads((tmp_path / "live" / "proposal-2026-10-30.json").read_text())
     assert body["trade_at_open_of"] == "2026-11-02" and seen["limit"] == mt.PROPOSAL_DEPTH
-    assert body["closes"] == {"AAA": 11.0}
+    assert body["closes"] == {"AAA": 11.0} and body["bands"] == {"AAA": 20.0, "BBB": None}
     assert mt.write_proposal(m, None, now) is None  # fixed once written
+
+
+def test_price_bands_read_eq_rows_and_survive_a_failed_download(monkeypatch) -> None:
+    import io
+    import urllib.request
+
+    text = "Symbol,Series,Security Name,Band,Remarks\nAAA,EQ,A LTD,20,-\nBBB,EQ,B LTD,No Band,-\nCCC,BE,C LTD,2,-\n"
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: io.BytesIO(text.encode()))
+    assert mt.price_bands() == {"AAA": 20.0, "BBB": None}
+
+    def fail(*a, **k):
+        raise OSError("blocked")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fail)
+    assert mt.price_bands() == {}

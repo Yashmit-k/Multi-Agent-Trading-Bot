@@ -1,6 +1,6 @@
 # Momentum live: approve-then-place with Zerodha (plan)
 
-Status (2026-11-05): **phases 1–3 built. Order placement exists but is switched off:** the server switch `MOMENTUM_LIVE_ENABLED` is not set, so Mode cannot be set to Live and Approve is refused. Written 2026-11-04.
+Status (2026-11-05): **phases 1–3 built, then reviewed and fixed** (own cash and book, sale credit, lost replies, later-day runs, Mode Off stops a run, splits on holdings, price bands, Telegram alerts). Order placement exists but is switched off:** the server switch `MOMENTUM_LIVE_ENABLED` is not set, so Mode cannot be set to Live and Approve is refused. Written 2026-11-04.
 
 - **Phase 1:** operator-only Settings page, Zerodha login through the site, read-only account view.
 - **Phase 2:** the trial writes `live/proposal-<close>.json` once per month-end. Core's planner (`core_api/live_plan.py`) turns it into the orders shown on the Settings page; each dry run on the real account is logged once. Telegram sends one notice when the ranking is fixed and one at 08:45 IST on rebalance morning (Mode not Off).
@@ -35,7 +35,7 @@ The owner logs in once a month, on rebalance morning. In other months nothing ne
 
 | Setting | Meaning | Default |
 |---|---|---|
-| **Amount for the strategy** | The most of the account the strategy may use (₹). It never spends beyond this, even if the account holds more cash | ₹0, so nothing is bought until set |
+| **Money put into the strategy** | The money given to the strategy (₹). Its book (its own shares plus its own cash) then grows or shrinks with the market, like the paper trial. Raise it to add money; lower it to take money out at the next rebalance. Other money in the account is never used | ₹0, so nothing is bought until set |
 | **Number of stocks** | How many of the top-ranked stocks to hold (10, 15, 20…). Changed by hand only; takes effect at the next rebalance | 10 |
 | **Mode** | **Off**: nothing is computed. **Dry run**: orders are computed and shown but never sent. **Live**: orders are sent after Approve | Off |
 | **Largest single order** | Any order above this value is refused, as a guard against a bug | ₹25,000 |
@@ -50,10 +50,11 @@ All changes are logged with the time. A change made after a proposal is ready ap
 - Before every rebalance the ledger is checked against Zerodha's holdings. If a stock in the ledger has fewer shares in Zerodha (sold by hand, say), the smaller number is used and the difference is reported.
 
 **How much to hold of each**
-- Book value = value of the ledger holdings + the strategy's cash, capped at the amount set.
+- **The book is the strategy's own:** its ledger shares at the close, plus its own cash. That cash is the money put in, plus what its sales brought, minus what its buys cost, charges included. It is updated from the actual fills of each run.
 - Each of the N stocks gets book value ÷ N, in whole shares.
 - The leftover cash buys one more share at a time of the holding furthest below its share, as in the paper trial.
-- It reuses the paper trial's own code for this, so the two books follow exactly the same rule.
+- Buys are limited to the smaller of the strategy's cash and the cash Zerodha shows.
+- **A split or bonus on a holding** (the account's shares a multiple of the ledger's, and the price down in step) updates the ledger. More shares than that are taken to be bought by hand and left alone.
 
 **Prices**
 - The free Personal plan has no live prices, so orders are **limit orders priced from the last close** (NSE's free daily file): buys up to **3%** above it, sells down to **3%** below it. 3% replaced the first draft's 1.5% on 2026-11-05, after [momentum-gap-check.md](momentum-gap-check.md):
@@ -70,6 +71,7 @@ All changes are logged with the time. A change made after a proposal is ready ap
 
   Approve is refused without the instrument list, and opens only at 09:15, after the pre-open.
 - **Before the first live run, the owner enables DDPI** in the Zerodha console. Without it, every automated sell from the demat account fails.
+- **Daily price band:** a stock whose NSE band is narrower than 3% (2%) gets its limit at the band, because Zerodha rejects a price outside it. The trial reads NSE's band file each month-end.
 - **Leftover round (phase 3):** Zerodha blocks cash at the limit price, so buys are sized to fit at 3% above the close and about 97% of the amount is invested at typical prices. Once the first buys fill below their limits, the freed cash buys more shares in a second round, so the book ends close to fully invested, as in the paper trial.
 - Market orders are not used.
 

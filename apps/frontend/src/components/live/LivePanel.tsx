@@ -7,7 +7,8 @@ import { useOperator, OperatorLogin } from "@/components/operator/OperatorGate";
 import { Card, Table, Td } from "@/components/ui";
 
 type Settings = { amount: number; stocks: number; mode: string; max_order: number };
-type SettingsView = { settings: Settings; modes: string[]; updated_at: string | null; changes: Array<{ at: string; by: string; changed: Record<string, { from: unknown; to: unknown }> }> };
+type Book = { shares: Record<string, number>; cash: number; contributed?: number };
+type SettingsView = { settings: Settings; modes: string[]; updated_at: string | null; changes: Array<{ at: string; by: string; changed: Record<string, { from: unknown; to: unknown }> }>; book?: Book };
 type ZerodhaStatus = { configured: boolean; authenticated: boolean; expires_at?: string | null };
 type Account = {
   holdings: Array<{ symbol: string; quantity: number; t1_quantity: number; average_price: number | null; close_price: number | null }>;
@@ -41,9 +42,9 @@ const PHASE: Record<string, string> = {
 };
 
 const MODE_LABEL: Record<string, string> = { off: "Off", dry_run: "Dry run (orders shown, never sent)", live: "Live (orders sent after you approve)" };
-const LABEL: Record<string, string> = { amount: "Amount for the strategy", stocks: "Number of stocks", mode: "Mode", max_order: "Largest single order" };
+const LABEL: Record<string, string> = { amount: "Money put into the strategy", stocks: "Number of stocks", mode: "Mode", max_order: "Largest single order" };
 const HINT: Record<string, string> = {
-  amount: "The most of your account the strategy may use, in rupees. It never spends beyond this.",
+  amount: "The money you have put into the strategy, in rupees. Its book then grows or shrinks with the market, like the paper trial. Raise it to add money; lower it to take money out at the next rebalance. Other money in the account is never used.",
   stocks: "How many of the top-ranked stocks to hold. Takes effect at the next rebalance.",
   max_order: "Any order above this is refused, as a guard against a bug.",
 };
@@ -91,6 +92,11 @@ function SettingsForm({ view, onSaved }: { view: SettingsView; onSaved: (next: S
           </span>
         </span>
       </label>
+      {view.book ? (
+        <p className="text-xs text-[#94A3B8]">
+          Strategy now: {Object.keys(view.book.shares).length} stock(s) held, {inr(view.book.cash)} of its own cash.
+        </p>
+      ) : null}
       <div className="flex items-center gap-3">
         <button type="submit" disabled={pending} className="rounded bg-[#2563EB] px-3 py-1 font-medium text-white disabled:opacity-50">Save</button>
         {message ? <span className={message.ok ? "text-[#22C55E]" : "text-[#EF4444]"}>{message.text}</span> : null}

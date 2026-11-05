@@ -23,7 +23,7 @@ from core_api.live_exec import FINAL_PHASES, RUN_EVENT, RUN_KEY, Executor, LiveR
 from core_db.repository import CoreRepository
 
 SETTING_KEY = "momentum_live"
-LEDGER_KEY = "momentum_live_ledger"  # shares the strategy bought itself; written only from real fills (phase 3)
+LEDGER_KEY = "momentum_live_ledger"  # the strategy's own book: its shares (from real fills only), its cash, and what was put in
 CHANGE_EVENT = "momentum_live.settings_changed"
 DRY_RUN_EVENT = "momentum_live.dry_run"
 DEFAULTS: dict[str, object] = {"amount": 0, "stocks": 10, "mode": "off", "max_order": 25000}
@@ -47,9 +47,25 @@ def latest_proposal(folder: Path | None = None) -> dict | None:
     return json.loads(files[-1].read_text()) if files else None
 
 
-def load_ledger(repository: CoreRepository) -> dict[str, int]:
+def load_book(repository: CoreRepository) -> dict:
+    """{"shares", "cash", "contributed", "ref"}; before the first trade, all of the amount is cash."""
+    from core_api.live_plan import empty_book
+
     stored = repository.get_setting(LEDGER_KEY)
-    return {str(k): int(v) for k, v in ((stored or {}).get("payload") or {}).items()}
+    if not stored:
+        return empty_book(float(load_settings(repository)["amount"]))
+    payload = dict(stored["payload"])
+    if "shares" not in payload:  # an early ledger of shares only
+        payload = {**empty_book(float(load_settings(repository)["amount"])), "shares": payload}
+    return payload
+
+
+def load_ledger(repository: CoreRepository) -> dict[str, int]:
+    return {str(k): int(v) for k, v in load_book(repository)["shares"].items()}
+
+
+def save_book(repository: CoreRepository, book: dict) -> None:
+    repository.save_setting(LEDGER_KEY, book, updated_by="momentum_live", now=datetime.now(timezone.utc))
 
 
 def load_settings(repository: CoreRepository) -> dict[str, object]:
@@ -137,6 +153,8 @@ def summarize_account(holdings: list[dict], positions: dict, margins: dict, orde
 
 
 def register(app: FastAPI, repository: CoreRepository, require_user: Callable[..., None], logged_in: Callable[[], bool]) -> None:
+    lock = threading.RLock()  # one step of a run at a time: the background runner and the routes never overlap
+
     class LiveSettingsBody(BaseModel):
         values: dict[str, Any]
         operator: str = "operator"
@@ -150,6 +168,7 @@ def register(app: FastAPI, repository: CoreRepository, require_user: Callable[..
             "limits": {key: {"min": low, "max": high} for key, (low, high) in LIMITS.items()},
             "updated_at": stored["updated_at"] if stored else None,
             "changes": [{"at": row["recorded_at"].isoformat(), **row["envelope"]} for row in changes],
+            "book": load_book(repository),
         }
 
     @app.get("/api/v1/live/settings")
@@ -158,17 +177,28 @@ def register(app: FastAPI, repository: CoreRepository, require_user: Callable[..
 
     @app.post("/api/v1/live/settings")
     def save_live_settings(body: LiveSettingsBody, _: Annotated[None, Depends(require_user)]) -> dict[str, object]:
-        before = load_settings(repository)
-        clean, errors = parse_settings({**before, **body.values})
-        if errors:
-            raise HTTPException(status_code=422, detail={"errors": errors})
-        now = datetime.now(timezone.utc)
-        operator = body.operator[:64] or "operator"
-        repository.save_setting(SETTING_KEY, clean, updated_by=operator, now=now)
-        changed = {key: {"from": before.get(key), "to": value} for key, value in clean.items() if before.get(key) != value}
-        if changed:
-            # Append-only record of every change (the plan's audit log).
-            repository.insert_system_event(str(uuid4()), CHANGE_EVENT, now, {"by": operator, "changed": changed})
+        with lock:
+            before = load_settings(repository)
+            clean, errors = parse_settings({**before, **body.values})
+            if errors:
+                raise HTTPException(status_code=422, detail={"errors": errors})
+            now = datetime.now(timezone.utc)
+            operator = body.operator[:64] or "operator"
+            if repository.get_setting(LEDGER_KEY) and clean["amount"] != before["amount"]:
+                # "Amount" is the money put into the strategy: raising it adds cash to the book, lowering it takes cash
+                # out (sold at the next rebalance if the book's cash is not enough).
+                book = load_book(repository)
+                delta = float(clean["amount"]) - float(before["amount"])
+                book["cash"], book["contributed"] = float(book["cash"]) + delta, float(book.get("contributed", 0.0)) + delta
+                save_book(repository, book)
+            repository.save_setting(SETTING_KEY, clean, updated_by=operator, now=now)
+            changed = {key: {"from": before.get(key), "to": value} for key, value in clean.items() if before.get(key) != value}
+            if changed:
+                # Append-only record of every change (the plan's audit log).
+                repository.insert_system_event(str(uuid4()), CHANGE_EVENT, now, {"by": operator, "changed": changed})
+            run = load_run()
+            if before["mode"] == "live" and clean["mode"] != "live" and run and run["phase"] not in FINAL_PHASES and app.state.kite_client is not None:
+                executor().stop(run)  # leaving Live stops a run in progress, like the Stop button
         return settings_view()
 
     def read_account() -> dict[str, object]:
@@ -209,7 +239,7 @@ def register(app: FastAPI, repository: CoreRepository, require_user: Callable[..
         if proposal is None:
             return {"mode": settings["mode"], "sent": False, "detail": "no_proposal_yet"}
         account = read_account() if app.state.kite_client is not None and logged_in() else None
-        body = plan(proposal, settings, account, load_ledger(repository), instruments_today() if account is not None else None)
+        body = plan(proposal, settings, account, load_book(repository), instruments_today() if account is not None else None, today=ist_today())
         run = load_run()
         body["digest"] = order_digest(body["orders"])
         body["run_phase"] = run["phase"] if run and run.get("decided") == body["decided_at_close"] else None
@@ -232,7 +262,6 @@ def register(app: FastAPI, repository: CoreRepository, require_user: Callable[..
 
     # ---- Approve / Skip / Stop and the run (core_api.live_exec) ------------------------------------------------
 
-    lock = threading.Lock()  # one step of a run at a time: the background runner and the routes never overlap
     # Swappable in tests: the clock and the pause between orders.
     app.state.momentum_live_clock = lambda: datetime.now(timezone.utc)
     app.state.momentum_live_sleep = time.sleep
@@ -251,11 +280,16 @@ def register(app: FastAPI, repository: CoreRepository, require_user: Callable[..
         def log(kind: str, payload: dict) -> None:
             repository.insert_system_event(str(uuid4()), kind, datetime.now(timezone.utc), json.loads(json.dumps(payload, default=str)))
 
-        def update_ledger(ledger: dict[str, int]) -> None:
-            repository.save_setting(LEDGER_KEY, ledger, updated_by="momentum_live", now=datetime.now(timezone.utc))
+        def update_ledger(shares: dict[str, int], cash_delta: float, ref: dict[str, float]) -> None:
+            book = load_book(repository)
+            book["shares"] = shares
+            book["cash"] = float(book["cash"]) + cash_delta
+            book["ref"] = {s: p for s, p in {**book.get("ref", {}), **ref}.items() if s in shares}
+            save_book(repository, book)
 
         notify = send_telegram if os.environ.get("TELEGRAM_BOT_TOKEN") else None
-        return Executor(app.state.kite_client, save, log, update_ledger, sleep=app.state.momentum_live_sleep, notify=notify)
+        return Executor(app.state.kite_client, save, log, update_ledger, sleep=app.state.momentum_live_sleep, notify=notify,
+                        is_live=lambda: load_settings(repository)["mode"] == "live")
 
     def run_view() -> dict[str, object]:
         return {"run": load_run(), "live_switch": enabled()}
@@ -291,14 +325,14 @@ def register(app: FastAPI, repository: CoreRepository, require_user: Callable[..
         with lock:
             settings = load_settings(repository)
             account = read_account() if logged_in() else None
-            current = plan(proposal, settings, account, load_ledger(repository), instruments_today() if account is not None else None)
+            current = plan(proposal, settings, account, load_book(repository), instruments_today() if account is not None else None, today=ist_today())
             now = clock()
             try:
                 check_approval(settings=settings, plan=current, digest=body.digest, run=load_run(), now=now, logged_in=account is not None,
                                trading_day=nse_trading_day(now))
             except LiveRefused as exc:
                 raise HTTPException(status_code=409, detail=exc.code) from exc
-            run = new_run(current, settings, load_ledger(repository), now)
+            run = new_run(current, settings, current["ledger_used"], now)
             run["approved_by"] = body.operator[:64] or "operator"
             repository.insert_system_event(str(uuid4()), "momentum_live.approved", now, {"by": run["approved_by"], "decided": run["decided"], "digest": body.digest})
             executor().tick(run, now)
@@ -317,7 +351,7 @@ def register(app: FastAPI, repository: CoreRepository, require_user: Callable[..
             if run is not None and run.get("decided") == proposal["decided_at_close"]:
                 raise HTTPException(status_code=409, detail="already_done_this_month")
             settings = load_settings(repository)
-            skipped = new_run(plan(proposal, settings, None, load_ledger(repository)), settings, load_ledger(repository), clock(), skipped=True)
+            skipped = new_run(plan(proposal, settings, None, load_book(repository)), settings, load_ledger(repository), clock(), skipped=True)
             skipped["notes"].append(f"skipped by {body.operator[:64] or 'operator'}")
             repository.save_setting(RUN_KEY, skipped, updated_by="momentum_live", now=clock())
             repository.insert_system_event(str(uuid4()), RUN_EVENT, clock(), json.loads(json.dumps(skipped, default=str)))
@@ -345,7 +379,15 @@ def register(app: FastAPI, repository: CoreRepository, require_user: Callable[..
                     run["notes"].append(note)
                     repository.save_setting(RUN_KEY, run, updated_by="momentum_live", now=clock())
                 return
-            executor().tick(run, clock())
+            ex = executor()
+            ex.tick(run, clock())
+            if run["phase"] not in FINAL_PHASES and clock() > datetime.fromisoformat(run["deadline"]) + timedelta(minutes=30) and not run.get("stall_alerted"):
+                run["stall_alerted"] = True
+                repository.save_setting(RUN_KEY, run, updated_by="momentum_live", now=clock())
+                ex.alert("StockX momentum: the rebalance is still not finished 30 minutes after its deadline. Check the Settings page.")
+
+    def ist_today() -> str:
+        return (clock().astimezone(timezone.utc) + timedelta(hours=5, minutes=30)).date().isoformat()
 
     app.state.momentum_live_advance = advance
 
@@ -365,11 +407,18 @@ async def run_loop(app: FastAPI, every_seconds: int = 15) -> None:
     import logging
 
     log = logging.getLogger("uvicorn.error")
+    last_alert = 0.0
     while True:
         try:
             await asyncio.to_thread(app.state.momentum_live_advance)
         except Exception as exc:  # noqa: BLE001 - logged; the next tick retries from the saved state
             log.warning("momentum_live run step failed: %s: %s", type(exc).__name__, str(exc)[:200])
+            if time.monotonic() - last_alert > 3600 and os.environ.get("TELEGRAM_BOT_TOKEN"):
+                last_alert = time.monotonic()
+                try:
+                    await asyncio.to_thread(send_telegram, f"StockX momentum: a rebalance step failed ({type(exc).__name__}); it keeps retrying. Check the Settings page.")
+                except Exception:  # noqa: BLE001
+                    pass
         await asyncio.sleep(every_seconds)
 
 

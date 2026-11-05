@@ -189,10 +189,38 @@ def record_decisions(m, wm, now: datetime, book: str = "plain", scorer=None) -> 
     return notes
 
 
+BANDS_URL = "https://nsearchives.nseindia.com/content/equities/sec_list.csv"
+
+
+def price_bands() -> dict[str, float | None]:
+    """NSE's daily price band per EQ share (2, 5, 10 or 20 %; None for no band). {} when the file cannot be read: the
+    live orders then use their own 3% limit, which fits every band of 5% or more."""
+    import csv
+    import io
+    import urllib.request
+
+    from quant_agents.research.bhavcopy import UA
+
+    try:
+        with urllib.request.urlopen(urllib.request.Request(BANDS_URL, headers={"User-Agent": UA}), timeout=30) as response:
+            text = response.read().decode("utf-8", "replace")
+    except Exception:  # noqa: BLE001
+        logger.warning("momentum_trial: price band file unavailable")
+        return {}
+    out: dict[str, float | None] = {}
+    for row in csv.DictReader(io.StringIO(text)):
+        if (row.get("Series") or "").strip() != "EQ":
+            continue
+        band = (row.get("Band") or "").strip()
+        out[(row.get("Symbol") or "").strip()] = float(band) if band.replace(".", "", 1).isdigit() else None
+    return out
+
+
 def write_proposal(m, wm, now: datetime) -> str | None:
     """Momentum live (services/quant/docs/momentum-live-plan.md): for the latest month-end decision, write once the
-    ranking deep enough for up to 50 stocks plus fallbacks, and that close for every EQ share (to price the sells of
-    holdings that left the ranking). Core sizes the orders from it; this service never talks to a broker."""
+    ranking deep enough for up to 50 stocks plus fallbacks, that close for every EQ share (to price the sells of
+    holdings that left the ranking), and NSE's daily price band per share (a limit must stay inside it). Core sizes the
+    orders from it; this service never talks to a broker."""
     ends = [t for t in sorted(m.members) if m.d[t] >= START]
     if not ends:
         return None
@@ -207,7 +235,7 @@ def write_proposal(m, wm, now: datetime) -> str | None:
         if m.p.series[t, j] == 1 and np.isfinite(close) and close > 0:
             closes[str(symbol)] = round(float(close), 2)
     body = {"decided_at_close": key, "trade_at_open_of": next_session(m.d[t]).isoformat(), "rule": RULE, "written_at": now.isoformat(),
-            "ranking": ranking(m, wm, t, limit=PROPOSAL_DEPTH), "closes": closes}
+            "ranking": ranking(m, wm, t, limit=PROPOSAL_DEPTH), "closes": closes, "bands": price_bands()}
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(body, default=_plain))

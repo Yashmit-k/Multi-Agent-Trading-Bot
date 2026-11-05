@@ -96,15 +96,16 @@ def switch_on(monkeypatch):
     monkeypatch.setenv(ENABLED_ENV, "true")
 
 
-def _executor(broker, sleeps=None, ledger_out=None, events=None, notes=None):
+def _executor(broker, sleeps=None, ledger_out=None, events=None, notes=None, is_live=lambda: True, notify=None):
     saved = {}
     return Executor(
         broker,
         save=lambda run: saved.update(run=json.loads(json.dumps(run))),
         log=lambda kind, payload: (events if events is not None else []).append(kind),
-        update_ledger=lambda ledger: (ledger_out if ledger_out is not None else {}).update(ledger=ledger),
+        update_ledger=lambda shares, cash_delta, ref: (ledger_out if ledger_out is not None else {}).update(ledger=shares, cash_delta=cash_delta, ref=ref),
         sleep=lambda s: (sleeps if sleeps is not None else []).append(s),
-        notify=lambda text: (notes if notes is not None else []).append(text),
+        notify=notify or (lambda text: (notes if notes is not None else []).append(text)),
+        is_live=is_live,
     ), saved
 
 
@@ -320,3 +321,103 @@ def test_skip_and_stop(tmp_path, monkeypatch, switch_on) -> None:
     client.post("/api/v1/live/stop", headers=HEADERS, json={})
     assert client.get("/api/v1/live/settings", headers=HEADERS).json()["settings"]["mode"] == "off"
     assert broker.placed == []
+
+
+# ---- the fixes of 2026-11-05 ------------------------------------------------------------------------------------
+
+
+def test_buys_see_the_credit_from_todays_sales(switch_on) -> None:
+    class SaleCredit(FakeBroker):
+        def equity_margins(self) -> dict:  # live_balance leaves out the sale credit; net includes it
+            return {"net": self.cash, "available": {"live_balance": 0.0}}
+
+    broker = SaleCredit(cash=0.0, holdings={"OLD": 4})
+    executor, _ = _executor(broker)
+    run = new_run({**PLAN, "totals": {"spendable": 0.0}}, SETTINGS, {"OLD": 4}, TRADE_MORNING)
+    for k in range(3):
+        executor.tick(run, TRADE_MORNING + timedelta(minutes=k))
+    assert any(p["side"] == "BUY" for p in broker.placed)  # paid for by the sale of OLD
+
+
+def test_a_failed_telegram_message_never_stops_a_run(switch_on) -> None:
+    def down(text):
+        raise RuntimeError("telegram down")
+
+    executor, saved = _executor(FakeBroker(cash=8000.0, holdings={"OLD": 4}), notify=down)
+    run = _run_to_end(executor, new_run(PLAN, SETTINGS, {"OLD": 4}, TRADE_MORNING))
+    assert run["phase"] == "done" and saved["run"]["phase"] == "done"
+
+
+def test_a_run_found_open_on_a_later_day_is_closed_and_flagged(switch_on) -> None:
+    broker = FakeBroker(cash=8000.0, holdings={"OLD": 4}, behaviour={"OLD": "partial"})
+    ledger, notes = {}, []
+    executor, _ = _executor(broker, ledger_out=ledger, notes=notes)
+    run = new_run(PLAN, SETTINGS, {"OLD": 4}, TRADE_MORNING)
+    executor.tick(run, TRADE_MORNING)
+    executor.refresh(run)  # half of OLD sold, half open
+    executor.tick(run, TRADE_MORNING + timedelta(days=1))
+    assert run["phase"] == "done" and run["needs_check"] and run["orders"][0]["status"] == "EXPIRED"
+    assert ledger["ledger"] == {"OLD": 2} and any("later day" in n for n in notes)
+
+
+def test_a_lost_reply_and_an_unknown_order_are_both_tracked(switch_on) -> None:
+    class LostReply(FakeBroker):
+        def place_limit_order(self, **kw) -> str:
+            super().place_limit_order(**kw)  # Zerodha accepts it...
+            raise TimeoutError("read timed out")  # ...but the reply never arrives
+
+    broker = LostReply(cash=8000.0, holdings={"OLD": 4})
+    executor, _ = _executor(broker)
+    run = new_run(PLAN, SETTINGS, {"OLD": 4}, TRADE_MORNING)
+    executor.tick(run, TRADE_MORNING)
+    assert run["orders"][0]["order_id"] == "1000" and run["orders"][0]["status"] != "ERROR"
+    stray = FakeBroker.place_limit_order(broker, symbol="ZZZ", side="BUY", quantity=1, price=10.0, tag=run["tag"])
+    broker.behaviour["ZZZ"] = "never"
+    executor.refresh(run)
+    adopted = [o for o in run["orders"] if o["order_id"] == stray]
+    assert adopted and adopted[0]["round"] == "untracked"
+    executor.tick(run, datetime.fromisoformat(run["deadline"]) + timedelta(seconds=1))
+    assert stray in broker.cancelled
+
+
+def test_no_order_is_sent_once_mode_is_no_longer_live(switch_on) -> None:
+    broker = FakeBroker(cash=8000.0, holdings={"OLD": 4})
+    executor, _ = _executor(broker, is_live=lambda: False)
+    run = new_run(PLAN, SETTINGS, {"OLD": 4}, TRADE_MORNING)
+    executor.tick(run, TRADE_MORNING)
+    assert broker.placed == [] and "Mode is no longer Live" in run["notes"][0]
+
+
+def test_the_run_updates_the_strategys_cash_from_the_fills(switch_on) -> None:
+    ledger = {}
+    executor, _ = _executor(FakeBroker(cash=8000.0, holdings={"OLD": 4}), ledger_out=ledger)
+    run = _run_to_end(executor, new_run(PLAN, SETTINGS, {"OLD": 4}, TRADE_MORNING))
+    bought = sum(o["filled"] * o["average_price"] for o in run["orders"] if o["side"] == "BUY")
+    sold = sum(o["filled"] * o["average_price"] for o in run["orders"] if o["side"] == "SELL")
+    assert ledger["cash_delta"] < sold - bought  # charges come out too
+    assert abs(ledger["cash_delta"] - (sold - bought - run["summary"]["charges"])) < 0.01
+    assert set(ledger["ref"]) <= set(ledger["ledger"])
+
+
+def test_leaving_live_mode_stops_a_run_in_progress(tmp_path, monkeypatch, switch_on) -> None:
+    broker = RouteBroker(cash=20000.0, behaviour={s: "never" for s in ("AAA", "BBB", "CCC", "DDD", "EEE")})
+    client, app, _ = _client(tmp_path, monkeypatch, broker)
+    client.post("/api/v1/live/settings", headers=HEADERS, json={"values": {"mode": "live", "amount": 10000, "stocks": 5}}).raise_for_status()
+    plan = client.get("/api/v1/live/plan", headers=HEADERS).json()
+    client.post("/api/v1/live/approve", headers=HEADERS, json={"digest": plan["digest"]}).raise_for_status()
+    app.state.momentum_live_advance()
+    assert broker.placed  # buys are open
+    client.post("/api/v1/live/settings", headers=HEADERS, json={"values": {"mode": "dry_run"}}).raise_for_status()
+    run = client.get("/api/v1/live/run", headers=HEADERS).json()["run"]
+    assert run["phase"] == "stopped" and len(broker.cancelled) == len(broker.placed)
+
+
+def test_amount_is_money_put_in_and_moves_the_strategys_cash(tmp_path, monkeypatch, switch_on) -> None:
+    client, _, repository = _client(tmp_path, monkeypatch, RouteBroker(cash=20000.0))
+    client.post("/api/v1/live/settings", headers=HEADERS, json={"values": {"amount": 10000}}).raise_for_status()
+    assert client.get("/api/v1/live/settings", headers=HEADERS).json()["book"]["cash"] == 10000  # before any trade
+    repository.save_setting("momentum_live_ledger", {"shares": {"AAA": 50}, "cash": 500.0, "contributed": 10000.0, "ref": {"AAA": 100.0}},
+                            updated_by="test", now=TRADE_MORNING)
+    client.post("/api/v1/live/settings", headers=HEADERS, json={"values": {"amount": 15000}}).raise_for_status()
+    book = client.get("/api/v1/live/settings", headers=HEADERS).json()["book"]
+    assert book["cash"] == 5500.0 and book["contributed"] == 15000.0 and book["shares"] == {"AAA": 50}

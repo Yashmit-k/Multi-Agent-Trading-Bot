@@ -161,3 +161,55 @@ def test_a_price_jump_like_a_split_is_left_out() -> None:
 def test_without_the_instrument_list_the_plan_says_so() -> None:
     body = plan(PROPOSAL, SETTINGS, None, {})
     assert body["instruments_checked"] is False and any("instrument list was not available" in w for w in body["warnings"])
+
+
+GROWN = {"decided_at_close": "2026-12-31", "trade_at_open_of": "2027-01-01", "ranking": [{"symbol": s, "close": 100.0} for s in ("AAA", "BBB", "CCC", "DDD", "EEE")],
+         "closes": {s: 100.0 for s in ("AAA", "BBB", "CCC", "DDD", "EEE")}}
+LIVE5 = {"amount": 100000, "stocks": 5, "mode": "live", "max_order": 50000}
+
+
+def _holding(qty: int, cash: float, names=("AAA", "BBB", "CCC", "DDD", "EEE"), close=100.0) -> dict:
+    return {"holdings": [{"symbol": s, "quantity": qty, "t1_quantity": 0, "close_price": close} for s in names], "positions": [], "cash": {"available": cash}}
+
+
+def test_a_grown_book_is_not_sold_back_to_the_amount() -> None:
+    book = {"shares": {s: 260 for s in GROWN["closes"]}, "cash": 0.0, "ref": {}}  # ₹1,00,000 became ₹1,30,000
+    body = plan(GROWN, LIVE5, _holding(260, 0.0), book, INSTRUMENTS)
+    assert body["book"] == 130000 and body["orders"] == []
+
+
+def test_a_shrunk_book_never_uses_other_money_in_the_account() -> None:
+    book = {"shares": {s: 160 for s in GROWN["closes"]}, "cash": 0.0, "ref": {}}  # fell to ₹80,000; the account has ₹50,000 of other money
+    body = plan(GROWN, LIVE5, _holding(160, 50000.0), book, INSTRUMENTS)
+    assert body["book"] == 80000 and not any(o["side"] == "BUY" for o in body["orders"])
+
+
+def test_buys_are_limited_to_the_cash_zerodha_shows() -> None:
+    body = plan(GROWN, LIVE5, _holding(0, 30000.0, names=()), {"shares": {}, "cash": 100000.0, "ref": {}}, INSTRUMENTS)
+    assert body["totals"]["buy"] + body["totals"]["charges"] <= 30000 and any("less than the strategy's" in w for w in body["warnings"])
+
+
+def test_a_flagged_holding_gets_no_order_at_all() -> None:
+    off_eq = {k: v for k, v in INSTRUMENTS.items() if k != "AAA"}
+    body = plan(GROWN, LIVE5, _holding(300, 70000.0, names=("AAA",)), {"shares": {"AAA": 300}, "cash": 70000.0, "ref": {}}, off_eq)
+    assert not any(o["symbol"] == "AAA" for o in body["orders"])
+
+
+def test_a_split_on_a_holding_updates_the_ledger() -> None:
+    # 10 shares bought at ₹500 became 50 at ₹100 (1:5 split).
+    body = plan(GROWN, LIVE5, _holding(50, 0.0, names=("AAA",)), {"shares": {"AAA": 10}, "cash": 0.0, "ref": {"AAA": 500.0}}, INSTRUMENTS)
+    assert body["ledger_used"]["AAA"] == 50 and any("split or bonus" in w for w in body["warnings"])
+    bought_by_hand = plan(GROWN, LIVE5, _holding(50, 0.0, names=("AAA",)), {"shares": {"AAA": 10}, "cash": 0.0, "ref": {"AAA": 100.0}}, INSTRUMENTS)
+    assert bought_by_hand["ledger_used"]["AAA"] == 10 and any("not the strategy's" in w for w in bought_by_hand["warnings"])
+
+
+def test_a_narrow_daily_band_narrows_the_limit() -> None:
+    body = plan({**PROPOSAL, "bands": {"AAA": 2.0}}, SETTINGS, _account(50000), {}, INSTRUMENTS)
+    aaa = next(o for o in body["orders"] if o["symbol"] == "AAA")
+    assert aaa["limit"] == 102.0 and buy_limit(100.0, 0.05, 0.02) == 102.0 and sell_limit(100.0, 0.05, 0.02) == 98.0
+
+
+def test_approving_after_the_trade_day_warns() -> None:
+    late = plan(PROPOSAL, SETTINGS, _account(50000), {}, INSTRUMENTS, today="2026-12-03")
+    assert any("after the trade day" in w for w in late["warnings"])
+    assert not any("after the trade day" in w for w in plan(PROPOSAL, SETTINGS, _account(50000), {}, INSTRUMENTS, today="2026-12-01")["warnings"])

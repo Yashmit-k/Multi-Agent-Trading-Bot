@@ -5,11 +5,14 @@ freed; anything still open at the deadline is cancelled; the strategy's ledger i
 
 Nothing is sent unless every gate passes: the server switch MOMENTUM_LIVE_ENABLED=true (off by default, set only by
 the owner), Mode = Live, a fresh Zerodha login, the owner pressing Approve on exactly the orders shown, 09:15-15:00 IST
-on an NSE trading day on or after the trade day, with Zerodha's instrument list for the day (price steps, EQ series), and at most one run per month-end decision. Each order is an NSE delivery (CNC)
-limit order, no larger than the "largest single order" setting, in a stock of that month's ranking (buys) or the
-ledger (sells); buys never exceed the approved budget. Orders go out at most one a second, and every run state is
-saved after each order, so a restart picks up the run (and adopts an order placed just before a crash) instead of
-placing it twice.
+on an NSE trading day on or after the trade day, with Zerodha's instrument list for the day (price steps, EQ series),
+and at most one run per month-end decision. Each order is an NSE delivery (CNC) limit order, no larger than the
+"largest single order" setting, in a stock of that month's ranking (buys) or the ledger (sells), sent only while Mode
+is still Live; buys never exceed the approved budget. Orders go out at most one a second, and every run state is saved
+after each order, so a restart picks up the run instead of placing an order twice. An order Zerodha holds under the
+run's tag but the run does not know (a reply lost on the way back) is adopted, so its fills count and it is cancelled
+at the deadline. A run still open on a later day is closed with the fills it knows, and flagged for checking.
+At the end the ledger and the strategy's own cash are updated from the actual fills.
 """
 
 import hashlib
@@ -19,13 +22,13 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
-from core_api.live_plan import TICK, buy_limit, delivery_charges
+from core_api.live_plan import BAND, TICK, buy_limit, delivery_charges
 
 RUN_KEY = "momentum_live_run"
 RUN_EVENT = "momentum_live.run"
 ORDER_EVENT = "momentum_live.order"
 ENABLED_ENV = "MOMENTUM_LIVE_ENABLED"
-TERMINAL = {"COMPLETE", "CANCELLED", "REJECTED", "ERROR"}
+TERMINAL = {"COMPLETE", "CANCELLED", "REJECTED", "ERROR", "EXPIRED"}
 FINAL_PHASES = {"done", "stopped", "skipped"}
 SELL_WAIT = timedelta(minutes=15)  # buys start once the sells are done, or after this long
 IST = timedelta(hours=5, minutes=30)
@@ -87,16 +90,27 @@ def new_run(plan: dict, settings: dict, ledger: dict[str, int], now: datetime, *
         "approved_at": now.isoformat(), "deadline": (deadline_local - IST).replace(tzinfo=timezone.utc).isoformat(),
         "phase": "skipped" if skipped else "selling", "budget": float(plan["totals"].get("spendable", 0.0)) if not skipped else 0.0,
         "max_order": float(settings["max_order"]), "targets": list(plan.get("targets", [])), "per_stock": float(plan.get("per_stock", 0.0)),
-        "closes": closes, "ticks": {str(k): float(v) for k, v in plan.get("ticks", {}).items()}, "ledger_before": dict(ledger), "orders": [] if skipped else orders, "notes": [], "ledger_applied": skipped,
+        "closes": closes, "ticks": {str(k): float(v) for k, v in plan.get("ticks", {}).items()},
+        "bands": {str(k): float(v) for k, v in plan.get("bands", {}).items()}, "ledger_before": dict(ledger), "orders": [] if skipped else orders, "notes": [], "ledger_applied": skipped,
     }
 
 
 class Executor:
     """Advances a run one step at a time. kite is the wrapper in core_market_data.kite_client (or a fake in tests)."""
 
-    def __init__(self, kite: Any, save: Callable[[dict], None], log: Callable[[str, dict], None], update_ledger: Callable[[dict[str, int]], None], *,
-                 sleep: Callable[[float], None] = time.sleep, notify: Callable[[str], Any] | None = None) -> None:
-        self.kite, self.save, self.log, self.update_ledger, self.sleep, self.notify = kite, save, log, update_ledger, sleep, notify
+    def __init__(self, kite: Any, save: Callable[[dict], None], log: Callable[[str, dict], None],
+                 update_ledger: Callable[[dict[str, int], float, dict[str, float]], None], *, sleep: Callable[[float], None] = time.sleep,
+                 notify: Callable[[str], Any] | None = None, is_live: Callable[[], bool] = lambda: True) -> None:
+        self.kite, self.save, self.log, self.update_ledger, self.sleep, self.notify, self.is_live = kite, save, log, update_ledger, sleep, notify, is_live
+
+    def alert(self, text: str) -> None:
+        """Telegram, never allowed to stop a run."""
+        if self.notify is None:
+            return
+        try:
+            self.notify(text)
+        except Exception:  # noqa: BLE001
+            pass
 
     # ---- bookkeeping ----------------------------------------------------------------------------------------
 
@@ -120,10 +134,23 @@ class Executor:
                 o["status"] = str(row.get("status", o["status"]))
                 o["filled"] = int(row.get("filled_quantity") or 0)
                 o["average_price"] = float(row["average_price"]) if row.get("average_price") else o["average_price"]
+        for row in book:  # under the run's tag but unknown to the run: adopted so it is tracked, counted and cancelled
+            if str(row["order_id"]) in claimed:
+                continue
+            side = str(row.get("transaction_type", ""))
+            run["orders"].append({"key": f"untracked:{side}:{row.get('tradingsymbol')}:{row['order_id']}", "round": "untracked", "side": side,
+                                  "symbol": str(row.get("tradingsymbol", "")), "quantity": int(row.get("quantity") or 0), "limit": float(row.get("price") or 0.0),
+                                  "order_id": str(row["order_id"]), "status": str(row.get("status", "OPEN")), "filled": int(row.get("filled_quantity") or 0),
+                                  "average_price": float(row["average_price"]) if row.get("average_price") else None})
+            claimed.add(str(row["order_id"]))
+            run["notes"].append(f"found order {row['order_id']} ({side} {row.get('tradingsymbol')}) under the run's tag and adopted it")
+            self.alert(f"StockX momentum: found an order the run did not know ({side} {row.get('tradingsymbol')}); it is now tracked.")
 
     def _gate(self, run: dict, o: dict) -> str | None:
         if not enabled():
             return "server switch off"
+        if not self.is_live():
+            return "Mode is no longer Live"
         if o["side"] == "BUY" and o["symbol"] not in run["targets"]:
             return "not in this month's ranking"
         if o["side"] == "SELL" and o["quantity"] > int(run["ledger_before"].get(o["symbol"], 0)) - self._sold(run, o["symbol"], exclude=o):
@@ -161,6 +188,7 @@ class Executor:
             o["status"] = "ERROR"
             run["notes"].append(f"{o['side']} {o['symbol']} not sent: {refused}")
             self.save(run)
+            self.alert(f"StockX momentum: {o['side']} {o['symbol']} not sent: {refused}.")
             return
         o["status"] = "PLACING"
         self.save(run)  # saved first: a crash after Zerodha accepts it is caught by refresh()'s adoption
@@ -168,20 +196,50 @@ class Executor:
             o["order_id"] = self.kite.place_limit_order(symbol=o["symbol"], side=o["side"], quantity=o["quantity"], price=o["limit"], tag=run["tag"])
             o["status"] = "OPEN"
         except Exception as exc:  # noqa: BLE001 - a rejected order is recorded, never retried blindly
-            o["status"] = "ERROR"
-            run["notes"].append(f"{o['side']} {o['symbol']} failed: {type(exc).__name__}: {str(exc)[:120]}")
+            twin = self._find_twin(run, o)  # the reply may have been lost after Zerodha accepted it
+            if twin is not None:
+                o["order_id"], o["status"] = str(twin["order_id"]), str(twin.get("status", "OPEN"))
+                run["notes"].append(f"{o['side']} {o['symbol']}: Zerodha's reply was lost but the order exists ({o['order_id']}); tracking it")
+            else:
+                o["status"] = "ERROR"
+                run["notes"].append(f"{o['side']} {o['symbol']} failed: {type(exc).__name__}: {str(exc)[:120]}")
+                self.alert(f"StockX momentum: {o['side']} {o['symbol']} was rejected: {str(exc)[:120]}")
         self.save(run)
         self.log(ORDER_EVENT, {"run": run["decided"], **o})
         self.sleep(1.0)  # at most one order a second
 
+    def _find_twin(self, run: dict, o: dict) -> dict | None:
+        try:
+            book = [r for r in self.kite.orders() if r.get("tag") == run["tag"]]
+        except Exception:  # noqa: BLE001
+            return None
+        claimed = {x["order_id"] for x in run["orders"] if x["order_id"]}
+        return next((r for r in book if str(r["order_id"]) not in claimed and r.get("tradingsymbol") == o["symbol"]
+                     and r.get("transaction_type") == o["side"] and int(r.get("quantity") or 0) == o["quantity"]), None)
+
     def _cash(self) -> float:
-        available = (self.kite.equity_margins().get("available") or {})
-        return float(available.get("live_balance") or 0.0)
+        """Money Zerodha will let the account spend now. "net" includes the credit from today's sales; live_balance
+        may not."""
+        margins = self.kite.equity_margins()
+        if margins.get("net") is not None:
+            return float(margins["net"])
+        return float((margins.get("available") or {}).get("live_balance") or 0.0)
 
     # ---- the run --------------------------------------------------------------------------------------------
 
     def tick(self, run: dict, now: datetime) -> dict:
         if run["phase"] in FINAL_PHASES:
+            return run
+        if ist(now).date() > ist(datetime.fromisoformat(run["approved_at"])).date():
+            # Day orders expired at that day's close, and Zerodha's order book only lists today's orders.
+            for o in run["orders"]:
+                if o["status"] not in TERMINAL:
+                    o["status"] = "EXPIRED"
+            run["needs_check"] = True
+            run["notes"].append("picked up on a later day: open orders expired at that day's close; check the fills against your holdings")
+            self.alert("StockX momentum: a rebalance was still open on a later day. It is closed with the fills it knew; check them against your holdings.")
+            self._finish(run, "done")
+            self.save(run)
             return run
         self.refresh(run)
         if now >= datetime.fromisoformat(run["deadline"]) and run["phase"] != "closing":
@@ -249,18 +307,22 @@ class Executor:
         value = {s: held.get(s, 0) * run["closes"][s] for s in targets}
         extra: dict[str, int] = {}
         while True:
-            fits = [s for s in targets if buy_limit(run["closes"][s], run["ticks"].get(s, TICK)) * 1.0013 <= left]
+            fits = [s for s in targets if self._limit(run, s) * 1.0013 <= left]
             if not fits:
                 break
             s = min(fits, key=lambda k: value[k])
             extra[s] = extra.get(s, 0) + 1
             value[s] += run["closes"][s]
-            left -= buy_limit(run["closes"][s], run["ticks"].get(s, TICK)) * 1.0013
+            left -= self._limit(run, s) * 1.0013
         for s, qty in sorted(extra.items()):
-            o = {"key": f"leftover:BUY:{s}", "round": "leftover", "side": "BUY", "symbol": s, "quantity": qty, "limit": buy_limit(run["closes"][s], run["ticks"].get(s, TICK)),
+            o = {"key": f"leftover:BUY:{s}", "round": "leftover", "side": "BUY", "symbol": s, "quantity": qty, "limit": self._limit(run, s),
                  "order_id": None, "status": "PENDING", "filled": 0, "average_price": None}
             run["orders"].append(o)
             self.place(run, o)
+
+    @staticmethod
+    def _limit(run: dict, symbol: str) -> float:
+        return buy_limit(run["closes"][symbol], run["ticks"].get(symbol, TICK), run.get("bands", {}).get(symbol, BAND))
 
     def _cancel_open(self, run: dict) -> None:
         for o in run["orders"]:
@@ -274,17 +336,20 @@ class Executor:
 
     def _finish(self, run: dict, phase: str) -> None:
         run["phase"] = phase
+        bought = sum(o["filled"] * (o["average_price"] or o["limit"]) for o in run["orders"] if o["side"] == "BUY")
+        sold = sum(o["filled"] * (o["average_price"] or o["limit"]) for o in run["orders"] if o["side"] == "SELL")
+        charges = delivery_charges(bought, 0.0) + sum(delivery_charges(0.0, o["filled"] * (o["average_price"] or o["limit"]))
+                                                      for o in run["orders"] if o["side"] == "SELL" and o["filled"])
         if not run["ledger_applied"]:
-            self.update_ledger(apply_fills_to_ledger(run, run["ledger_before"]))
+            ref = {o["symbol"]: float(o["average_price"] or o["limit"]) for o in run["orders"] if o["side"] == "BUY" and o["filled"]}
+            self.update_ledger(apply_fills_to_ledger(run, run["ledger_before"]), sold - bought - charges, ref)
             run["ledger_applied"] = True
-        bought = sum(o["filled"] * (o["average_price"] or 0) for o in run["orders"] if o["side"] == "BUY")
-        sold = sum(o["filled"] * (o["average_price"] or 0) for o in run["orders"] if o["side"] == "SELL")
         unfilled = [f"{o['side']} {o['symbol']}" for o in run["orders"] if o["filled"] < o["quantity"]]
-        run["summary"] = {"bought": round(bought, 2), "sold": round(sold, 2), "unfilled": unfilled}
+        run["summary"] = {"bought": round(bought, 2), "sold": round(sold, 2), "charges": round(charges, 2), "unfilled": unfilled}
+        self.save(run)  # saved before anything that can fail
         self.log(RUN_EVENT, run)
-        if self.notify:
-            text = f"StockX momentum: rebalance {phase}. Bought ₹{bought:,.0f}, sold ₹{sold:,.0f}."
-            self.notify(text + (f" Not filled: {', '.join(unfilled)}." if unfilled else " Everything filled."))
+        text = f"StockX momentum: rebalance {phase}. Bought ₹{bought:,.0f}, sold ₹{sold:,.0f}."
+        self.alert(text + (f" Not filled: {', '.join(unfilled)}." if unfilled else " Everything filled."))
 
     def stop(self, run: dict) -> dict:
         """The Stop button: cancel the strategy's open orders; the fills so far still count."""
