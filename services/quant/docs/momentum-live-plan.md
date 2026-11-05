@@ -36,6 +36,7 @@ The owner logs in once a month, on rebalance morning. In other months nothing ne
 | Setting | Meaning | Default |
 |---|---|---|
 | **Money put into the strategy** | The money given to the strategy (₹). Its book (its own shares plus its own cash) then grows or shrinks with the market, like the paper trial. Raise it to add money; lower it to take money out at the next rebalance. Other money in the account is never used | ₹0, so nothing is bought until set |
+| **Money for the strategy** | **A fixed amount** (the row above), or **All the cash in my Zerodha account**: on each rebalance morning all the cash Zerodha shows is invested along with the strategy's shares. Shares bought by hand are never sold or counted either way. Switching back to a fixed amount makes that amount the strategy's cash from then on | A fixed amount |
 | **Number of stocks** | How many of the top-ranked stocks to hold (10, 15, 20…). Changed by hand only; takes effect at the next rebalance | 10 |
 | **Mode** | **Off**: nothing is computed. **Dry run**: orders are computed and shown but never sent. **Live**: orders are sent after Approve | Off |
 | **Largest single order** | Any order above this value is refused, as a guard against a bug | ₹25,000 |

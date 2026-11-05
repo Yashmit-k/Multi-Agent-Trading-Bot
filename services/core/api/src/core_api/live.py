@@ -26,7 +26,8 @@ SETTING_KEY = "momentum_live"
 LEDGER_KEY = "momentum_live_ledger"  # the strategy's own book: its shares (from real fills only), its cash, and what was put in
 CHANGE_EVENT = "momentum_live.settings_changed"
 DRY_RUN_EVENT = "momentum_live.dry_run"
-DEFAULTS: dict[str, object] = {"amount": 0, "stocks": 10, "mode": "off", "max_order": 25000}
+DEFAULTS: dict[str, object] = {"amount": 0, "stocks": 10, "mode": "off", "max_order": 25000, "funding": "fixed"}
+FUNDING = ("fixed", "all_cash")  # the amount set, or all the cash Zerodha shows on the morning of each rebalance
 MODES = ("off", "dry_run")  # plus "live" while the server switch MOMENTUM_LIVE_ENABLED is on
 
 
@@ -88,6 +89,11 @@ def parse_settings(values: dict[str, Any]) -> tuple[dict[str, object], dict[str,
             errors[key] = f"must be between {low:,} and {high:,}"
             continue
         clean[key] = number
+    funding = str(values.get("funding", "fixed")).strip()
+    if funding not in FUNDING:
+        errors["funding"] = f"must be one of {', '.join(FUNDING)}"
+    else:
+        clean["funding"] = funding
     mode = str(values.get("mode", "")).strip()
     if mode not in modes():
         errors["mode"] = "live needs the server switch MOMENTUM_LIVE_ENABLED=true" if mode == "live" else f"must be one of {', '.join(modes())}"
@@ -184,7 +190,12 @@ def register(app: FastAPI, repository: CoreRepository, require_user: Callable[..
                 raise HTTPException(status_code=422, detail={"errors": errors})
             now = datetime.now(timezone.utc)
             operator = body.operator[:64] or "operator"
-            if repository.get_setting(LEDGER_KEY) and clean["amount"] != before["amount"]:
+            if repository.get_setting(LEDGER_KEY) and before["funding"] == "all_cash" and clean["funding"] == "fixed":
+                # Back to a fixed amount: the amount entered becomes the strategy's own cash from now on; its shares stay.
+                book = load_book(repository)
+                book["cash"] = book["contributed"] = float(clean["amount"])
+                save_book(repository, book)
+            elif repository.get_setting(LEDGER_KEY) and clean["funding"] == "fixed" and clean["amount"] != before["amount"]:
                 # "Amount" is the money put into the strategy: raising it adds cash to the book, lowering it takes cash
                 # out (sold at the next rebalance if the book's cash is not enough).
                 book = load_book(repository)

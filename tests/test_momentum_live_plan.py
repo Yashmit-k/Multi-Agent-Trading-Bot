@@ -213,3 +213,29 @@ def test_approving_after_the_trade_day_warns() -> None:
     late = plan(PROPOSAL, SETTINGS, _account(50000), {}, INSTRUMENTS, today="2026-12-03")
     assert any("after the trade day" in w for w in late["warnings"])
     assert not any("after the trade day" in w for w in plan(PROPOSAL, SETTINGS, _account(50000), {}, INSTRUMENTS, today="2026-12-01")["warnings"])
+
+
+ALL_CASH = {**LIVE5, "funding": "all_cash"}
+
+
+def test_all_cash_invests_every_rupee_zerodha_shows_and_leaves_other_shares() -> None:
+    account = _holding(0, 200000.0, names=())
+    account["holdings"] = [{"symbol": "MINE", "quantity": 40, "t1_quantity": 0, "close_price": 900.0}]
+    body = plan(GROWN, ALL_CASH, account, {"shares": {}, "cash": 100000.0, "ref": {}}, INSTRUMENTS)
+    assert body["strategy_cash"] == 200000 and body["book"] == 200000
+    assert body["totals"]["buy"] + body["totals"]["charges"] <= 200000 and body["totals"]["buy"] > 190000
+    assert not any(o["symbol"] == "MINE" for o in body["orders"])
+    assert not any("less than the strategy's" in w for w in body["warnings"])
+
+
+def test_all_cash_adds_the_account_cash_to_the_strategys_shares() -> None:
+    book = {"shares": {s: 200 for s in GROWN["closes"]}, "cash": 0.0, "ref": {}}  # ₹1,00,000 held, ₹50,000 new cash
+    body = plan(GROWN, ALL_CASH, _holding(200, 50000.0), book, INSTRUMENTS)
+    assert body["book"] == 150000 and all(o["side"] == "BUY" for o in body["orders"]) and body["orders"]
+
+
+def test_all_cash_with_an_empty_account_is_explained_and_without_login_warns() -> None:
+    body = plan(GROWN, ALL_CASH, _holding(0, 0.0, names=()), {"shares": {}, "cash": 100000.0, "ref": {}}, INSTRUMENTS)
+    assert body["orders"] == [] and any("no cash available" in w for w in body["warnings"])
+    body = plan(GROWN, ALL_CASH, None, {"shares": {}, "cash": 100000.0, "ref": {}})
+    assert any("account's cash is unknown" in w for w in body["warnings"])

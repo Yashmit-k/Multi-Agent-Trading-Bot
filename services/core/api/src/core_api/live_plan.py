@@ -47,6 +47,7 @@ def plan(proposal: dict, settings: dict, account: dict | None, book: dict, instr
 
     book: the strategy's own book, {"shares": {symbol: qty}, "cash": rupees, "ref": {symbol: price when last traded}}.
     A plain {symbol: qty} is read as shares with all of the amount as cash (tests, and before the first trade).
+    settings["funding"] "all_cash": the strategy's cash is all the cash Zerodha shows, not its own (shares are still its own).
     account None means not logged in: the plan then assumes the account holds exactly the strategy's book, and says so.
     instruments: Zerodha's NSE EQ list for the day, symbol -> {"tick", "last_price"}; None when unavailable (fine for a
     dry run; Approve refuses such a plan). today: the IST date, to warn when approving after the trade day."""
@@ -121,13 +122,19 @@ def plan(proposal: dict, settings: dict, account: dict | None, book: dict, instr
     held_value = sum(qty * closes[s] for s, qty in held.items() if s in closes)
     cash_info = account["cash"]
     account_cash = float(cash_info["net"] if cash_info.get("net") is not None else cash_info.get("available") or 0.0)
+    all_cash = settings.get("funding") == "all_cash"
+    if all_cash and not assumed:
+        strategy_cash = account_cash  # all the cash in the account is the strategy's; shares it did not buy stay out
+    elif all_cash:
+        warnings.append(f"Not logged in to Zerodha, so the account's cash is unknown: this assumes ₹{strategy_cash:,.0f}.")
     book_value = max(held_value + strategy_cash, 0.0)
     spendable = max(min(account_cash, strategy_cash), 0.0)
     base = {"decided_at_close": proposal["decided_at_close"], "trade_at_open_of": proposal["trade_at_open_of"], "assumed_account": assumed,
             "stocks": stocks, "amount": amount, "strategy_cash": round(strategy_cash, 2), "cash": account_cash, "held_value": round(held_value, 2),
-            "book": round(book_value, 2), "ledger_used": ledger_used, "instruments_checked": instruments is not None}
+            "book": round(book_value, 2), "ledger_used": ledger_used, "instruments_checked": instruments is not None, "funding": "all_cash" if all_cash else "fixed"}
     if book_value <= 0:
-        return {**base, "orders": [], "warnings": [*warnings, "Set the amount for the strategy first."], "per_stock": 0.0, "totals": {}, "targets": [], "closes": {}, "ticks": {}, "bands": {}}
+        empty = "Your Zerodha account has no cash available, so nothing can be bought. Add funds to see this month's real orders." if all_cash else "Set the amount for the strategy first."
+        return {**base, "orders": [], "warnings": [*warnings, empty], "per_stock": 0.0, "totals": {}, "targets": [], "closes": {}, "ticks": {}, "bands": {}}
     if not assumed and account_cash < strategy_cash:
         warnings.append(f"Zerodha shows ₹{account_cash:,.0f} of cash, less than the strategy's ₹{strategy_cash:,.0f}: buys are limited to ₹{max(account_cash, 0):,.0f}.")
 

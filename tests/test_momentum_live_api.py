@@ -81,7 +81,7 @@ def test_settings_start_off_and_need_the_core_token() -> None:
     client, _ = _client()
     assert client.get("/api/v1/live/settings").status_code == 401
     view = client.get("/api/v1/live/settings", headers=HEADERS).json()
-    assert view["settings"] == {"amount": 0, "stocks": 10, "mode": "off", "max_order": 25000}
+    assert view["settings"] == {"amount": 0, "stocks": 10, "mode": "off", "max_order": 25000, "funding": "fixed"}
     assert view["changes"] == []
 
 
@@ -89,7 +89,7 @@ def test_settings_save_validate_and_log_each_change() -> None:
     client, _ = _client()
     saved = client.post("/api/v1/live/settings", headers=HEADERS, json={"values": {"amount": "1,50,000", "stocks": 15, "mode": "dry_run"}, "operator": "web-operator"})
     assert saved.status_code == 200
-    assert saved.json()["settings"] == {"amount": 150000, "stocks": 15, "mode": "dry_run", "max_order": 25000}
+    assert saved.json()["settings"] == {"amount": 150000, "stocks": 15, "mode": "dry_run", "max_order": 25000, "funding": "fixed"}
     change = saved.json()["changes"][0]
     assert change["by"] == "web-operator"
     assert change["changed"]["stocks"] == {"from": 10, "to": 15}
@@ -142,3 +142,18 @@ def test_summary_drops_raw_fields() -> None:
         [{"tradingsymbol": "X", "quantity": 1, "user_id": "AB1234", "isin": "INE000"}], {"net": []}, {"available": {}}, []
     )
     assert set(summary["holdings"][0]) == {"symbol", "exchange", "quantity", "t1_quantity", "average_price", "last_price", "close_price"}
+
+
+def test_all_cash_funding_is_validated_and_back_to_fixed_resets_the_strategy_cash() -> None:
+    from core_api.live import load_book, save_book
+
+    client, app = _client()
+    assert client.post("/api/v1/live/settings", headers=HEADERS, json={"values": {"funding": "everything"}}).status_code == 422
+    client.post("/api/v1/live/settings", headers=HEADERS, json={"values": {"amount": 100000, "mode": "dry_run"}})
+    repository = app.state.repository
+    save_book(repository, {"shares": {"AAA": 10}, "cash": 4000.0, "contributed": 100000.0, "ref": {}})
+    view = client.post("/api/v1/live/settings", headers=HEADERS, json={"values": {"funding": "all_cash", "amount": 50000}}).json()
+    assert view["settings"]["funding"] == "all_cash" and view["book"]["cash"] == 4000.0  # amount changes do nothing in all-cash
+    view = client.post("/api/v1/live/settings", headers=HEADERS, json={"values": {"funding": "fixed", "amount": 20000}}).json()
+    assert view["book"]["cash"] == 20000.0 and view["book"]["shares"] == {"AAA": 10}
+    assert load_book(repository)["contributed"] == 20000.0

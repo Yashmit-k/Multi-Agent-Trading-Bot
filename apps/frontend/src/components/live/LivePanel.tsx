@@ -6,7 +6,7 @@ import { inr, price } from "@/lib/format";
 import { useOperator, OperatorLogin } from "@/components/operator/OperatorGate";
 import { Card, Table, Td } from "@/components/ui";
 
-type Settings = { amount: number; stocks: number; mode: string; max_order: number };
+type Settings = { amount: number; stocks: number; mode: string; max_order: number; funding?: string };
 type Book = { shares: Record<string, number>; cash: number; contributed?: number };
 type SettingsView = { settings: Settings; modes: string[]; updated_at: string | null; changes: Array<{ at: string; by: string; changed: Record<string, { from: unknown; to: unknown }> }>; book?: Book };
 type ZerodhaStatus = { configured: boolean; authenticated: boolean; expires_at?: string | null };
@@ -42,7 +42,12 @@ const PHASE: Record<string, string> = {
 };
 
 const MODE_LABEL: Record<string, string> = { off: "Off", dry_run: "Dry run (orders shown, never sent)", live: "Live (orders sent after you approve)" };
-const LABEL: Record<string, string> = { amount: "Money put into the strategy", stocks: "Number of stocks", mode: "Mode", max_order: "Largest single order" };
+const LABEL: Record<string, string> = { funding: "Money for the strategy", amount: "Money put into the strategy", stocks: "Number of stocks", mode: "Mode", max_order: "Largest single order" };
+const FUNDING_LABEL: Record<string, string> = { fixed: "A fixed amount", all_cash: "All the cash in my Zerodha account" };
+const FUNDING_HINT: Record<string, string> = {
+  fixed: "Only the amount below is used. Other money in the account is never touched.",
+  all_cash: "On each rebalance morning, all the cash Zerodha shows is invested along with the strategy's shares. Shares you bought yourself are never sold or counted. Switching back to a fixed amount makes that amount the strategy's cash from then on.",
+};
 const HINT: Record<string, string> = {
   amount: "The money you have put into the strategy, in rupees. Its book then grows or shrinks with the market, like the paper trial. Raise it to add money; lower it to take money out at the next rebalance. Other money in the account is never used.",
   stocks: "How many of the top-ranked stocks to hold. Takes effect at the next rebalance.",
@@ -70,7 +75,18 @@ function SettingsForm({ view, onSaved }: { view: SettingsView; onSaved: (next: S
   const field = "w-40 rounded border border-[#26303C] bg-[#0B0F14] px-2 py-1 text-sm";
   return (
     <form onSubmit={(event) => void save(event)} className="space-y-3 text-sm">
-      {(["amount", "stocks", "max_order"] as const).map((key) => (
+      <label className="grid gap-1 sm:grid-cols-[220px_1fr] sm:items-center">
+        <span className="text-[#94A3B8]">{LABEL.funding}</span>
+        <span>
+          <select aria-label={LABEL.funding} className="w-72 rounded border border-[#26303C] bg-[#0B0F14] px-2 py-1 text-sm" value={draft.funding ?? "fixed"} onChange={(e) => setDraft({ ...draft, funding: e.target.value })}>
+            {Object.entries(FUNDING_LABEL).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+          <span className="mt-0.5 block text-xs text-[#64748B]">{FUNDING_HINT[draft.funding ?? "fixed"]}</span>
+        </span>
+      </label>
+      {(["amount", "stocks", "max_order"] as const).filter((key) => key !== "amount" || (draft.funding ?? "fixed") === "fixed").map((key) => (
         <label key={key} className="grid gap-1 sm:grid-cols-[220px_1fr] sm:items-center">
           <span className="text-[#94A3B8]">{LABEL[key]}</span>
           <span>
@@ -94,7 +110,7 @@ function SettingsForm({ view, onSaved }: { view: SettingsView; onSaved: (next: S
       </label>
       {view.book ? (
         <p className="text-xs text-[#94A3B8]">
-          Strategy now: {Object.keys(view.book.shares).length} stock(s) held, {inr(view.book.cash)} of its own cash.
+          Strategy now: {Object.keys(view.book.shares).length} stock(s) held{view.settings.funding === "all_cash" ? "; it uses all the account's cash." : `, ${inr(view.book.cash)} of its own cash.`}
         </p>
       ) : null}
       <div className="flex items-center gap-3">
@@ -108,7 +124,7 @@ function SettingsForm({ view, onSaved }: { view: SettingsView; onSaved: (next: S
             {view.changes.map((change) => (
               <li key={change.at}>
                 {new Date(change.at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}:{" "}
-                {Object.entries(change.changed).map(([k, v]) => `${LABEL[k] ?? k} ${String(v.from)} → ${String(v.to)}`).join(", ")}
+                {Object.entries(change.changed).map(([k, v]) => k === "funding" ? `${LABEL[k]} → ${FUNDING_LABEL[String(v.to)] ?? String(v.to)}` : `${LABEL[k] ?? k} ${String(v.from)} → ${String(v.to)}`).join(", ")}
               </li>
             ))}
           </ul>
